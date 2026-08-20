@@ -1,0 +1,403 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="ER Diagram">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10"
+                  guides="1" tooltips="1" connect="1" arrows="1"
+                  fold="1" page="1" pageScale="1"
+                  pageWidth="1600" pageHeight="1200"
+                  math="0" shadow="0">
+
+      <root>
+
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+
+        <!-- ================= USERS ================= -->
+
+        <mxCell id="users"
+          value="&lt;b&gt;USERS&lt;/b&gt;&lt;hr&gt;
+          &lt;b&gt;PK&lt;/b&gt; user_id&lt;br&gt;
+          user_name&lt;br&gt;
+          password&lt;br&gt;
+          email&lt;br&gt;
+          phonenumber"
+          style="rounded=1;whiteSpace=wrap;html=1;
+          fillColor=#E2F0D9;strokeColor=#70AD47;
+          fontSize=13;"
+          vertex="1"
+          parent="1">
+
+          <mxGeometry x="40" y="80" width="200" height="180"
+                      as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================= ACCOUNTS ================= -->
+
+        <mxCell id="accounts"
+          value="&lt;b&gt;ACCOUNTS&lt;/b&gt;&lt;hr&gt;
+          &lt;b&gt;PK&lt;/b&gt; account_id&lt;br&gt;
+          account_num&lt;br&gt;
+          &lt;b&gt;FK&lt;/b&gt; user_id&lt;br&gt;
+          balance&lt;br&gt;
+          status&lt;br&gt;
+          created_at"
+          style="rounded=1;whiteSpace=wrap;html=1;
+          fillColor=#D9EAF7;strokeColor=#5B9BD5;
+          fontSize=13;"
+          vertex="1"
+          parent="1">
+
+          <mxGeometry x="330" y="80" width="210" height="200"
+                      as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================= ORDERS ================= -->
+
+        <mxCell id="orders"
+          value="&lt;b&gt;ORDERS&lt;/b&gt;&lt;hr&gt;
+          &lt;b&gt;PK&lt;/b&gt; order_id&lt;br&gt;
+          &lt;b&gt;FK&lt;/b&gt; account_id&lt;br&gt;
+          &lt;b&gt;FK&lt;/b&gt; instrument_id&lt;br&gt;
+          action&lt;br&gt;
+          type&lt;br&gt;
+          price&lt;br&gt;
+          quantity&lt;br&gt;
+          timestamp"
+          style="rounded=1;whiteSpace=wrap;html=1;
+          fillColor=#FFF2CC;strokeColor=#BF9000;
+          fontSize=13;"
+          vertex="1"
+          parent="1">
+
+          <mxGeometry x="630" y="80" width="220" height="230"
+                      as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================= ORDER HISTORY ================= -->
+
+        <mxCell id="order_history"
+          value="&lt;b&gt;ORDER_HISTORY&lt;/b&gt;&lt;hr&gt;
+          &lt;b&gt;PK, FK&lt;/b&gt; order_id&lt;br&gt;
+          &lt;b&gt;PK&lt;/b&gt; status&lt;br&gt;
+          &lt;b&gt;PK&lt;/b&gt; timestamp"
+          style="rounded=1;whiteSpace=wrap;html=1;
+          fillColor=#E4DFEC;strokeColor=#8064A2;
+          fontSize=13;"
+          vertex="1"
+          parent="1">
+
+          <mxGeometry x="940" y="80" width="210" height="150"
+                      as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================= INSTRUMENTS ================= -->
+
+        <mxCell id="instruments"
+          value="&lt;b&gt;INSTRUMENTS&lt;/b&gt;&lt;hr&gt;
+          &lt;b&gt;PK&lt;/b&gt; instrument_id&lt;br&gt;
+          ticker_symbol&lt;br&gt;
+          name&lt;br&gt;
+          description&lt;br&gt;
+          status&lt;br&gt;
+          availability&lt;br&gt;
+          price"
+          style="rounded=1;whiteSpace=wrap;html=1;
+          fillColor=#FCE4D6;strokeColor=#ED7D31;
+          fontSize=13;"
+          vertex="1"
+          parent="1">
+
+          <mxGeometry x="1220" y="80" width="220" height="220"
+                      as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================= WATCHLIST ================= -->
+
+        <mxCell id="watchlist"
+          value="&lt;b&gt;WATCHLIST&lt;/b&gt;&lt;hr&gt;
+          &lt;b&gt;PK&lt;/b&gt; watchlist_id&lt;br&gt;
+          &lt;b&gt;FK&lt;/b&gt; user_id&lt;br&gt;
+          watchlist_name&lt;br&gt;
+          description&lt;br&gt;
+          created_ts&lt;br&gt;
+          updated_ts"
+          style="rounded=1;whiteSpace=wrap;html=1;
+          fillColor=#FCE4D6;strokeColor=#ED7D31;
+          fontSize=13;"
+          vertex="1"
+          parent="1">
+
+          <mxGeometry x="40" y="400" width="220" height="200"
+                      as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================= WATCHLIST INST ================= -->
+
+        <mxCell id="watchlist_inst"
+          value="&lt;b&gt;WATCHLIST_INST&lt;/b&gt;&lt;hr&gt;
+          &lt;b&gt;PK, FK&lt;/b&gt; wlist_id&lt;br&gt;
+          &lt;b&gt;PK, FK&lt;/b&gt; inst_id"
+          style="rounded=1;whiteSpace=wrap;html=1;
+          fillColor=#FCE4D6;strokeColor=#ED7D31;
+          fontSize=13;"
+          vertex="1"
+          parent="1">
+
+          <mxGeometry x="350" y="430" width="220" height="130"
+                      as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================= POSITIONS ================= -->
+
+        <mxCell id="positions"
+          value="&lt;b&gt;POSITIONS&lt;/b&gt;&lt;hr&gt;
+          &lt;b&gt;PK&lt;/b&gt; position_id&lt;br&gt;
+          &lt;b&gt;FK&lt;/b&gt; account_id&lt;br&gt;
+          &lt;b&gt;FK&lt;/b&gt; instrument_id&lt;br&gt;
+          status&lt;br&gt;
+          total_quantity&lt;br&gt;
+          total_price&lt;br&gt;
+          as_of_date&lt;br&gt;
+          average_price&lt;br&gt;
+          trade_type"
+          style="rounded=1;whiteSpace=wrap;html=1;
+          fillColor=#DDEBF7;strokeColor=#5B9BD5;
+          fontSize=13;"
+          vertex="1"
+          parent="1">
+
+          <mxGeometry x="630" y="390" width="230" height="250"
+                      as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================= HOLDINGS ================= -->
+
+        <mxCell id="holdings"
+          value="&lt;b&gt;HOLDINGS&lt;/b&gt;&lt;hr&gt;
+          &lt;b&gt;PK&lt;/b&gt; holding_id&lt;br&gt;
+          &lt;b&gt;FK&lt;/b&gt; account_id&lt;br&gt;
+          &lt;b&gt;FK&lt;/b&gt; instrument_id&lt;br&gt;
+          total_quantity&lt;br&gt;
+          total_price&lt;br&gt;
+          as_of_date&lt;br&gt;
+          average_price"
+          style="rounded=1;whiteSpace=wrap;html=1;
+          fillColor=#DDEBF7;strokeColor=#5B9BD5;
+          fontSize=13;"
+          vertex="1"
+          parent="1">
+
+          <mxGeometry x="940" y="400" width="230" height="210"
+                      as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================================================= -->
+        <!-- RELATIONSHIP: USERS 1:1 ACCOUNTS                  -->
+        <!-- ================================================= -->
+
+        <mxCell id="rel_users_accounts"
+          value="1 : 1"
+          style="edgeStyle=orthogonalEdgeStyle;
+          rounded=0;orthogonalLoop=1;jettySize=auto;
+          html=1;endArrow=none;startArrow=none;"
+          edge="1"
+          parent="1"
+          source="users"
+          target="accounts">
+
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================================================= -->
+        <!-- USERS 1:N WATCHLIST                               -->
+        <!-- ================================================= -->
+
+        <mxCell id="rel_users_watchlist"
+          value="1 : N"
+          style="edgeStyle=orthogonalEdgeStyle;
+          rounded=0;orthogonalLoop=1;jettySize=auto;
+          html=1;"
+          edge="1"
+          parent="1"
+          source="users"
+          target="watchlist">
+
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================================================= -->
+        <!-- ACCOUNTS 1:N ORDERS                               -->
+        <!-- ================================================= -->
+
+        <mxCell id="rel_accounts_orders"
+          value="1 : N"
+          style="edgeStyle=orthogonalEdgeStyle;
+          rounded=0;orthogonalLoop=1;jettySize=auto;
+          html=1;"
+          edge="1"
+          parent="1"
+          source="accounts"
+          target="orders">
+
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================================================= -->
+        <!-- INSTRUMENTS 1:N ORDERS                            -->
+        <!-- ================================================= -->
+
+        <mxCell id="rel_instruments_orders"
+          value="1 : N"
+          style="edgeStyle=orthogonalEdgeStyle;
+          rounded=0;orthogonalLoop=1;jettySize=auto;
+          html=1;"
+          edge="1"
+          parent="1"
+          source="instruments"
+          target="orders">
+
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================================================= -->
+        <!-- ORDERS 1:N ORDER HISTORY                          -->
+        <!-- ================================================= -->
+
+        <mxCell id="rel_orders_history"
+          value="1 : N"
+          style="edgeStyle=orthogonalEdgeStyle;
+          rounded=0;orthogonalLoop=1;jettySize=auto;
+          html=1;"
+          edge="1"
+          parent="1"
+          source="orders"
+          target="order_history">
+
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================================================= -->
+        <!-- ACCOUNTS 1:N POSITIONS                            -->
+        <!-- ================================================= -->
+
+        <mxCell id="rel_accounts_positions"
+          value="1 : N"
+          style="edgeStyle=orthogonalEdgeStyle;
+          rounded=0;orthogonalLoop=1;jettySize=auto;
+          html=1;"
+          edge="1"
+          parent="1"
+          source="accounts"
+          target="positions">
+
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================================================= -->
+        <!-- INSTRUMENTS 1:N POSITIONS                         -->
+        <!-- ================================================= -->
+
+        <mxCell id="rel_instruments_positions"
+          value="1 : N"
+          style="edgeStyle=orthogonalEdgeStyle;
+          rounded=0;orthogonalLoop=1;jettySize=auto;
+          html=1;"
+          edge="1"
+          parent="1"
+          source="instruments"
+          target="positions">
+
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================================================= -->
+        <!-- ACCOUNTS 1:N HOLDINGS                             -->
+        <!-- ================================================= -->
+
+        <mxCell id="rel_accounts_holdings"
+          value="1 : N"
+          style="edgeStyle=orthogonalEdgeStyle;
+          rounded=0;orthogonalLoop=1;jettySize=auto;
+          html=1;"
+          edge="1"
+          parent="1"
+          source="accounts"
+          target="holdings">
+
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================================================= -->
+        <!-- INSTRUMENTS 1:N HOLDINGS                          -->
+        <!-- ================================================= -->
+
+        <mxCell id="rel_instruments_holdings"
+          value="1 : N"
+          style="edgeStyle=orthogonalEdgeStyle;
+          rounded=0;orthogonalLoop=1;jettySize=auto;
+          html=1;"
+          edge="1"
+          parent="1"
+          source="instruments"
+          target="holdings">
+
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================================================= -->
+        <!-- WATCHLIST 1:N WATCHLIST_INST                      -->
+        <!-- ================================================= -->
+
+        <mxCell id="rel_watchlist_inst"
+          value="1 : N"
+          style="edgeStyle=orthogonalEdgeStyle;
+          rounded=0;orthogonalLoop=1;jettySize=auto;
+          html=1;"
+          edge="1"
+          parent="1"
+          source="watchlist"
+          target="watchlist_inst">
+
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+
+        <!-- ================================================= -->
+        <!-- INSTRUMENTS 1:N WATCHLIST_INST                    -->
+        <!-- ================================================= -->
+
+        <mxCell id="rel_instruments_watchlist_inst"
+          value="1 : N"
+          style="edgeStyle=orthogonalEdgeStyle;
+          rounded=0;orthogonalLoop=1;jettySize=auto;
+          html=1;"
+          edge="1"
+          parent="1"
+          source="instruments"
+          target="watchlist_inst">
+
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
