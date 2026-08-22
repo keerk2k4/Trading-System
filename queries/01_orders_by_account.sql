@@ -6,9 +6,9 @@ SELECT
     o.type,
     o.price,
     o.quantity,
-    o.timestamp
+    o.created_at
 FROM orders o
 JOIN accounts a ON a.account_id = o.account_id
 JOIN instruments i ON i.instrument_id = o.instrument_id
 WHERE o.account_id = 1
-ORDER BY o.timestamp DESC;
+ORDER BY o.created_at DESC;
