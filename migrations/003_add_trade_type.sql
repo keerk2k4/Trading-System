@@ -1,5 +1,5 @@
--- migrations/003_add_product_type.sql
--- Adds product_type to ORDERS so the system can distinguish
+-- migrations/003_add_trade_type.sql
+-- Adds trade_type to ORDERS so the system can distinguish
 -- intraday trades (settle same day, land in POSITIONS) from
 -- delivery trades (settle into long-term ownership, land in HOLDINGS).
 --
@@ -14,10 +14,10 @@
 BEGIN;
 
 ALTER TABLE orders
-    ADD COLUMN product_type VARCHAR(20) NOT NULL DEFAULT 'DELIVERY';
+    ADD COLUMN trade_type VARCHAR(20) NOT NULL DEFAULT 'DELIVERY';
 
 ALTER TABLE orders
-    ADD CONSTRAINT chk_order_product_type
-        CHECK (product_type IN ('INTRADAY', 'DELIVERY'));
+    ADD CONSTRAINT chk_order_trade_type
+        CHECK (trade_type IN ('INTRADAY', 'DELIVERY'));
 
 COMMIT;
