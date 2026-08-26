@@ -1,14 +1,6 @@
 """
 extract.py
 
-The ONLY module allowed to:
-  - open a network connection
-  - read the API key from the environment
-  - hit the Fauxnance API
-
-Obtains raw responses and hands them on UNCHANGED (no cleaning here).
-Raw responses are cached to disk, keyed by symbol + date range, so
-re-running the pipeline costs nothing against the daily quota.
 """
 
 from __future__ import annotations
@@ -40,8 +32,7 @@ class SymbolRequestError(RuntimeError):
 
 
 def _api_key() -> str:
-    # FAUXNANCE_API_KEY is the documented name; API_KEY is accepted too so
-    # nothing breaks if it's already set that way in your environment.
+    
     key = os.environ.get("FAUXNANCE_API_KEY") or os.environ.get("API_KEY")
     if not key:
         raise RuntimeError(

@@ -1,23 +1,6 @@
 """
 transform.py
 
-Takes data in, returns data out. Nothing else.
-  - No network calls
-  - No environment variables read
-  - No files written (that is load.py's job)
-
-Handles the real Fauxnance response shape:
-    {"data": {"symbol": ..., "candles": [...]}, "meta": {...}}
-
-And the dirty-data cases actually observed from the live API:
-  - Duplicate rows for the same date (conflicting values)      -> keep the later one
-  - Missing "close" field entirely                              -> row dropped
-  - "open": "n/a" (string instead of number)                    -> row dropped
-  - "high" < "low" (physically impossible)                      -> row dropped
-  - "volume": -1 (negative, invalid)                             -> volume set to NaN, row kept
-  - "volume": null                                               -> volume stays NaN, row kept
-  - Date in "DD/MM/YYYY" mixed with ISO "YYYY-MM-DD"             -> both parsed correctly
-  - "synthetic": true (fabricated/filled-in data, not real)      -> row dropped
 """
 
 from __future__ import annotations
@@ -47,13 +30,7 @@ def _find_field(row: dict, canonical: str):
 
 
 def _parse_date(value):
-    """
-    Parses ISO ("2026-07-01") or "DD/MM/YYYY" ("09/07/2026"), checked in that
-    order, strictly -- a slash-separated date is never mistaken for the
-    US-style MM/DD/YYYY. A single Fauxnance response can genuinely mix both
-    formats, so this is done per-value rather than trusting pandas' column-
-    wide format inference.
-    """
+    
     if isinstance(value, str):
         try:
             return pd.Timestamp(datetime.strptime(value, "%Y-%m-%d"))
@@ -89,16 +66,7 @@ def _raw_to_dataframe(raw: dict) -> pd.DataFrame:
 
 
 def transform(raw: dict[str, Any]) -> pd.DataFrame:
-    """
-    Clean raw candle data. Steps:
-      1. Parse into a DataFrame with proper types (dates may be mixed formats)
-      2. Drop rows missing required price fields (close, open, high, low)
-      3. Drop rows with impossible prices (high < low, non-positive prices)
-      4. Drop rows flagged as synthetic (fabricated, not real trading data)
-      5. Treat negative volume as missing (NaN) rather than dropping the row
-      6. Deduplicate: same symbol+date reported twice -> keep the LAST entry
-      7. Derive extra columns (daily return, trade range)
-    """
+    
     df = _raw_to_dataframe(raw)
     if df.empty:
         return df
