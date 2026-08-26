@@ -1,9 +1,6 @@
 """
 pipeline.py
 
-Does NOTHING except wire extract -> transform -> load together, symbol by
-symbol, applying the required error-handling policy:
-
     Problem                  -> Action
     ------------------------------------------------
     API quota exceeded       -> stop the whole pipeline and report
@@ -26,7 +23,7 @@ from .extract import (
 from .load import load
 from .transform import transform
 
-# At least two NSE/BSE instruments, as required. Reasons go in claims.md.
+
 SYMBOLS = ["INFY.NS", "RELIANCE.NS", "TATASTEEL.BO"]
 START_DATE = "2026-01-01"
 END_DATE = "2026-07-31"
@@ -46,8 +43,7 @@ def run_pipeline(symbols: list[str] = SYMBOLS, start: str = START_DATE, end: str
                 usage = check_usage()
                 print(f"Quota status: {usage}")
             except Exception as usage_exc:
-                # Even the diagnostic call can fail (e.g. no key at all) --
-                # don't let that mask the original quota error.
+                
                 print(f"(Could not fetch /usage for diagnostics: {usage_exc})")
             sys.exit(1)
         except SymbolRequestError as exc:
