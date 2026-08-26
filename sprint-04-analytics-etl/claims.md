@@ -11,5 +11,8 @@
 Try the mock API demonstration with:
 
 ```text
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e .\sprint-04-analytics-etl
 analytics-etl --mock-api
 ```
