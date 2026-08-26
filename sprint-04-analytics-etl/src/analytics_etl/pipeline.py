@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Mapping
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -23,20 +22,12 @@ def extract(source: Iterable[Mapping[str, Any]] | None = None) -> list[dict[str,
 
 
 def transform(records: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """Normalize records and add a numeric order value for analytics."""
+    """Return API records unchanged until transformation rules are defined."""
     transformed = []
     for record in records:
-        if "id" not in record or "value" not in record or "date" not in record:
-            raise ValueError("every record must contain id, value, and date")
-        try:
-            value = float(record["value"])
-        except (TypeError, ValueError) as error:
-            raise ValueError("record value must be numeric") from error
-        try:
-            date = datetime.strptime(str(record["date"]), "%d-%m-%Y").strftime("%d/%m/%Y")
-        except ValueError as error:
-            raise ValueError("record date must use dd-mm-yyyy") from error
-        transformed.append({"id": str(record["id"]), "value": value, "date": date})
+        if not isinstance(record, Mapping):
+            raise ValueError("every record must be an object")
+        transformed.append(dict(record))
     return transformed
 
 

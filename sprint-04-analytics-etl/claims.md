@@ -1,18 +1,23 @@
 # Claims
 
 - The package installs in editable mode from the repository root.
-- The `analytics-etl --mock-api` command runs without input files.
+- The `analytics-etl` command runs without input files.
 - The pipeline exposes `extract`, `transform`, and `load` from `analytics_etl`.
-- `extract()` calls a nonexistent mock API and receives dummy records with `dd-mm-yyyy` dates.
-- `transform()` converts dates to `dd/mm/yyyy`, and `load()` prints and writes `dummy_output.json`.
+- `extract()` calls the analytics API and receives candle records with ISO dates.
+- `transform()` currently passes records through unchanged, and `load()` prints and writes `dummy_output.json`.
+- The API key is read from the `API_KEY` environment variable and sent as the `x-api-key` header.
 
 > Note: The teammate-facing entry point is the installed `analytics-etl` command.
 
-Try the mock API demonstration with:
+Run the API pipeline with:
 
 ```text
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -e .\sprint-04-analytics-etl
-analytics-etl --mock-api
+analytics-etl
+```
+
+Set the key in PowerShell before running:
+
+```powershell
+$env:API_KEY = "your-api-key"
+analytics-etl
 ```

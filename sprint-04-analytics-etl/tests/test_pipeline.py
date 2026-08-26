@@ -1,26 +1,38 @@
 import pytest
 
-from analytics_etl.mock_api import MOCK_API_URL
+import io
+import json
+
+from analytics_etl.mock_api import API_URL, fetch_records
 from analytics_etl import extract, load, transform
 
 
 def test_pipeline_transforms_records():
-    assert transform(extract([{"id": 7, "value": "12.5", "date": "01-02-2026"}])) == [
-        {"id": "7", "value": 12.5, "date": "01/02/2026"}
-    ]
+    records = [{"date": "2026-08-26", "open": 1, "close": 1}]
+    assert transform(extract(records)) == records
 
 
 def test_malformed_input_is_rejected():
-    with pytest.raises(ValueError, match="id, value, and date"):
-        transform([{"id": "missing-value"}])
+    with pytest.raises(ValueError, match="object"):
+        extract(["not an object"])
 
 
-def test_extract_calls_unavailable_mock_api(monkeypatch):
-    monkeypatch.setattr("analytics_etl.pipeline.fetch_records", lambda: [
-        {"id": "demo", "value": 1, "date": "26-08-2026"}
-    ])
-    assert MOCK_API_URL.endswith(".invalid/analytics")
-    assert extract() == [{"id": "demo", "value": 1, "date": "26-08-2026"}]
+def test_extract_calls_real_api(monkeypatch):
+    response = io.BytesIO(json.dumps({"data": {"candles": [
+        {"date": "2026-08-26", "open": 1, "close": 1}
+    ]}}).encode("utf-8"))
+    response.__enter__ = lambda: response
+    response.__exit__ = lambda *args: None
+    monkeypatch.setenv("API_KEY", "test-key")
+
+    def fake_urlopen(request, timeout):
+        assert request.get_header("X-api-key") == "test-key"
+        return response
+
+    monkeypatch.setattr("analytics_etl.mock_api.urlopen", fake_urlopen)
+
+    assert API_URL == "https://y4t9nq2bqf.execute-api.eu-west-2.amazonaws.com/v1/candles/AAPL"
+    assert fetch_records() == [{"date": "2026-08-26", "open": 1, "close": 1}]
 
 
 def test_load_writes_and_prints_dummy_file(tmp_path, capsys):

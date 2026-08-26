@@ -1,23 +1,62 @@
-"""Deterministic mock API client used for local demonstrations."""
+"""Client for the analytics API used by the ETL pipeline."""
 
 from __future__ import annotations
 
-from urllib.error import URLError
-from urllib.request import urlopen
+import json
+import os
+from pathlib import Path
+from typing import Any
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
 
-MOCK_API_URL = "https://api.example.invalid/analytics"
-MOCK_RECORDS = [
-    {"id": "demo-001", "value": 125.50, "date": "26-08-2026"},
-    {"id": "demo-002", "value": 89.25, "date": "27-08-2026"},
-    {"id": "demo-003", "value": 210.00, "date": "28-08-2026"},
-]
+API_URL = "https://y4t9nq2bqf.execute-api.eu-west-2.amazonaws.com/v1/candles/AAPL"
 
 
-def fetch_records() -> list[dict[str, str | float]]:
-    """Try the nonexistent API, then return deterministic fallback data."""
+def _load_api_key() -> str | None:
+    """Read API_KEY from the environment or the repository .env file."""
+    if api_key := os.environ.get("API_KEY"):
+        return api_key
+
+    env_path = next(
+        (path for path in (Path.cwd() / ".env", Path(__file__).parents[3] / ".env") if path.is_file()),
+        None,
+    )
+    if env_path is None:
+        return None
+
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        name, separator, value = line.partition("=")
+        if separator and name.strip() == "API_KEY":
+            return value.strip().strip('"').strip("'")
+    return None
+
+
+def fetch_records() -> list[dict[str, Any]]:
+    """Fetch records from the analytics API."""
+    api_key = _load_api_key()
+    if not api_key:
+        raise RuntimeError("API_KEY is not set; set it before running the pipeline")
+
+    request = Request(
+        API_URL,
+        headers={"Accept": "application/json", "x-api-key": api_key},
+    )
     try:
-        with urlopen(MOCK_API_URL, timeout=2):
-            raise RuntimeError("the mock API unexpectedly exists")
-    except (URLError, TimeoutError, OSError):
-        return [record.copy() for record in MOCK_RECORDS]
+        with urlopen(request, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        raise RuntimeError(f"API request failed with HTTP {error.code}: {error.reason}") from error
+
+    if (
+        isinstance(payload, dict)
+        and isinstance(payload.get("data"), dict)
+        and isinstance(payload["data"].get("candles"), list)
+    ):
+        records = payload["data"]["candles"]
+    else:
+        raise ValueError("API response must contain a list of records")
+
+    if any(not isinstance(record, dict) for record in records):
+        raise ValueError("API records must be JSON objects")
+    return records
