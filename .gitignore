@@ -10,3 +10,6 @@ __pycache__/
 
 # Test cache
 .pytest_cache/
+
+# ETL demo output
+dummy_output.json
