@@ -1,0 +1,12 @@
+# Python environments
+.venv/
+
+# Python generated files
+__pycache__/
+*.py[cod]
+
+# Packaging metadata
+*.egg-info/
+
+# Test cache
+.pytest_cache/
