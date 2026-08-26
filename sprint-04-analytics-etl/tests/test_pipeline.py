@@ -1,42 +1,47 @@
+import sys
+
 import pytest
 
-import io
-import json
-
-from analytics_etl.mock_api import API_URL, fetch_records
-from analytics_etl import extract, load, transform
+from analytics_etl.extract import QuotaExceededError
+from analytics_etl.pipeline import run_pipeline
 
 
-def test_pipeline_transforms_records():
-    records = [{"date": "2026-08-26", "open": 1, "close": 1}]
-    assert transform(extract(records)) == records
+def test_quota_exceeded_reports_usage_diagnostics(monkeypatch, capsys):
+    monkeypatch.setattr("analytics_etl.pipeline.check_health", lambda: True)
+
+    def fake_extract(symbol, start, end):
+        raise QuotaExceededError(f"Quota exceeded while fetching {symbol}.")
+
+    monkeypatch.setattr("analytics_etl.pipeline.extract", fake_extract)
+    monkeypatch.setattr(
+        "analytics_etl.pipeline.check_usage",
+        lambda: {"used": 2000, "limit": 2000, "remaining": 0},
+    )
+
+    with pytest.raises(SystemExit):
+        run_pipeline(symbols=["INFY.NS"])
+
+    output = capsys.readouterr().out
+    assert "STOPPING" in output
+    assert "Quota status" in output
+    assert "remaining" in output
 
 
-def test_malformed_input_is_rejected():
-    with pytest.raises(ValueError, match="object"):
-        extract(["not an object"])
+def test_quota_exceeded_still_stops_even_if_usage_check_itself_fails(monkeypatch, capsys):
+    monkeypatch.setattr("analytics_etl.pipeline.check_health", lambda: True)
 
+    def fake_extract(symbol, start, end):
+        raise QuotaExceededError(f"Quota exceeded while fetching {symbol}.")
 
-def test_extract_calls_real_api(monkeypatch):
-    response = io.BytesIO(json.dumps({"data": {"candles": [
-        {"date": "2026-08-26", "open": 1, "close": 1}
-    ]}}).encode("utf-8"))
-    response.__enter__ = lambda: response
-    response.__exit__ = lambda *args: None
-    monkeypatch.setenv("API_KEY", "test-key")
+    def failing_usage():
+        raise RuntimeError("no key set")
 
-    def fake_urlopen(request, timeout):
-        assert request.get_header("X-api-key") == "test-key"
-        return response
+    monkeypatch.setattr("analytics_etl.pipeline.extract", fake_extract)
+    monkeypatch.setattr("analytics_etl.pipeline.check_usage", failing_usage)
 
-    monkeypatch.setattr("analytics_etl.mock_api.urlopen", fake_urlopen)
+    with pytest.raises(SystemExit):
+        run_pipeline(symbols=["INFY.NS"])
 
-    assert API_URL == "https://y4t9nq2bqf.execute-api.eu-west-2.amazonaws.com/v1/candles/AAPL"
-    assert fetch_records() == [{"date": "2026-08-26", "open": 1, "close": 1}]
-
-
-def test_load_writes_and_prints_dummy_file(tmp_path, capsys):
-    destination = tmp_path / "dummy_output.json"
-    load([{"id": "demo", "value": 1.0, "date": "26/08/2026"}], destination)
-    assert '"date": "26/08/2026"' in destination.read_text(encoding="utf-8")
-    assert "Dummy output written" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "STOPPING" in output
+    assert "Could not fetch /usage" in output

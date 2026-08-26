@@ -1,42 +1,68 @@
-"""Core functions for the analytics ETL pipeline."""
+"""
+pipeline.py
+
+Does NOTHING except wire extract -> transform -> load together, symbol by
+symbol, applying the required error-handling policy:
+
+    Problem                  -> Action
+    ------------------------------------------------
+    API quota exceeded       -> stop the whole pipeline and report
+    Bad request / bad key    -> skip that symbol, continue with the rest
+    Network failure          -> already retried inside extract()
+    Bad data returned        -> already handled inside transform()
+"""
 
 from __future__ import annotations
 
-import json
-from collections.abc import Iterable, Mapping
-from pathlib import Path
-from typing import Any
+import sys
 
-from .mock_api import fetch_records
+from .extract import (
+    QuotaExceededError,
+    SymbolRequestError,
+    check_health,
+    check_usage,
+    extract,
+)
+from .load import load
+from .transform import transform
 
-
-def extract(source: Iterable[Mapping[str, Any]] | None = None) -> list[dict[str, Any]]:
-    """Call the mock API and return its records, or normalize supplied records."""
-    if source is None:
-        source = fetch_records()
-
-    records = list(source)
-    if any(not isinstance(record, Mapping) for record in records):
-        raise ValueError("every input record must be an object")
-    return [dict(record) for record in records]
-
-
-def transform(records: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """Return API records unchanged until transformation rules are defined."""
-    transformed = []
-    for record in records:
-        if not isinstance(record, Mapping):
-            raise ValueError("every record must be an object")
-        transformed.append(dict(record))
-    return transformed
+# At least two NSE/BSE instruments, as required. Reasons go in claims.md.
+SYMBOLS = ["INFY.NS", "RELIANCE.NS", "TATASTEEL.BO"]
+START_DATE = "2026-01-01"
+END_DATE = "2026-07-31"
 
 
-def load(records: Iterable[Mapping[str, Any]], destination: str | Path = "dummy_output.json") -> Path:
-    """Write transformed records to a dummy JSON file and print its contents."""
-    path = Path(destination)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    content = json.dumps(list(records), indent=2) + "\n"
-    path.write_text(content, encoding="utf-8")
-    print(f"Dummy output written to {path}")
-    print(content, end="")
-    return path
+def run_pipeline(symbols: list[str] = SYMBOLS, start: str = START_DATE, end: str = END_DATE) -> None:
+    if not check_health():
+        print("Fauxnance API is not reachable (GET /health failed). Aborting.")
+        sys.exit(1)
+
+    for symbol in symbols:
+        try:
+            raw = extract(symbol, start, end)
+        except QuotaExceededError as exc:
+            print(f"STOPPING: {exc}")
+            try:
+                usage = check_usage()
+                print(f"Quota status: {usage}")
+            except Exception as usage_exc:
+                # Even the diagnostic call can fail (e.g. no key at all) --
+                # don't let that mask the original quota error.
+                print(f"(Could not fetch /usage for diagnostics: {usage_exc})")
+            sys.exit(1)
+        except SymbolRequestError as exc:
+            print(f"SKIPPING {symbol}: {exc}")
+            continue
+        except ConnectionError as exc:
+            print(f"SKIPPING {symbol} after retries failed: {exc}")
+            continue
+
+        clean_df = transform(raw)
+        if clean_df.empty:
+            print(f"No valid rows for {symbol} after cleaning; skipping load.")
+            continue
+
+        load(clean_df)
+        print(f"Loaded {len(clean_df)} rows for {symbol}.")
+
+    print("Pipeline complete.")

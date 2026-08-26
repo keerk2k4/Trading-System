@@ -1,23 +1,38 @@
-# Claims
+# Claims — Sprint 4 Analytics & ETL
 
-- The package installs in editable mode from the repository root.
-- The `analytics-etl` command runs without input files.
-- The pipeline exposes `extract`, `transform`, and `load` from `analytics_etl`.
-- `extract()` calls the analytics API and receives candle records with ISO dates.
-- `transform()` currently passes records through unchanged, and `load()` prints and writes `dummy_output.json`.
-- The API key is read from the `API_KEY` environment variable and sent as the `x-api-key` header.
+## Symbol Universe
 
-> Note: The teammate-facing entry point is the installed `analytics-etl` command.
+| Symbol | Market | Reason for inclusion |
+|---|---|---|
+| INFY.NS | NSE | (fill in) |
+| RELIANCE.NS | NSE | (fill in) |
+| TATASTEEL.BO | BSE | (fill in) |
 
-Run the API pipeline with:
+## Business Claims
 
-```text
+### Claim 1
+**Statement:**
+**Chart:**
+**Evidence:**
+
+### Claim 2
+**Statement:**
+**Chart:**
+**Evidence:**
+
+### Claim 3
+**Statement:**
+**Chart:**
+**Evidence:**
+
+---
+
+## Entry Point
+
+Run the full pipeline with:
+
+```
 analytics-etl
 ```
 
-Set the key in PowerShell before running:
-
-```powershell
-$env:API_KEY = "your-api-key"
-analytics-etl
-```
+(after installing the package with `pip install -e sprint-04-analytics-etl[dev]` from the repository root, and setting `FAUXNANCE_API_KEY` in your `.env` file)

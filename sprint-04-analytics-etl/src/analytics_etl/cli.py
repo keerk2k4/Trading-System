@@ -1,14 +1,13 @@
-"""Command-line interface for analytics-etl."""
+"""Command-line interface for `analytics-etl` -- the teammate-facing entry point."""
 
 import argparse
 
-from .mock_api import API_URL
-from .pipeline import extract, load, transform
+from .pipeline import run_pipeline
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Fetch, transform, and print analytics API data.")
+    parser = argparse.ArgumentParser(
+        description="Fetch Fauxnance candles, clean them, and load into DuckDB."
+    )
     parser.parse_args()
-    records = transform(extract())
-    print(f"API: {API_URL}")
-    load(records)
+    run_pipeline()
