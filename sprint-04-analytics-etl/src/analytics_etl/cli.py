@@ -11,3 +11,5 @@ def main() -> None:
     )
     parser.parse_args()
     run_pipeline()
+if __name__ == "__main__":  
+    main()
