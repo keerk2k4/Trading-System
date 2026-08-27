@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import sys
-
+from datetime import date, timedelta
 
 from .extract import (
     QuotaExceededError,
@@ -18,6 +18,7 @@ from .extract import (
 
 from .load import load
 from .transform import transform
+from .dashboard import create_dashboard
 
 
 logger = logging.getLogger(__name__)
@@ -33,9 +34,11 @@ END_DATE = "2026-08-27"
 
 def run_pipeline(
     symbols: list[str] = SYMBOLS,
-    start: str = START_DATE,
-    end: str = END_DATE
+    start: str | None = None,
+    end: str | None = None,
 ):
+    end = end or date.today().isoformat()
+    start = start or (date.today() - timedelta(days=365)).isoformat()
 
 
     if not check_health():
@@ -67,6 +70,7 @@ def run_pipeline(
                 "PIPELINE_STOPPED reason=%s",
                 exc
             )
+            print(f"STOPPING: {exc}")
 
 
             try:
@@ -77,6 +81,7 @@ def run_pipeline(
                     "USAGE=%s",
                     usage
                 )
+                print(f"Quota status: {usage}")
 
 
             except Exception as usage_exc:
@@ -85,6 +90,7 @@ def run_pipeline(
                     "USAGE_CHECK_FAILED reason=%s",
                     usage_exc
                 )
+                print(f"(Could not fetch /usage for diagnostics: {usage_exc})")
 
 
             sys.exit(1)
@@ -142,7 +148,8 @@ def run_pipeline(
         )
 
 
-
+    create_dashboard()
+    print("Dashboard written to dashboard.html.")
     logger.info(
         "PIPELINE_COMPLETE"
     )
