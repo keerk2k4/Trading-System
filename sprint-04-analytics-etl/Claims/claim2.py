@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 
 
 DB_PATH = Path(__file__).parents[1] / "analytics.duckdb"
+OUTPUT_FILE = Path(__file__).with_name("investment_comparison.png")
 
 TABLE_NAME = "candles"
 
@@ -96,7 +97,7 @@ def calculate_returns(df):
 
 
 
-def plot_comparison(results):
+def plot_comparison(results, output_file: Path = OUTPUT_FILE):
 
     plt.figure(figsize=(10,6))
 
@@ -141,12 +142,14 @@ def plot_comparison(results):
 
     plt.tight_layout()
 
+    output_file.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(
-        "investment_comparison.png",
+        output_file,
         dpi=150,
+        bbox_inches="tight",
     )
-
-    plt.show()
+    plt.close()
+    print(f"Saved chart to {output_file}")
 
 
 
