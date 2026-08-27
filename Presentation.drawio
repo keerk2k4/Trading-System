@@ -1,0 +1,76 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="AHlNvoRN3sqblBjIiHBe">
+    <mxGraphModel grid="1" page="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0" adaptiveColors="auto">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="etl_title" parent="1" style="text;html=1;fontStyle=1;fontSize=20;align=center;verticalAlign=middle;" value="ETL Pipeline Architecture&#xa;Extract → Transform → Load" vertex="1">
+          <mxGeometry height="50" width="500" x="400" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="api_health" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f4f8;strokeColor=#6c8ebf;" value="Health Check&#xa;Validate API availability" vertex="1">
+          <mxGeometry height="60" width="140" x="40" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="cache_check" parent="1" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" value="Cache Lookup&#xa;Symbol + date range" vertex="1">
+          <mxGeometry height="80" width="140" x="220" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="cached_json" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="Reuse Cached JSON&#xa;Avoid API request" vertex="1">
+          <mxGeometry height="60" width="140" x="400" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="api_request" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Request OHLCV Data&#xa;Fauxnance API" vertex="1">
+          <mxGeometry height="60" width="140" x="400" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="save_cache" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f4f8;strokeColor=#6c8ebf;" value="Save Response&#xa;Local JSON cache" vertex="1">
+          <mxGeometry height="60" width="140" x="580" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="xyXsnspE-9PibbUO_lKD-3" edge="1" parent="1" source="dataframe" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="xyXsnspE-9PibbUO_lKD-2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="dataframe" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#b85450;" value="Parse JSON → Pandas DataFrame" vertex="1">
+          <mxGeometry height="60" width="140" x="760" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="clean" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff0e6;strokeColor=#d79b00;" value="Clean &amp; Validate&#xa;Types, malformed records, duplicates, synthetic data" vertex="1">
+          <mxGeometry height="60" width="140" x="940" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="features" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9e6;strokeColor=#d6b656;" value="Feature Engineering&#xa;Daily return %&#xa;Trading range" vertex="1">
+          <mxGeometry height="60" width="140" x="1120" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="duckdb" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="DuckDB&#xa;Create table if needed&#xa;Delete matching keys + insert latest data" vertex="1">
+          <mxGeometry height="80" width="140" x="1300" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="e_etl1" edge="1" parent="1" source="api_health" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;" target="cache_check">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_etl2" edge="1" parent="1" source="cache_check" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;" target="cached_json" value="Yes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_etl3" edge="1" parent="1" source="cache_check" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;" target="api_request" value="No">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_etl4" edge="1" parent="1" source="api_request" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;" target="save_cache">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_etl5" edge="1" parent="1" source="cached_json" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;" target="dataframe">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_etl6" edge="1" parent="1" source="save_cache" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;" target="dataframe">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_etl7" edge="1" parent="1" source="dataframe" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;" target="clean">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_etl8" edge="1" parent="1" source="clean" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;" target="features">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_etl9" edge="1" parent="1" source="features" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=classic;" target="duckdb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="xyXsnspE-9PibbUO_lKD-2" parent="1" style="whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#b85450;rounded=1;" value="" vertex="1">
+          <mxGeometry height="60" width="160" x="750" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="xyXsnspE-9PibbUO_lKD-4" parent="1" style="text;whiteSpace=wrap;html=1;" value="&lt;br&gt;&lt;div style=&quot;text-align: center;&quot;&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Handling Exceptions&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="40" width="160" x="780" y="300" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
