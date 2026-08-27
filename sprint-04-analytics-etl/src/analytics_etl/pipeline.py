@@ -23,11 +23,7 @@ from .transform import transform
 logger = logging.getLogger(__name__)
 
 
-SYMBOLS = [
-    "INFY.NS",
-    "RELIANCE.NS",
-    "TATASTEEL.BO"
-]
+SYMBOLS = ["TCS.NS", "HDFCBANK.NS", "TMCV.NS"]
 
 
 START_DATE = "2026-01-01"
