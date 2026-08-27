@@ -9,7 +9,7 @@ DB_PATH = Path(__file__).parents[1] / "analytics.duckdb"
 
 TABLE_NAME = "candles"
 
-INITIAL_INVESTMENT = 1000
+INITIAL_INVESTMENT = 100000
 
 
 def load_stock_data():
