@@ -1,17 +1,12 @@
 """
 pipeline.py
-
-    Problem                  -> Action
-    ------------------------------------------------
-    API quota exceeded       -> stop the whole pipeline and report
-    Bad request / bad key    -> skip that symbol, continue with the rest
-    Network failure          -> already retried inside extract()
-    Bad data returned        -> already handled inside transform()
 """
 
 from __future__ import annotations
 
+import logging
 import sys
+
 
 from .extract import (
     QuotaExceededError,
@@ -20,45 +15,138 @@ from .extract import (
     check_usage,
     extract,
 )
+
 from .load import load
 from .transform import transform
 
 
-SYMBOLS = ["INFY.NS", "RELIANCE.NS", "TATASTEEL.BO"]
+logger = logging.getLogger(__name__)
+
+
+SYMBOLS = [
+    "INFY.NS",
+    "RELIANCE.NS",
+    "TATASTEEL.BO"
+]
+
+
 START_DATE = "2026-01-01"
 END_DATE = "2026-07-31"
 
 
-def run_pipeline(symbols: list[str] = SYMBOLS, start: str = START_DATE, end: str = END_DATE) -> None:
+
+def run_pipeline(
+    symbols: list[str] = SYMBOLS,
+    start: str = START_DATE,
+    end: str = END_DATE
+):
+
+
     if not check_health():
-        print("Fauxnance API is not reachable (GET /health failed). Aborting.")
+
+        logger.error(
+            "HEALTH_CHECK_FAILED"
+        )
+
         sys.exit(1)
 
+
+
     for symbol in symbols:
+
+
         try:
-            raw = extract(symbol, start, end)
+
+            raw = extract(
+                symbol,
+                start,
+                end
+            )
+
+
         except QuotaExceededError as exc:
-            print(f"STOPPING: {exc}")
+
+
+            logger.error(
+                "PIPELINE_STOPPED reason=%s",
+                exc
+            )
+
+
             try:
+
                 usage = check_usage()
-                print(f"Quota status: {usage}")
+
+                logger.info(
+                    "USAGE=%s",
+                    usage
+                )
+
+
             except Exception as usage_exc:
-                
-                print(f"(Could not fetch /usage for diagnostics: {usage_exc})")
+
+                logger.error(
+                    "USAGE_CHECK_FAILED reason=%s",
+                    usage_exc
+                )
+
+
             sys.exit(1)
+
+
+
         except SymbolRequestError as exc:
-            print(f"SKIPPING {symbol}: {exc}")
+
+
+            logger.error(
+                "SYMBOL_SKIPPED symbol=%s reason=%s",
+                symbol,
+                exc
+            )
+
             continue
+
+
+
         except ConnectionError as exc:
-            print(f"SKIPPING {symbol} after retries failed: {exc}")
+
+
+            logger.error(
+                "NETWORK_FAILED symbol=%s reason=%s",
+                symbol,
+                exc
+            )
+
             continue
+
+
 
         clean_df = transform(raw)
+
+
         if clean_df.empty:
-            print(f"No valid rows for {symbol} after cleaning; skipping load.")
+
+
+            logger.warning(
+                "BAD_PAYLOAD symbol=%s action=drop",
+                symbol
+            )
+
             continue
 
-        load(clean_df)
-        print(f"Loaded {len(clean_df)} rows for {symbol}.")
 
-    print("Pipeline complete.")
+
+        load(clean_df)
+
+
+        logger.info(
+            "LOADED symbol=%s rows=%s",
+            symbol,
+            len(clean_df)
+        )
+
+
+
+    logger.info(
+        "PIPELINE_COMPLETE"
+    )
