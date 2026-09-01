@@ -1,4 +1,4 @@
-package com.tradingsystem.domain;
+package com.tradingsystem.domain.enums;
 
 public enum OrderSide {
     BUY,
