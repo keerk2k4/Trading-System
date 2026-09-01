@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.example</groupId>
+    <artifactId>Sprint05-work</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <junit.version>5.11.0</junit.version>
+        <enforcer.version>3.5.0</enforcer.version>
+        <surefire.version>3.5.0</surefire.version>
+    </properties>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+            <version>3.1.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+    <build>
+        <plugins>
+
+            <!-- Java 21 compilation -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <release>21</release>
+                </configuration>
+            </plugin>
+
+            <!-- JUnit 5 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
+
+            <!-- Dependency restrictions -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>${enforcer.version}</version>
+
+                <executions>
+                    <execution>
+                        <id>ban-forbidden-dependencies</id>
+                        <phase>validate</phase>
+
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+
+                        <configuration>
+
+                            <rules>
+
+                                <bannedDependencies>
+                                    <searchTransitive>true</searchTransitive>
+
+                                    <excludes>
+
+                                        <!-- Spring -->
+                                        <exclude>org.springframework</exclude>
+                                        <exclude>org.springframework.boot</exclude>
+
+                                        <!-- Servlet -->
+                                        <exclude>jakarta.servlet</exclude>
+                                        <exclude>javax.servlet</exclude>
+
+                                        <!-- JDBC -->
+                                        <exclude>org.postgresql</exclude>
+                                        <exclude>com.mysql:mysql-connector-j</exclude>
+                                        <exclude>com.microsoft.sqlserver</exclude>
+                                        <exclude>com.oracle.database.jdbc</exclude>
+
+                                        <!-- MyBatis -->
+                                        <exclude>org.mybatis</exclude>
+
+                                        <!-- Connection pools -->
+                                        <exclude>com.zaxxer:HikariCP</exclude>
+                                        <exclude>org.apache.tomcat:tomcat-jdbc</exclude>
+                                        <exclude>org.apache.commons:commons-dbcp2</exclude>
+
+                                    </excludes>
+
+                                    <message>
+                                        Forbidden dependency detected.
+                                        Spring, servlet APIs, JDBC drivers,
+                                        MyBatis and connection pools are not
+                                        allowed in this module.
+                                    </message>
+
+                                </bannedDependencies>
+
+                            </rules>
+
+                            <fail>true</fail>
+
+                        </configuration>
+
+                    </execution>
+                </executions>
+            </plugin>
+
+        </plugins>
+    </build>
+</project>
