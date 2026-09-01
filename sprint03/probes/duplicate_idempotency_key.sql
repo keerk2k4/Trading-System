@@ -1,100 +1,134 @@
 BEGIN;
 
+-- ============================================================
+-- 1. TEST USER
+-- ============================================================
+
 INSERT INTO users (
     user_id,
-    user_name,
-    password,
+    full_name,
     email,
-    phonenumber
+    phone
 )
+OVERRIDING SYSTEM VALUE
 VALUES (
     -900000000001,
     'Harness Duplicate Test User',
-    'harness-password',
     'harness-duplicate@example.com',
     '-900000000001'
 );
 
-INSERT INTO accounts (
-    account_id,
-    account_num,
+
+-- ============================================================
+-- 2. TEST TRADING ACCOUNT
+-- ============================================================
+
+INSERT INTO trading_accounts (
+    trading_account_id,
     user_id,
-    balance,
-    status,
-    version
+    available_balance,
+    blocked_balance,
+    account_status
 )
+OVERRIDING SYSTEM VALUE
 VALUES (
     -900000000001,
-    'HARNESS-DUP-ACCOUNT',
     -900000000001,
     10000.00,
-    'ACTIVE',
-    0
+    0.00,
+    'ACTIVE'
 );
+
+
+-- ============================================================
+-- 3. TEST INSTRUMENT
+-- ============================================================
 
 INSERT INTO instruments (
     instrument_id,
-    ticker_symbol,
-    name,
-    description,
-    status,
-    availability,
-    price
+    symbol,
+    company_name,
+    exchange,
+    isin,
+    instrument_type,
+    status
 )
+OVERRIDING SYSTEM VALUE
 VALUES (
     -900000000001,
     'HARNDUP',
     'Harness Duplicate Test Instrument',
-    'Temporary instrument for duplicate idempotency probe',
-    'ACTIVE',
-    TRUE,
-    100.0000
+    'NSE',
+    'IN00000000001',
+    'EQUITY',
+    'ACTIVE'
 );
+
+
+-- ============================================================
+-- 4. FIRST ORDER
+-- ============================================================
 
 INSERT INTO orders (
     order_id,
-    idempotency_key,
-    account_id,
+    trading_account_id,
     instrument_id,
-    action,
-    type,
+    order_type,
+    side,
+    product_type,
+    quantity,
+    limit_price,
+    stop_price,
     status,
-    price,
-    quantity
+    idempotency_key
 )
+OVERRIDING SYSTEM VALUE
 VALUES (
     -900000000001,
-    'HARNESS-DUPLICATE-IDEMPOTENCY-KEY',
     -900000000001,
     -900000000001,
-    'BUY',
     'LIMIT',
-    'PENDING',
+    'BUY',
+    'DELIVERY',
+    10,
     100.0000,
-    10.0000
+    NULL,
+    'NEW',
+    'HARNESS-DUPLICATE-IDEMPOTENCY-KEY'
 );
+
+
+-- ============================================================
+-- 5. DUPLICATE IDEMPOTENCY KEY
+-- ============================================================
 
 INSERT INTO orders (
     order_id,
-    idempotency_key,
-    account_id,
+    trading_account_id,
     instrument_id,
-    action,
-    type,
+    order_type,
+    side,
+    product_type,
+    quantity,
+    limit_price,
+    stop_price,
     status,
-    price,
-    quantity
+    idempotency_key
 )
+OVERRIDING SYSTEM VALUE
 VALUES (
     -900000000002,
-    'HARNESS-DUPLICATE-IDEMPOTENCY-KEY',
     -900000000001,
     -900000000001,
-    'BUY',
     'LIMIT',
-    'PENDING',
+    'BUY',
+    'DELIVERY',
+    10,
     100.0000,
-    10.0000
+    NULL,
+    'NEW',
+    'HARNESS-DUPLICATE-IDEMPOTENCY-KEY'
 );
+
 
 ROLLBACK;

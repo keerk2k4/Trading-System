@@ -3,6 +3,7 @@
 -- PostgreSQL
 -- ============================================
 
+BEGIN;
 -- ============================================
 -- 1. USERS
 -- ============================================
@@ -325,14 +326,9 @@ CREATE TABLE positions (
             (position_status = 'OPEN' AND closed_at IS NULL)
             OR
             (position_status = 'CLOSED' AND closed_at IS NOT NULL)
-        ),
-
-    CONSTRAINT uq_active_position
-        UNIQUE (
-            trading_account_id,
-            instrument_id,
-            product_type
         )
+
+        
 );
 
 
@@ -495,3 +491,5 @@ CREATE TABLE watchlist_inst (
         FOREIGN KEY (inst_id)
         REFERENCES instruments(instrument_id)
 );
+
+COMMIT;

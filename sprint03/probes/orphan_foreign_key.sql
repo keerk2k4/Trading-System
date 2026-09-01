@@ -1,60 +1,80 @@
 BEGIN;
 
+-- ============================================================
+-- 1. TEST USER
+-- ============================================================
+
 INSERT INTO users (
     user_id,
-    user_name,
-    password,
+    full_name,
     email,
-    phonenumber
+    phone
 )
+OVERRIDING SYSTEM VALUE
 VALUES (
     -900000000003,
     'Harness Orphan Test User',
-    'harness-password',
     'harness-orphan@example.com',
     '-900000000003'
 );
 
+
+-- ============================================================
+-- 2. TEST INSTRUMENT
+-- ============================================================
+
 INSERT INTO instruments (
     instrument_id,
-    ticker_symbol,
-    name,
-    description,
-    status,
-    availability,
-    price
+    symbol,
+    company_name,
+    exchange,
+    isin,
+    instrument_type,
+    status
 )
+OVERRIDING SYSTEM VALUE
 VALUES (
     -900000000003,
     'HARNORPH',
     'Harness Orphan Test Instrument',
-    'Temporary instrument for orphan foreign-key probe',
-    'ACTIVE',
-    TRUE,
-    100.0000
+    'NSE',
+    'IN00000000002',
+    'EQUITY',
+    'ACTIVE'
 );
+
+
+-- ============================================================
+-- 3. ORDER WITH NON-EXISTENT TRADING ACCOUNT
+-- ============================================================
 
 INSERT INTO orders (
     order_id,
-    idempotency_key,
-    account_id,
+    trading_account_id,
     instrument_id,
-    action,
-    type,
+    order_type,
+    side,
+    product_type,
+    quantity,
+    limit_price,
+    stop_price,
     status,
-    price,
-    quantity
+    idempotency_key
 )
+OVERRIDING SYSTEM VALUE
 VALUES (
     -900000000003,
-    'HARNESS-ORPHAN-FOREIGN-KEY',
     999999999999,
     -900000000003,
-    'BUY',
     'LIMIT',
-    'PENDING',
+    'BUY',
+    'DELIVERY',
+    10,
     100.0000,
-    10.0000
+    NULL,
+    'NEW',
+    'HARNESS-ORPHAN-FOREIGN-KEY'
 );
+
 
 ROLLBACK;
