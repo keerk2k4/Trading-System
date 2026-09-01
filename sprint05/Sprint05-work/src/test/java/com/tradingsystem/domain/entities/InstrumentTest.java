@@ -1,4 +1,102 @@
 package com.tradingsystem.domain.entities;
 
-public class InstrumentTest {
+import com.tradingsystem.domain.enums.AssetClass;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class InstrumentTest {
+
+
+    @Test
+    void shouldCreateInstrumentWithRequiredDetails() {
+
+        Instrument instrument = createInstrument();
+
+        assertEquals(
+                "FAUX:TCS",
+                instrument.getSymbol()
+        );
+
+        assertEquals(
+                "Tata Consultancy Services",
+                instrument.getDisplayName()
+        );
+
+        assertEquals(
+                AssetClass.EQUITY,
+                instrument.getAssetClass()
+        );
+
+        assertEquals(
+                "INR",
+                instrument.getQuotationCurrency()
+        );
+    }
+
+
+    @Test
+    void newlyCreatedInstrumentShouldBeTradable() {
+
+        Instrument instrument = createInstrument();
+
+        assertTrue(
+                instrument.mayBeTraded()
+        );
+    }
+
+
+    @Test
+    void delistedInstrumentShouldNotBeTradable() {
+
+        Instrument instrument = createInstrument();
+
+        instrument.delist();
+
+        assertFalse(
+                instrument.mayBeTraded()
+        );
+    }
+
+
+    @Test
+    void delistingShouldNotRemoveInstrumentDetails() {
+
+        Instrument instrument = createInstrument();
+
+        instrument.delist();
+
+        assertEquals(
+                "FAUX:TCS",
+                instrument.getSymbol()
+        );
+
+        assertEquals(
+                "Tata Consultancy Services",
+                instrument.getDisplayName()
+        );
+    }
+
+
+    @Test
+    void instrumentShouldRemainDelisted() {
+
+        Instrument instrument = createInstrument();
+
+        instrument.delist();
+
+        assertFalse(instrument.mayBeTraded());
+        assertFalse(instrument.mayBeTraded());
+    }
+
+
+    private Instrument createInstrument() {
+
+        return new Instrument(
+                "FAUX:TCS",
+                "Tata Consultancy Services",
+                AssetClass.EQUITY,
+                "INR"
+        );
+    }
 }
