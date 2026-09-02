@@ -66,27 +66,21 @@ public class Settlement {
     public Long getSettlementId() {
         return settlementId;
     }
-
     public Account getAccount() {
         return account;
     }
-
     public Instrument getInstrument() {
         return instrument;
     }
-
     public ProductType getProductType() {
         return productType;
     }
-
     public int getQuantity() {
         return quantity;
     }
-
     public BigDecimal getExecutionPrice() {
         return executionPrice;
     }
-
     public SettlementStatus getStatus() {
         return status;
     }
@@ -97,7 +91,6 @@ public class Settlement {
                     "Only pending settlements can be completed"
             );
         }
-
         status = SettlementStatus.COMPLETED;
     }
 
@@ -107,7 +100,6 @@ public class Settlement {
                     "Only pending settlements can be failed"
             );
         }
-
         status = SettlementStatus.FAILED;
     }
 }
