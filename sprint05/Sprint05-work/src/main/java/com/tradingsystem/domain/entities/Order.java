@@ -175,7 +175,8 @@ public class Order {
             case NEW ->
                     next == OrderStatus.OPEN
                             || next == OrderStatus.CANCELLED
-                            || next == OrderStatus.REJECTED;
+                            || next == OrderStatus.REJECTED
+                            || next == OrderStatus.FILLED;
 
             case OPEN ->
                     next == OrderStatus.PARTIALLY_FILLED

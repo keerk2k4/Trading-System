@@ -2,25 +2,50 @@ package com.tradingsystem.domain.services;
 
 import com.tradingsystem.domain.entities.Order;
 import com.tradingsystem.domain.enums.OrderStatus;
+import com.tradingsystem.domain.enums.OrderType;
 
 import java.math.BigDecimal;
 
 public class OrderExecutor {
 
-    public BigDecimal execute(Order order) {
+    private final MarketPriceProvider marketPriceProvider;
+    private final PositionUpdater positionUpdater;
 
-        order.transitionTo(OrderStatus.OPEN);
+    public OrderExecutor(
+            MarketPriceProvider marketPriceProvider,
+            PositionUpdater positionUpdater
+    ) {
+        this.marketPriceProvider = marketPriceProvider;
+        this.positionUpdater = positionUpdater;
+    }
 
-        BigDecimal executionPrice = order.getLimitPrice();
+    public void execute(Order order) {
 
-        if (executionPrice == null) {
-            throw new IllegalStateException(
-                    "No execution price available"
+        BigDecimal executionPrice =
+                determineExecutionPrice(order);
+
+        positionUpdater.update(
+                order,
+                executionPrice
+        );
+
+        order.transitionTo(OrderStatus.FILLED);
+    }
+
+    private BigDecimal determineExecutionPrice(Order order) {
+
+        if (order.getOrderType() == OrderType.LIMIT) {
+            return order.getLimitPrice();
+        }
+
+        if (order.getOrderType() == OrderType.MARKET) {
+            return marketPriceProvider.getMarketPrice(
+                    order.getInstrument()
             );
         }
 
-        order.transitionTo(OrderStatus.FILLED);
-
-        return executionPrice;
+        throw new IllegalArgumentException(
+                "Unsupported order type"
+        );
     }
 }
