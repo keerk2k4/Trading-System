@@ -1,7 +1,8 @@
 package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.domain.enums.TradingStatus;
-import com.tradingsystem.exception.InsufficientFundsException;
+import com.tradingsystem.exception.InsufficientBalanceException;
+import com.tradingsystem.exception.InvalidAmountException;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
@@ -82,9 +83,8 @@ public class Account {
     public void debit(BigDecimal amount) {
         validateAmount(amount);
         if (!canAfford(amount)) {
-            throw new InsufficientFundsException(
-                    amount,
-                    this.getCashBalance()
+            throw new InsufficientBalanceException(
+                    "Balance amount is less"
             );
         }
         cashBalance = cashBalance.subtract(amount);
@@ -99,19 +99,19 @@ public class Account {
 
     private void validateAmount(BigDecimal amount) {
         if (amount == null) {
-            throw new IllegalArgumentException(
+            throw new InvalidAmountException(
                     "Amount cannot be null"
             );
         }
 
         if (amount.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException(
+            throw new InvalidAmountException(
                     "Amount cannot be negative"
             );
         }
 
         if (amount.scale() > 2) {
-            throw new IllegalArgumentException(
+            throw new InvalidAmountException(
                     "Amount cannot have more than 2 decimal places"
             );
         }
