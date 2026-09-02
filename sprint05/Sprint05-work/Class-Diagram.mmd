@@ -9,12 +9,12 @@ classDiagram
         -String firstName
         -String lastName
         -String email
-        -String phoneNumber
+        -String phone
         -String passwordHash
-        -String status
-        -Timestamp createdAt
-        -Timestamp updatedAt
-        +createOrder()
+        -UserStatus status
+        -LocalDateTime updatedAt
+        -LocalDateTime createdAt
+        +setStatus(UserStatus status)
     }
 
 
