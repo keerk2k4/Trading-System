@@ -1,6 +1,9 @@
 package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.domain.enums.ProductType;
+import com.tradingsystem.exception.InsufficientHoldingsException;
+import com.tradingsystem.exception.InvalidOrderException;
+
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
@@ -56,15 +59,15 @@ public class Position {
         }
 
         if (quantity < 0) {
-            throw new IllegalArgumentException(
-                    "Quantity cannot be negative"
-            );
+            throw new InvalidOrderException("quantity",String.valueOf(quantity));
+                    
         }
 
         if (averagePrice == null ||
                 averagePrice.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException(
-                    "Average price must be positive"
+           throw new InvalidOrderException(
+                    "averagePrice",
+                    averagePrice == null ? "null" : averagePrice.toString()
             );
         }
 
@@ -169,9 +172,7 @@ public class Position {
 
 
         if (soldQuantity > quantity) {
-            throw new IllegalArgumentException(
-                    "Cannot sell more than owned quantity"
-            );
+            throw new InsufficientHoldingsException(soldQuantity, quantity);
         }
 
 
@@ -182,9 +183,7 @@ public class Position {
     private void validateQuantity(int quantity) {
 
         if (quantity <= 0) {
-            throw new IllegalArgumentException(
-                    "Quantity must be positive"
-            );
+            throw new InvalidOrderException("quantity", String.valueOf(quantity));
         }
     }
 
@@ -194,8 +193,9 @@ public class Position {
         if (price == null ||
                 price.compareTo(BigDecimal.ZERO) <= 0) {
 
-            throw new IllegalArgumentException(
-                    "Price must be positive"
+            throw new InvalidOrderException(
+                    "price",
+                    price == null ? "null" : price.toString()
             );
         }
     }
