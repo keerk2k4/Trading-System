@@ -2,7 +2,7 @@ package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.domain.enums.ProductType;
 import com.tradingsystem.exception.InsufficientHoldingsException;
-import com.tradingsystem.exception.InvalidOrderException;
+import com.tradingsystem.exception.InvalidOrderArgumentException;
 
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -59,13 +59,13 @@ public class Position {
         }
 
         if (quantity < 0) {
-            throw new InvalidOrderException("quantity",String.valueOf(quantity));
+            throw new InvalidOrderArgumentException("quantity",String.valueOf(quantity));
                     
         }
 
         if (averagePrice == null ||
                 averagePrice.compareTo(BigDecimal.ZERO) <= 0) {
-           throw new InvalidOrderException(
+           throw new InvalidOrderArgumentException(
                     "averagePrice",
                     averagePrice == null ? "null" : averagePrice.toString()
             );
@@ -183,7 +183,7 @@ public class Position {
     private void validateQuantity(int quantity) {
 
         if (quantity <= 0) {
-            throw new InvalidOrderException("quantity", String.valueOf(quantity));
+            throw new InvalidOrderArgumentException("quantity", String.valueOf(quantity));
         }
     }
 
@@ -193,7 +193,7 @@ public class Position {
         if (price == null ||
                 price.compareTo(BigDecimal.ZERO) <= 0) {
 
-            throw new InvalidOrderException(
+            throw new InvalidOrderArgumentException(
                     "price",
                     price == null ? "null" : price.toString()
             );

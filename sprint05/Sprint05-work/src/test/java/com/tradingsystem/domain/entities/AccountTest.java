@@ -2,7 +2,9 @@
 package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.domain.enums.TradingStatus;
+import com.tradingsystem.exception.InsufficientBalanceException;
 import com.tradingsystem.exception.InsufficientFundsException;
+import com.tradingsystem.exception.InvalidAmountException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -108,7 +110,7 @@ class AccountTest {
     void debitShouldBeRejectedWhenItWouldMakeBalanceNegative() {
 
         assertThrows(
-                IllegalArgumentException.class,
+                InsufficientBalanceException.class,
                 () -> account.debit(new BigDecimal("1000.01"))
         );
     }
@@ -117,7 +119,7 @@ class AccountTest {
     void rejectedDebitShouldLeaveBalanceUnchanged() {
 
         assertThrows(
-                InsufficientFundsException.class,
+                InsufficientBalanceException.class,
                 () -> account.debit(new BigDecimal("1000.01"))
         );
 
@@ -142,7 +144,7 @@ class AccountTest {
     @Test
     void creditShouldRejectNegativeAmount() {
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidAmountException.class,
                 () -> account.credit(new BigDecimal("-10.00"))
         );
     }
@@ -150,7 +152,7 @@ class AccountTest {
     @Test
     void debitShouldRejectNegativeAmount() {
         assertThrows(
-                InsufficientFundsException.class,
+                InvalidAmountException.class,
                 () -> account.debit(new BigDecimal("-10.00"))
         );
     }

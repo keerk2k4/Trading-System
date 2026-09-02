@@ -2,6 +2,7 @@
 package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.domain.enums.*;
+import com.tradingsystem.exception.InvalidOrderArgumentException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -270,7 +271,7 @@ class OrderTest {
     void shouldRejectZeroQuantity() {
 
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidOrderArgumentException.class,
                 () -> createOrder(
                         0,
                         new BigDecimal("100.00")
@@ -283,7 +284,7 @@ class OrderTest {
     void shouldRejectNegativeQuantity() {
 
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidOrderArgumentException.class,
                 () -> createOrder(
                         -5,
                         new BigDecimal("100.00")
@@ -296,7 +297,7 @@ class OrderTest {
     void shouldRejectNullAccount() {
 
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidOrderArgumentException.class,
                 () -> new Order(
                         1L,
                         null,
@@ -315,7 +316,7 @@ class OrderTest {
     void shouldRejectNullInstrument() {
 
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidOrderArgumentException.class,
                 () -> new Order(
                         1L,
                         createAccount(),
@@ -334,7 +335,7 @@ class OrderTest {
     void shouldRejectLimitOrderWithoutLimitPrice() {
 
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidOrderArgumentException.class,
                 () -> new Order(
                         1L,
                         createAccount(),
@@ -353,7 +354,7 @@ class OrderTest {
     void shouldRejectNegativeLimitPrice() {
 
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidOrderArgumentException.class,
                 () -> createOrder(
                         10,
                         new BigDecimal("-100.00")
@@ -366,7 +367,7 @@ class OrderTest {
     void shouldRejectZeroLimitPrice() {
 
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidOrderArgumentException.class,
                 () -> createOrder(
                         10,
                         BigDecimal.ZERO
@@ -379,7 +380,7 @@ class OrderTest {
     void shouldRejectLimitPriceWithMoreThanTwoDecimalPlaces() {
 
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidOrderArgumentException.class,
                 () -> createOrder(
                         10,
                         new BigDecimal("100.123")

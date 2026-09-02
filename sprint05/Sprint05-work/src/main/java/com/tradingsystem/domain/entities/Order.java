@@ -1,7 +1,7 @@
 package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.domain.enums.*;
-import com.tradingsystem.exception.InvalidOrderException;
+import com.tradingsystem.exception.InvalidOrderArgumentException;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
@@ -52,31 +52,31 @@ public class Order {
     ) {
 
         if (orderId == null) {
-            throw new InvalidOrderException("Order ID");
+            throw new InvalidOrderArgumentException("Order ID");
         }
 
         if (account == null) {
-            throw new InvalidOrderException("Account");
+            throw new InvalidOrderArgumentException("Account");
         }
 
         if (instrument == null) {
-            throw new InvalidOrderException("Instrument");
+            throw new InvalidOrderArgumentException("Instrument");
         }
 
         if (orderType == null) {
-            throw new InvalidOrderException("Order Type");
+            throw new InvalidOrderArgumentException("Order Type");
         }
 
         if (side == null) {
-            throw new InvalidOrderException("Side");
+            throw new InvalidOrderArgumentException("Side");
         }
 
         if (productType == null) {
-            throw new InvalidOrderException("Product Type");
+            throw new InvalidOrderArgumentException("Product Type");
         }
 
         if (quantity <= 0) {
-            throw new InvalidOrderException("Quantity");
+            throw new InvalidOrderArgumentException("Quantity");
         }
 
         if (limitPrice != null) {
@@ -84,7 +84,7 @@ public class Order {
         }
 
         if (requiresLimitPrice(orderType) && limitPrice == null) {
-            throw new InvalidOrderException("Limit Price");
+            throw new InvalidOrderArgumentException("Limit Price");
         }
 
         this.orderId = orderId;
@@ -199,11 +199,11 @@ public class Order {
     private void validateLimitPrice(BigDecimal price) {
 
         if (price.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new InvalidOrderException("Limit Price", price.toString());
+            throw new InvalidOrderArgumentException("Limit Price", price.toString());
         }
 
         if (price.scale() > 2) {
-            throw new InvalidOrderException("Limit Price", price.toString());
+            throw new InvalidOrderArgumentException("Limit Price", price.toString());
         }
     }
 }

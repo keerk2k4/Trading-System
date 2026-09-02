@@ -1,6 +1,7 @@
 package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.exception.InsufficientHoldingsException;
+import com.tradingsystem.exception.InvalidHoldingArgumentException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -22,26 +23,23 @@ public class Holding {
             BigDecimal averagePrice
     ) {
         if (holdingId == null) {
-            throw new IllegalArgumentException("Holding ID cannot be null");
+            throw new InvalidHoldingArgumentException("Holding ID");
         }
 
         if (account == null) {
-            throw new IllegalArgumentException("Account cannot be null");
+            throw new InvalidHoldingArgumentException("Account");
         }
 
         if (instrument == null) {
-            throw new IllegalArgumentException("Instrument cannot be null");
+            throw new InvalidHoldingArgumentException("Instrument");
         }
 
         if (quantity < 0) {
-            throw new IllegalArgumentException(
-                    "Holding quantity cannot be negative"
-            );
+            throw new InvalidHoldingArgumentException("Quantity", String.valueOf(quantity));
         }
 
-        if (averagePrice == null ||
-                averagePrice.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException(
+        if (averagePrice == null || averagePrice.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidHoldingArgumentException(
                     "Average price must be positive"
             );
         }

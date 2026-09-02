@@ -4,7 +4,7 @@ package com.tradingsystem.domain.entities;
 import com.tradingsystem.domain.enums.AssetClass;
 import com.tradingsystem.domain.enums.ProductType;
 import com.tradingsystem.exception.InsufficientHoldingsException;
-import com.tradingsystem.exception.InvalidOrderException;
+import com.tradingsystem.exception.InvalidOrderArgumentException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -16,7 +16,6 @@ class PositionTest {
 
     @Test
     void shouldCreatePositionWithInitialValues() {
-
         Position position = createPosition();
 
         assertEquals(10, position.getQuantity());
@@ -26,7 +25,6 @@ class PositionTest {
                 position.getAveragePrice()
         );
     }
-
 
     @Test
     void buyShouldIncreaseQuantity() {
@@ -142,7 +140,7 @@ class PositionTest {
 
 
         assertThrows(
-                InvalidOrderException.class,
+                InvalidOrderArgumentException.class,
                 () -> position.buy(
                         -5,
                         new BigDecimal("100.00")
@@ -158,7 +156,7 @@ class PositionTest {
 
 
         assertThrows(
-                InvalidOrderException.class,
+                InvalidOrderArgumentException.class,
                 () -> position.sell(-5)
         );
     }

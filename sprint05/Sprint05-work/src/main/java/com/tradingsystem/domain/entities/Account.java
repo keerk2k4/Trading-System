@@ -46,7 +46,6 @@ public class Account {
             Long loadedVersion
     ) {
         validateAmount(cashBalance);
-
         this.accountId = accountId;
         this.accountReference = accountReference;
         this.holder = holder;
