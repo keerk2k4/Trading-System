@@ -3,6 +3,8 @@ package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.domain.enums.AssetClass;
 import com.tradingsystem.domain.enums.ProductType;
+import com.tradingsystem.exception.InsufficientHoldingsException;
+import com.tradingsystem.exception.InvalidOrderException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -109,7 +111,7 @@ class PositionTest {
 
 
         assertThrows(
-                IllegalArgumentException.class,
+                InsufficientHoldingsException.class,
                 () -> position.sell(11)
         );
     }
@@ -121,7 +123,7 @@ class PositionTest {
         Position position = createPosition();
 
         assertThrows(
-                IllegalArgumentException.class,
+                InsufficientHoldingsException.class,
                 () -> position.sell(11)
         );
 
@@ -140,7 +142,7 @@ class PositionTest {
 
 
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidOrderException.class,
                 () -> position.buy(
                         -5,
                         new BigDecimal("100.00")
@@ -156,7 +158,7 @@ class PositionTest {
 
 
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidOrderException.class,
                 () -> position.sell(-5)
         );
     }
