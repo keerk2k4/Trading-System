@@ -1,21 +1,23 @@
 package com.tradingsystem.exception;
 
+import java.math.BigDecimal;
+
 public class InsufficientFundsException extends DomainException {
 
-    private final double requiredAmount;
-    private final double availableAmount;
+    private final BigDecimal requiredAmount;
+    private final BigDecimal availableAmount;
 
-    public InsufficientFundsException(double requiredAmount, double availableAmount) {
+    public InsufficientFundsException(BigDecimal requiredAmount, BigDecimal availableAmount) {
         super("ORD-400", "Insufficient funds");
         this.requiredAmount = requiredAmount;
         this.availableAmount = availableAmount;
     }
 
-    public double getRequiredAmount() {
+    public BigDecimal getRequiredAmount() {
         return requiredAmount;
     }
 
-    public double getAvailableAmount() {
+    public BigDecimal getAvailableAmount() {
         return availableAmount;
     }
 }
