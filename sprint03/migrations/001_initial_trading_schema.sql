@@ -1,5 +1,21 @@
 
 BEGIN;
+
+-- Drop all existing tables in reverse order of dependencies
+DROP TABLE IF EXISTS watchlist_inst CASCADE;
+DROP TABLE IF EXISTS watchlist CASCADE;
+DROP TABLE IF EXISTS account_transactions CASCADE;
+DROP TABLE IF EXISTS settlements CASCADE;
+DROP TABLE IF EXISTS holdings CASCADE;
+DROP TABLE IF EXISTS positions CASCADE;
+DROP TABLE IF EXISTS executions CASCADE;
+DROP TABLE IF EXISTS order_history CASCADE;
+DROP TABLE IF EXISTS orders CASCADE;
+DROP TABLE IF EXISTS instruments CASCADE;
+DROP TABLE IF EXISTS demat_accounts CASCADE;
+DROP TABLE IF EXISTS trading_accounts CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
 -- ============================================
 -- 1. USERS
 -- ============================================
