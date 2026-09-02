@@ -1,6 +1,8 @@
 package com.tradingsystem.domain.entities;
 
+import com.tradingsystem.exception.InvalidHoldingArgumentException;
 import com.tradingsystem.exception.InsufficientHoldingsException;
+import com.tradingsystem.exception.InvalidOrderException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -22,28 +24,24 @@ public class Holding {
             BigDecimal averagePrice
     ) {
         if (holdingId == null) {
-            throw new IllegalArgumentException("Holding ID cannot be null");
+            throw new InvalidHoldingArgumentException("Holding ID");
         }
 
         if (account == null) {
-            throw new IllegalArgumentException("Account cannot be null");
+            throw new InvalidHoldingArgumentException("Account ID");
         }
 
         if (instrument == null) {
-            throw new IllegalArgumentException("Instrument cannot be null");
+            throw new InvalidHoldingArgumentException("Instrument ID");
         }
 
         if (quantity < 0) {
-            throw new IllegalArgumentException(
-                    "Holding quantity cannot be negative"
-            );
+            throw new InvalidHoldingArgumentException("Holding ID", String.valueOf(quantity));
         }
 
         if (averagePrice == null ||
                 averagePrice.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException(
-                    "Average price must be positive"
-            );
+            throw new InvalidHoldingArgumentException("Average Price", String.valueOf(averagePrice));
         }
 
         this.holdingId = holdingId;
@@ -107,17 +105,16 @@ public class Holding {
 
     private void validateQuantity(int quantity) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException(
-                    "Quantity must be positive"
-            );
+            throw new InvalidOrderException("quantity", String.valueOf(quantity));
         }
     }
 
     private void validatePrice(BigDecimal price) {
         if (price == null ||
                 price.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException(
-                    "Price must be positive"
+            throw new InvalidOrderException(
+                    "price",
+                    price == null ? "null" : price.toString()
             );
         }
     }
