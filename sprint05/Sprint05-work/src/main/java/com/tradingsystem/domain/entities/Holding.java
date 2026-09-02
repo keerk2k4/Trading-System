@@ -1,7 +1,8 @@
 package com.tradingsystem.domain.entities;
 
-import com.tradingsystem.exception.InsufficientHoldingsException;
 import com.tradingsystem.exception.InvalidHoldingArgumentException;
+import com.tradingsystem.exception.InsufficientHoldingsException;
+import com.tradingsystem.exception.InvalidOrderArgumentException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -105,17 +106,16 @@ public class Holding {
 
     private void validateQuantity(int quantity) {
         if (quantity <= 0) {
-            throw new IllegalArgumentException(
-                    "Quantity must be positive"
-            );
+            throw new InvalidOrderArgumentException("quantity", String.valueOf(quantity));
         }
     }
 
     private void validatePrice(BigDecimal price) {
         if (price == null ||
                 price.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException(
-                    "Price must be positive"
+            throw new InvalidOrderArgumentException(
+                    "price",
+                    price == null ? "null" : price.toString()
             );
         }
     }

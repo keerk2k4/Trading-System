@@ -2,6 +2,7 @@ package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.exception.InsufficientFundsException;
 import com.tradingsystem.exception.InsufficientHoldingsException;
+import com.tradingsystem.exception.InvalidHoldingArgumentException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -127,7 +128,7 @@ class HoldingTest {
         );
 
         assertThrows(
-                InsufficientHoldingsException.class,
+                IllegalStateException.class,
                 () -> holding.sell(11)
         );
     }
@@ -143,7 +144,7 @@ class HoldingTest {
         );
 
         assertThrows(
-                InsufficientHoldingsException.class,
+                IllegalStateException.class,
                 () -> holding.sell(11)
         );
 
@@ -177,7 +178,7 @@ class HoldingTest {
         );
 
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidHoldingArgumentException.class,
                 () -> holding.buy(-5, new BigDecimal("120.00"))
         );
     }
@@ -193,7 +194,7 @@ class HoldingTest {
         );
 
         assertThrows(
-                IllegalArgumentException.class,
+                InvalidHoldingArgumentException.class,
                 () -> holding.sell(0)
         );
     }
