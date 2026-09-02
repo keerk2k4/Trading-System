@@ -107,29 +107,13 @@ public class Position {
     }
 
 
-    /**
-     * Buy increases quantity and recalculates average cost.
-     *
-     * Example:
-     *
-     * Existing:
-     * 10 shares @ 100
-     *
-     * Buy:
-     * 5 shares @ 120
-     *
-     * New:
-     * 15 shares @ 106.67
-     */
     public void buy(
             int boughtQuantity,
             BigDecimal buyPrice
     ) {
 
         validateQuantity(boughtQuantity);
-
         validatePrice(buyPrice);
-
 
         BigDecimal existingValue =
                 averagePrice.multiply(
@@ -160,12 +144,6 @@ public class Position {
         quantity = newQuantity;
     }
 
-
-    /**
-     * Sell reduces quantity.
-     *
-     * Average price remains unchanged.
-     */
     public void sell(int soldQuantity) {
 
         validateQuantity(soldQuantity);
@@ -174,7 +152,6 @@ public class Position {
         if (soldQuantity > quantity) {
             throw new InsufficientHoldingsException(soldQuantity, quantity);
         }
-
 
         quantity -= soldQuantity;
     }
