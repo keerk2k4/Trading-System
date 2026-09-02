@@ -1,6 +1,7 @@
 package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.domain.enums.TradingStatus;
+import com.tradingsystem.exception.InsufficientFundsException;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
@@ -53,66 +54,50 @@ public class Account {
         this.loadedVersion = loadedVersion;
     }
 
-
+    // getters
     public Long getAccountId() {
         return accountId;
     }
-
-
     public String getAccountReference() {
         return accountReference;
     }
-
-
     public String getHolder() {
         return holder;
     }
-
-
     public BigDecimal getCashBalance() {
         return cashBalance;
     }
-
-
     public TradingStatus getTradingStatus() {
         return tradingStatus;
     }
-
-
     public Long getLoadedVersion() {
         return loadedVersion;
     }
 
-
     public void credit(BigDecimal amount) {
         validateAmount(amount);
-
         cashBalance = cashBalance.add(amount);
     }
 
-
     public void debit(BigDecimal amount) {
         validateAmount(amount);
-
         if (!canAfford(amount)) {
-            throw new IllegalArgumentException(
-                    "Insufficient balance"
+            throw new InsufficientFundsException(
+                    amount,
+                    this.getCashBalance()
             );
         }
-
         cashBalance = cashBalance.subtract(amount);
     }
 
 
     public boolean canAfford(BigDecimal amount) {
         validateAmount(amount);
-
         return cashBalance.compareTo(amount) >= 0;
     }
 
 
     private void validateAmount(BigDecimal amount) {
-
         if (amount == null) {
             throw new IllegalArgumentException(
                     "Amount cannot be null"
