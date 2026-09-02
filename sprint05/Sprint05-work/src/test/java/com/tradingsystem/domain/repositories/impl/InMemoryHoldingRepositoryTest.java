@@ -1,4 +1,5 @@
-package com.tradingsystem.domain.repositories.impl;
+
+        package com.tradingsystem.domain.repositories.impl;
 
 import com.tradingsystem.domain.entities.Account;
 import com.tradingsystem.domain.entities.Holding;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -40,7 +42,61 @@ class InMemoryHoldingRepositoryTest {
     }
 
     @Test
-    void shouldStoreMultipleHoldingsForSameAccount() {
+    void shouldFindHoldingByAccountIdAndInstrument() {
+        InMemoryHoldingRepository repository = new InMemoryHoldingRepository();
+
+        Account account = createAccount(1L);
+        Instrument instrument = createInstrument("TCS");
+
+        Holding holding = new Holding(
+                1L,
+                account,
+                instrument,
+                10,
+                new BigDecimal("3500.00")
+        );
+
+        repository.save("1", holding);
+
+        Optional<Holding> result =
+                repository.findByAccountIdAndInstrument(
+                        "1",
+                        instrument
+                );
+
+        assertTrue(result.isPresent());
+        assertSame(holding, result.get());
+    }
+
+    @Test
+    void shouldReturnEmptyWhenHoldingDoesNotMatchInstrument() {
+        InMemoryHoldingRepository repository = new InMemoryHoldingRepository();
+
+        Account account = createAccount(1L);
+        Instrument tcs = createInstrument("TCS");
+        Instrument infy = createInstrument("INFY");
+
+        Holding holding = new Holding(
+                1L,
+                account,
+                tcs,
+                10,
+                new BigDecimal("3500.00")
+        );
+
+        repository.save("1", holding);
+
+        Optional<Holding> result =
+                repository.findByAccountIdAndInstrument(
+                        "1",
+                        infy
+                );
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void shouldStoreMultipleHoldingsForDifferentInstruments() {
         InMemoryHoldingRepository repository = new InMemoryHoldingRepository();
 
         Account account = createAccount(1L);
@@ -69,6 +125,38 @@ class InMemoryHoldingRepositoryTest {
         assertEquals(2, result.size());
         assertSame(holding1, result.get(0));
         assertSame(holding2, result.get(1));
+    }
+
+    @Test
+    void shouldNotAddDuplicateHoldingForSameAccountAndInstrument() {
+        InMemoryHoldingRepository repository = new InMemoryHoldingRepository();
+
+        Account account = createAccount(1L);
+        Instrument instrument = createInstrument("TCS");
+
+        Holding existingHolding = new Holding(
+                1L,
+                account,
+                instrument,
+                10,
+                new BigDecimal("3500.00")
+        );
+
+        Holding duplicateHolding = new Holding(
+                2L,
+                account,
+                instrument,
+                20,
+                new BigDecimal("3600.00")
+        );
+
+        repository.save("1", existingHolding);
+        repository.save("1", duplicateHolding);
+
+        List<Holding> result = repository.findByAccountId("1");
+
+        assertEquals(1, result.size());
+        assertSame(existingHolding, result.get(0));
     }
 
     @Test
@@ -121,6 +209,21 @@ class InMemoryHoldingRepositoryTest {
         assertTrue(result.isEmpty());
     }
 
+    @Test
+    void shouldReturnEmptyWhenFindingHoldingForUnknownAccount() {
+        InMemoryHoldingRepository repository = new InMemoryHoldingRepository();
+
+        Instrument instrument = createInstrument("TCS");
+
+        Optional<Holding> result =
+                repository.findByAccountIdAndInstrument(
+                        "999",
+                        instrument
+                );
+
+        assertTrue(result.isEmpty());
+    }
+
     private Account createAccount(Long accountId) {
         User user = new User(
                 accountId,
@@ -151,3 +254,4 @@ class InMemoryHoldingRepositoryTest {
         );
     }
 }
+

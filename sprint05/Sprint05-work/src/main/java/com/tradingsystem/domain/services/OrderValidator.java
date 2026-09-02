@@ -5,19 +5,11 @@ import com.tradingsystem.domain.entities.Holding;
 import com.tradingsystem.domain.entities.Order;
 import com.tradingsystem.domain.enums.OrderSide;
 import com.tradingsystem.domain.enums.TradingStatus;
-import com.tradingsystem.domain.repositories.IdempotencyStore;
-import com.tradingsystem.exception.DuplicateIdempotencyKeyException;
 
 import java.math.BigDecimal;
 
 public class OrderValidator {
 
-    private final IdempotencyStore idempotencyStore;
-
-    public OrderValidator(IdempotencyStore idempotencyStore) {
-        this.idempotencyStore = idempotencyStore;
-
-    }
     public void validate(Order order, Holding holding) {
 
         Account account = order.getAccount();
@@ -38,17 +30,6 @@ public class OrderValidator {
             validateBuy(order);
         } else {
             validateSell(order, holding);
-        }
-
-        validateIdempotencyOrder(order);
-    }
-
-    public void validateIdempotencyOrder(Order order) {
-
-        String key =order.getIdempotencyKey();
-
-        if(idempotencyStore.exists(key)) {
-            throw new DuplicateIdempotencyKeyException(key);
         }
     }
 
