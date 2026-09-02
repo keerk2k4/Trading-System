@@ -1,0 +1,192 @@
+classDiagram
+
+    %% =========================
+    %% USER
+    %% =========================
+
+    class User {
+        -Long userId
+        -String firstName
+        -String lastName
+        -String email
+        -String phoneNumber
+        -String passwordHash
+        -String status
+        -Timestamp createdAt
+        -Timestamp updatedAt
+        +createOrder()
+    }
+
+
+    %% =========================
+    %% ORDER
+    %% =========================
+
+    class Order {
+        -Long orderId
+        -Instrument instrument
+        -String orderType
+        -String side
+        -String productType
+        -Integer quantity
+        -BigDecimal limitPrice
+        -BigDecimal stopPrice
+        -String status
+        -String idempotencyKey
+        -Timestamp createdAt
+        -Timestamp updatedAt
+        +markFailed()
+        +markExecuted()
+    }
+
+
+    %% =========================
+    %% INSTRUMENT
+    %% =========================
+
+    class Instrument {
+        -Long instrumentId
+        -String symbol
+        -String companyName
+        -String exchange
+        -String isin
+        -String instrumentType
+        -String status
+    }
+
+
+    %% =========================
+    %% ORDER VALIDATOR
+    %% =========================
+
+    class OrderValidator {
+        +validate(Order order) boolean
+        +validateAccount(Order order) boolean
+        +validateInstrument(Order order) boolean
+        +validateFunds(Order order) boolean
+        +validateHoldings(Order order) boolean
+        +validateDuplicate(Order order) boolean
+    }
+
+
+    %% =========================
+    %% ORDER EXECUTOR
+    %% =========================
+
+    class OrderExecutor {
+        +execute(Order order)
+        +markFailed(Order order)
+    }
+
+
+    %% =========================
+    %% POSITION UPDATER
+    %% =========================
+
+    class PositionUpdater {
+        +updatePosition(Order order)
+        +calculateAveragePrice(Order order)
+    }
+
+
+    %% =========================
+    %% POSITION
+    %% =========================
+
+    class Position {
+        -Long positionId
+        -Instrument instrument
+        -String productType
+        -Integer quantity
+        -BigDecimal averagePrice
+        -BigDecimal realizedPnl
+        -String positionStatus
+        -Timestamp openedAt
+        -Timestamp closedAt
+        -Timestamp updatedAt
+        +increaseQuantity(Integer quantity)
+        +decreaseQuantity(Integer quantity)
+        +updateAveragePrice(BigDecimal price)
+        +calculateRealizedPnl()
+        +closePosition()
+    }
+
+
+    %% =========================
+    %% SETTLEMENT PROCESSOR
+    %% =========================
+
+    class SettlementProcessor {
+        +process(Order order)
+        +createSettlement(Order order)
+        +settle(Settlement settlement)
+    }
+
+
+    %% =========================
+    %% SETTLEMENT
+    %% =========================
+
+    class Settlement {
+        -Long settlementId
+        -Long executionId
+        -Integer quantity
+        -Date settlementDate
+        -String status
+        -Timestamp createdAt
+        -Timestamp updatedAt
+        +process()
+        +markProcessing()
+        +markSettled()
+        +markFailed()
+    }
+
+
+    %% =========================
+    %% HOLDING
+    %% =========================
+
+    class Holding {
+        -Long holdingId
+        -Instrument instrument
+        -Integer quantity
+        -BigDecimal averagePrice
+        -Timestamp createdAt
+        -Timestamp updatedAt
+        +updateQuantity(Integer quantity)
+        +updateAveragePrice(BigDecimal price)
+    }
+
+
+    %% =========================
+    %% DOMAIN RELATIONSHIPS
+    %% =========================
+
+    User "1" --> "*" Order : creates
+
+    Order "*" --> "1" Instrument : contains
+
+    Position "*" --> "1" Instrument : represents
+
+    Holding "*" --> "1" Instrument : represents
+
+
+    %% =========================
+    %% PROCESSING FLOW
+    %% =========================
+
+    Order --> OrderValidator : validates
+
+    OrderValidator --> OrderExecutor : valid / invalid
+
+    OrderExecutor --> PositionUpdater : valid order
+
+    PositionUpdater --> Position : updates
+
+    PositionUpdater --> SettlementProcessor : position updated
+
+    SettlementProcessor --> Settlement : creates
+
+    SettlementProcessor --> Holding : updates
+
+    OrderExecutor --> Order : marks FAILED
