@@ -1,17 +1,31 @@
 package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.domain.enums.ProductType;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 public class Position {
 
+    @NotNull
     private final Account account;
+
+    @NotNull
     private final Instrument instrument;
+
+    @NotNull
     private final ProductType productType;
 
+    @PositiveOrZero
     private int quantity;
+
+    @NotNull
+    @DecimalMin(value = "0.01")
+    @Digits(integer = 17, fraction = 2)
     private BigDecimal averagePrice;
 
 
@@ -22,6 +36,24 @@ public class Position {
             int quantity,
             BigDecimal averagePrice
     ) {
+
+        if (account == null) {
+            throw new IllegalArgumentException(
+                    "Account cannot be null"
+            );
+        }
+
+        if (instrument == null) {
+            throw new IllegalArgumentException(
+                    "Instrument cannot be null"
+            );
+        }
+
+        if (productType == null) {
+            throw new IllegalArgumentException(
+                    "Product type cannot be null"
+            );
+        }
 
         if (quantity < 0) {
             throw new IllegalArgumentException(
@@ -126,7 +158,6 @@ public class Position {
     }
 
 
-
     /**
      * Sell reduces quantity.
      *
@@ -146,7 +177,6 @@ public class Position {
 
         quantity -= soldQuantity;
     }
-
 
 
     private void validateQuantity(int quantity) {
