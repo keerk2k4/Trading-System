@@ -85,8 +85,7 @@ CREATE TABLE demat_accounts (
 CREATE TABLE instruments (
     instrument_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 
-    symbol VARCHAR(30) NOT NULL,
-    company_name VARCHAR(200) NOT NULL,
+    symbol VARCHAR(30) NOT NULL,    
 
     exchange VARCHAR(10) NOT NULL,
     isin VARCHAR(20) UNIQUE,
