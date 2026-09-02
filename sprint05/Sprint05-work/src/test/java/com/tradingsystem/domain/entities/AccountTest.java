@@ -1,8 +1,8 @@
 
-package com.tradingsystem.domain.entities;
+        package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.domain.enums.TradingStatus;
-import com.tradingsystem.exception.InsufficientBalanceException;
+import com.tradingsystem.domain.enums.UserStatus;
 import com.tradingsystem.exception.InsufficientFundsException;
 import com.tradingsystem.exception.InvalidAmountException;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,14 +13,27 @@ import java.math.BigDecimal;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AccountTest {
-    Account account;
+
+    private Account account;
+    private User user;
 
     @BeforeEach
     public void createAccount() {
-        account =  new Account(
+
+        user = new User(
+                1L,
+                "John",
+                "Doe",
+                "john@example.com",
+                "9876543210",
+                "hashed-password",
+                UserStatus.ACTIVE
+        );
+
+        account = new Account(
                 1001L,
                 "ACC-001",
-                "John",
+                user,
                 new BigDecimal("1000.00"),
                 TradingStatus.ACTIVE,
                 5L
@@ -47,13 +60,19 @@ class AccountTest {
 
     @Test
     void shouldStoreHolder() {
+        assertSame(user, account.getHolder());
+    }
 
-        assertEquals("John", account.getHolder());
+    @Test
+    void holderShouldBeUser() {
+        assertInstanceOf(
+                User.class,
+                account.getHolder()
+        );
     }
 
     @Test
     void shouldStoreCashBalance() {
-
         assertEquals(
                 new BigDecimal("1000.00"),
                 account.getCashBalance()
@@ -62,7 +81,6 @@ class AccountTest {
 
     @Test
     void cashBalanceShouldUseBigDecimal() {
-
         assertInstanceOf(
                 BigDecimal.class,
                 account.getCashBalance()
@@ -71,7 +89,6 @@ class AccountTest {
 
     @Test
     void shouldStoreTradingStatus() {
-
         assertEquals(
                 TradingStatus.ACTIVE,
                 account.getTradingStatus()
@@ -80,7 +97,6 @@ class AccountTest {
 
     @Test
     void shouldReportLoadedVersion() {
-
         assertEquals(5L, account.getLoadedVersion());
     }
 
@@ -110,7 +126,7 @@ class AccountTest {
     void debitShouldBeRejectedWhenItWouldMakeBalanceNegative() {
 
         assertThrows(
-                InsufficientBalanceException.class,
+                InsufficientFundsException.class,
                 () -> account.debit(new BigDecimal("1000.01"))
         );
     }
@@ -119,7 +135,7 @@ class AccountTest {
     void rejectedDebitShouldLeaveBalanceUnchanged() {
 
         assertThrows(
-                InsufficientBalanceException.class,
+                InsufficientFundsException.class,
                 () -> account.debit(new BigDecimal("1000.01"))
         );
 
@@ -137,7 +153,6 @@ class AccountTest {
 
     @Test
     void canAffordShouldReturnFalseWhenBalanceIsInsufficient() {
-
         assertFalse(account.canAfford(new BigDecimal("1000.01")));
     }
 
@@ -157,4 +172,3 @@ class AccountTest {
         );
     }
 }
-

@@ -1,7 +1,8 @@
-package com.tradingsystem.domain.entities;
+
+        package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.domain.enums.TradingStatus;
-import com.tradingsystem.exception.InsufficientBalanceException;
+import com.tradingsystem.exception.InsufficientFundsException;
 import com.tradingsystem.exception.InvalidAmountException;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -21,8 +22,7 @@ public class Account {
     private final String accountReference;
 
     @NotNull
-    @Size(min = 1, max = 100)
-    private final String holder;
+    private final User holder;
 
     @NotNull
     @PositiveOrZero
@@ -36,11 +36,10 @@ public class Account {
     @NotNull
     private final Long loadedVersion;
 
-
     public Account(
             Long accountId,
             String accountReference,
-            String holder,
+            User holder,
             BigDecimal cashBalance,
             TradingStatus tradingStatus,
             Long loadedVersion
@@ -54,22 +53,26 @@ public class Account {
         this.loadedVersion = loadedVersion;
     }
 
-    // getters
     public Long getAccountId() {
         return accountId;
     }
+
     public String getAccountReference() {
         return accountReference;
     }
-    public String getHolder() {
+
+    public User getHolder() {
         return holder;
     }
+
     public BigDecimal getCashBalance() {
         return cashBalance;
     }
+
     public TradingStatus getTradingStatus() {
         return tradingStatus;
     }
+
     public Long getLoadedVersion() {
         return loadedVersion;
     }
@@ -81,20 +84,21 @@ public class Account {
 
     public void debit(BigDecimal amount) {
         validateAmount(amount);
+
         if (!canAfford(amount)) {
-            throw new InsufficientBalanceException(
-                    "Balance amount is less"
+            throw new InsufficientFundsException(
+                    amount,
+                    cashBalance
             );
         }
+
         cashBalance = cashBalance.subtract(amount);
     }
-
 
     public boolean canAfford(BigDecimal amount) {
         validateAmount(amount);
         return cashBalance.compareTo(amount) >= 0;
     }
-
 
     private void validateAmount(BigDecimal amount) {
         if (amount == null) {
@@ -116,3 +120,4 @@ public class Account {
         }
     }
 }
+
