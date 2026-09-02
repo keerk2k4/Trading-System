@@ -21,9 +21,7 @@ class UserTest {
                 "john.doe@example.com",
                 "9876543210",
                 "hashedpassword",
-                UserStatus.ACTIVE,
-                now,
-                now);
+                UserStatus.ACTIVE);
     }
 
     @Test
@@ -59,11 +57,5 @@ class UserTest {
     @Test
     void shouldStoreStatus() {
         assertEquals(UserStatus.ACTIVE, user.getStatus());
-    }
-
-    @Test
-    void shouldStoreTimestamps() {
-        assertEquals(now, user.getCreatedAt());
-        assertEquals(now, user.getUpdatedAt());
     }
 }

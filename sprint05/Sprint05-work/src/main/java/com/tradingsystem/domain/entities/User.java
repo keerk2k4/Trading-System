@@ -35,12 +35,6 @@ public class User {
     @NotNull
     private UserStatus status;
 
-    @NotNull
-    private LocalDateTime updatedAt;
-
-    @NotNull
-    private final LocalDateTime createdAt;
-
     public User(
             Long userId,
             String firstName,
@@ -48,9 +42,7 @@ public class User {
             String email,
             String phone,
             String passwordHash,
-            UserStatus status,
-            LocalDateTime updatedAt,
-            LocalDateTime createdAt) {
+            UserStatus status) {
         this.userId = userId;
         this.firstName = firstName;
         this.lastName = lastName;
@@ -58,48 +50,31 @@ public class User {
         this.phone = phone;
         this.passwordHash = passwordHash;
         this.status = status;
-        this.updatedAt = updatedAt;
-        this.createdAt = createdAt;
     }
 
     public Long getUserId() {
         return userId;
     }
-
     public String getFirstName() {
         return firstName;
     }
-
     public String getLastName() {
         return lastName;
     }
-
     public String getEmail() {
         return email;
     }
-
     public String getPhone() {
         return phone;
     }
-
     public String getPasswordHash() {
         return passwordHash;
     }
-
     public UserStatus getStatus() {
         return status;
     }
 
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
     public void setStatus(UserStatus status) {
         this.status = status;
-        this.updatedAt = LocalDateTime.now();
     }
 }
