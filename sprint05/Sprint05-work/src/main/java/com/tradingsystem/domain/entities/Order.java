@@ -1,6 +1,7 @@
 package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.domain.enums.*;
+import com.tradingsystem.exception.InvalidOrderException;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
@@ -51,45 +52,31 @@ public class Order {
     ) {
 
         if (orderId == null) {
-            throw new IllegalArgumentException(
-                    "Order ID cannot be null"
-            );
+            throw new InvalidOrderException("Order ID");
         }
 
         if (account == null) {
-            throw new IllegalArgumentException(
-                    "Account cannot be null"
-            );
+            throw new InvalidOrderException("Account");
         }
 
         if (instrument == null) {
-            throw new IllegalArgumentException(
-                    "Instrument cannot be null"
-            );
+            throw new InvalidOrderException("Instrument");
         }
 
         if (orderType == null) {
-            throw new IllegalArgumentException(
-                    "Order type cannot be null"
-            );
+            throw new InvalidOrderException("Order Type");
         }
 
         if (side == null) {
-            throw new IllegalArgumentException(
-                    "Order side cannot be null"
-            );
+            throw new InvalidOrderException("Side");
         }
 
         if (productType == null) {
-            throw new IllegalArgumentException(
-                    "Product type cannot be null"
-            );
+            throw new InvalidOrderException("Product Type");
         }
 
         if (quantity <= 0) {
-            throw new IllegalArgumentException(
-                    "Order quantity must be positive"
-            );
+            throw new InvalidOrderException("Quantity");
         }
 
         if (limitPrice != null) {
@@ -97,9 +84,7 @@ public class Order {
         }
 
         if (requiresLimitPrice(orderType) && limitPrice == null) {
-            throw new IllegalArgumentException(
-                    "Limit price is required for " + orderType
-            );
+            throw new InvalidOrderException("Limit Price");
         }
 
         this.orderId = orderId;
@@ -110,7 +95,6 @@ public class Order {
         this.productType = productType;
         this.quantity = quantity;
         this.limitPrice = limitPrice;
-
         this.status = OrderStatus.NEW;
     }
 
@@ -118,50 +102,32 @@ public class Order {
     public Long getOrderId() {
         return orderId;
     }
-
-
     public Account getAccount() {
         return account;
     }
-
-
     public Instrument getInstrument() {
         return instrument;
     }
-
-
     public OrderType getOrderType() {
         return orderType;
     }
-
-
     public OrderSide getSide() {
         return side;
     }
-
-
     public ProductType getProductType() {
         return productType;
     }
-
-
     public int getQuantity() {
         return quantity;
     }
-
-
     public BigDecimal getLimitPrice() {
         return limitPrice;
     }
-
-
     public OrderStatus getStatus() {
         return status;
     }
 
-
     public void transitionTo(OrderStatus newStatus) {
-
         if (newStatus == null) {
             throw new IllegalArgumentException(
                     "New status cannot be null"
@@ -193,13 +159,11 @@ public class Order {
 
 
     private boolean isTerminal(OrderStatus status) {
-
         return status == OrderStatus.FILLED
                 || status == OrderStatus.CANCELLED
                 || status == OrderStatus.REJECTED
                 || status == OrderStatus.EXPIRED;
     }
-
 
     private boolean isValidTransition(
             OrderStatus current,
@@ -227,26 +191,19 @@ public class Order {
         };
     }
 
-
     private boolean requiresLimitPrice(OrderType orderType) {
-
-        return orderType == OrderType.LIMIT
-                || orderType == OrderType.STOP_LIMIT;
+        return orderType == OrderType.LIMIT || orderType == OrderType.STOP_LIMIT;
     }
 
 
     private void validateLimitPrice(BigDecimal price) {
 
         if (price.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException(
-                    "Limit price must be positive"
-            );
+            throw new InvalidOrderException("Limit Price", price.toString());
         }
 
         if (price.scale() > 2) {
-            throw new IllegalArgumentException(
-                    "Limit price cannot have more than 2 decimal places"
-            );
+            throw new InvalidOrderException("Limit Price", price.toString());
         }
     }
 }
