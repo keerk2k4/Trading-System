@@ -24,7 +24,6 @@ public class Instrument {
 
     private boolean delisted;
 
-
     public Instrument(
             String symbol,
             String displayName,
@@ -49,35 +48,18 @@ public class Instrument {
     }
 
 
-    public String getSymbol() {
-        return symbol;
-    }
-
-
-    public String getDisplayName() {
-        return displayName;
-    }
-
-
-    public AssetClass getAssetClass() {
-        return assetClass;
-    }
-
-
-    public String getQuotationCurrency() {
-        return quotationCurrency;
-    }
-
+    public String getSymbol() {return symbol;}
+    public String getDisplayName() {return displayName;}
+    public AssetClass getAssetClass() {return assetClass;}
+    public String getQuotationCurrency() {return quotationCurrency;}
 
     public boolean mayBeTraded() {
         return !delisted;
     }
 
-
     public void delist() {
         this.delisted = true;
     }
-
 
     private void validateString(String value, String fieldName) {
         if (value == null || value.isBlank()) {
