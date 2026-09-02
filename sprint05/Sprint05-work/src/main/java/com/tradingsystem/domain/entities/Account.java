@@ -1,19 +1,37 @@
 package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.domain.enums.TradingStatus;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 
 public class Account {
 
+    @NotNull
     private final Long accountId;
+
+    @NotNull
+    @Size(min = 1, max = 30)
     private final String accountReference;
+
+    @NotNull
+    @Size(min = 1, max = 100)
     private final String holder;
 
+    @NotNull
+    @PositiveOrZero
+    @DecimalMin(value = "0.00")
+    @Digits(integer = 17, fraction = 2)
     private BigDecimal cashBalance;
 
+    @NotNull
     private final TradingStatus tradingStatus;
 
+    @NotNull
     private final Long loadedVersion;
 
 
@@ -104,6 +122,12 @@ public class Account {
         if (amount.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException(
                     "Amount cannot be negative"
+            );
+        }
+
+        if (amount.scale() > 2) {
+            throw new IllegalArgumentException(
+                    "Amount cannot have more than 2 decimal places"
             );
         }
     }
