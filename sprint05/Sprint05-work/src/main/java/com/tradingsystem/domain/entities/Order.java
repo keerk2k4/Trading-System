@@ -36,6 +36,8 @@ public class Order {
     @Digits(integer = 17, fraction = 2)
     private final BigDecimal limitPrice;
 
+    private final String idempotencykey;
+
     @NotNull
     private OrderStatus status;
 
@@ -48,7 +50,8 @@ public class Order {
             OrderSide side,
             ProductType productType,
             int quantity,
-            BigDecimal limitPrice
+            BigDecimal limitPrice,
+            String idempotencyKey
     ) {
 
         if (orderId == null) {
@@ -87,6 +90,10 @@ public class Order {
             throw new InvalidOrderArgumentException("Limit Price");
         }
 
+        if(idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new InvalidOrderArgumentException("idempotencyKey");
+        }
+
         this.orderId = orderId;
         this.account = account;
         this.instrument = instrument;
@@ -95,6 +102,7 @@ public class Order {
         this.productType = productType;
         this.quantity = quantity;
         this.limitPrice = limitPrice;
+        this.idempotencykey = idempotencyKey;
         this.status = OrderStatus.NEW;
     }
 
@@ -122,6 +130,9 @@ public class Order {
     }
     public BigDecimal getLimitPrice() {
         return limitPrice;
+    }
+    public String getIdempotencyKey() {
+        return idempotencykey;
     }
     public OrderStatus getStatus() {
         return status;

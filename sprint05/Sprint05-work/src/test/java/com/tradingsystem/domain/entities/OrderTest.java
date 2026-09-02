@@ -1,6 +1,9 @@
 package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.domain.enums.*;
+import com.tradingsystem.domain.repositories.IdempotencyStore;
+import com.tradingsystem.domain.repositories.impl.IdempotencyStoreImpl;
+import com.tradingsystem.domain.services.OrderValidator;
 import com.tradingsystem.exception.InvalidOrderArgumentException;
 import org.junit.jupiter.api.Test;
 
@@ -285,7 +288,8 @@ class OrderTest {
                         OrderSide.BUY,
                         ProductType.DELIVERY,
                         10,
-                        new BigDecimal("100.00")
+                        new BigDecimal("100.00"),
+                        "Test-Key-001"
                 )
         );
     }
@@ -303,7 +307,8 @@ class OrderTest {
                         OrderSide.BUY,
                         ProductType.DELIVERY,
                         10,
-                        new BigDecimal("100.00")
+                        new BigDecimal("100.00"),
+                        "Test-Key-001"
                 )
         );
     }
@@ -321,7 +326,8 @@ class OrderTest {
                         OrderSide.BUY,
                         ProductType.DELIVERY,
                         10,
-                        null
+                        null,
+                        "Test-Key-001"
                 )
         );
     }
@@ -413,6 +419,24 @@ class OrderTest {
         );
     }
 
+    @Test
+    void shouldAllowNewIdempotencyKey(){
+
+        IdempotencyStore store = new IdempotencyStoreImpl();
+        OrderValidator validator = new OrderValidator(store);
+        Order order = createOrder();
+        assertDoesNotThrow(()->validator.validate(order,null));
+    }
+
+
+    @Test
+
+    void shouldStoreIdempotencyKey(){
+
+        Order order = createOrder();
+        assertEquals("Test-Key-001",order.getIdempotencyKey());
+    }
+
     private Order createOrder(
             int quantity,
             BigDecimal limitPrice
@@ -426,7 +450,8 @@ class OrderTest {
                 OrderSide.BUY,
                 ProductType.DELIVERY,
                 quantity,
-                limitPrice
+                limitPrice,
+                "Test-Key-001"
         );
     }
 }
