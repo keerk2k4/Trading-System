@@ -1,5 +1,7 @@
 package com.tradingsystem.domain.entities;
 
+import com.tradingsystem.exception.InsufficientHoldingsException;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
@@ -48,26 +50,22 @@ public class Holding {
         this.account = account;
         this.instrument = instrument;
         this.quantity = quantity;
-        this.averagePrice =
-                averagePrice.setScale(2, RoundingMode.HALF_UP);
+        this.averagePrice = averagePrice.setScale(2, RoundingMode.HALF_UP);
     }
 
+    //getters
     public Long getHoldingId() {
         return holdingId;
     }
-
     public Account getAccount() {
         return account;
     }
-
     public Instrument getInstrument() {
         return instrument;
     }
-
     public int getQuantity() {
         return quantity;
     }
-
     public BigDecimal getAveragePrice() {
         return averagePrice;
     }
@@ -101,9 +99,7 @@ public class Holding {
         validateQuantity(soldQuantity);
 
         if (soldQuantity > quantity) {
-            throw new IllegalStateException(
-                    "Cannot sell more than the holding quantity"
-            );
+            throw new InsufficientHoldingsException(soldQuantity, quantity);
         }
 
         quantity -= soldQuantity;
