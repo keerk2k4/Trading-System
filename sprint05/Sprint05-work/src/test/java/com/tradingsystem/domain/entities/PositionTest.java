@@ -1,8 +1,10 @@
-package com.tradingsystem.domain.entities;
 
+package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.domain.enums.AssetClass;
 import com.tradingsystem.domain.enums.ProductType;
+import com.tradingsystem.domain.enums.TradingStatus;
+import com.tradingsystem.domain.enums.UserStatus;
 import com.tradingsystem.exception.InsufficientHoldingsException;
 import com.tradingsystem.exception.InvalidOrderArgumentException;
 import org.junit.jupiter.api.Test;
@@ -13,12 +15,15 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PositionTest {
 
-
     @Test
     void shouldCreatePositionWithInitialValues() {
+
         Position position = createPosition();
 
-        assertEquals(10, position.getQuantity());
+        assertEquals(
+                10,
+                position.getQuantity()
+        );
 
         assertEquals(
                 new BigDecimal("100.00"),
@@ -41,7 +46,6 @@ class PositionTest {
                 position.getQuantity()
         );
     }
-
 
     @Test
     void buyShouldRecalculateAveragePrice() {
@@ -66,13 +70,11 @@ class PositionTest {
                 new BigDecimal("120.00")
         );
 
-
         assertEquals(
                 new BigDecimal("106.67"),
                 position.getAveragePrice()
         );
     }
-
 
     @Test
     void sellShouldReduceQuantity() {
@@ -87,7 +89,6 @@ class PositionTest {
         );
     }
 
-
     @Test
     void sellShouldKeepAveragePriceUnchanged() {
 
@@ -101,19 +102,16 @@ class PositionTest {
         );
     }
 
-
     @Test
     void sellingMoreThanAvailableShouldFail() {
 
         Position position = createPosition();
-
 
         assertThrows(
                 InsufficientHoldingsException.class,
                 () -> position.sell(11)
         );
     }
-
 
     @Test
     void failedSellShouldNotChangeQuantity() {
@@ -125,19 +123,16 @@ class PositionTest {
                 () -> position.sell(11)
         );
 
-
         assertEquals(
                 10,
                 position.getQuantity()
         );
     }
 
-
     @Test
     void buyingNegativeQuantityShouldFail() {
 
         Position position = createPosition();
-
 
         assertThrows(
                 InvalidOrderArgumentException.class,
@@ -148,12 +143,10 @@ class PositionTest {
         );
     }
 
-
     @Test
     void sellingNegativeQuantityShouldFail() {
 
         Position position = createPosition();
-
 
         assertThrows(
                 InvalidOrderArgumentException.class,
@@ -161,28 +154,33 @@ class PositionTest {
         );
     }
 
-
     private Position createPosition() {
 
-        Account account =
-                new Account(
-                        1L,
-                        "ACC-001",
-                        "John",
-                        new BigDecimal("1000.00"),
-                        com.tradingsystem.domain.enums.TradingStatus.ACTIVE,
-                        1L
-                );
+        User user = new User(
+                1L,
+                "John",
+                "Doe",
+                "john@example.com",
+                "9876543210",
+                "hashed-password",
+                UserStatus.ACTIVE
+        );
 
+        Account account = new Account(
+                1L,
+                "ACC-001",
+                user,
+                new BigDecimal("1000.00"),
+                TradingStatus.ACTIVE,
+                1L
+        );
 
-        Instrument instrument =
-                new Instrument(
-                        "FAUX:TCS",
-                        "Tata Consultancy Services",
-                        AssetClass.EQUITY,
-                        "INR"
-                );
-
+        Instrument instrument = new Instrument(
+                "FAUX:TCS",
+                "Tata Consultancy Services",
+                AssetClass.EQUITY,
+                "INR"
+        );
 
         return new Position(
                 account,
@@ -193,3 +191,4 @@ class PositionTest {
         );
     }
 }
+

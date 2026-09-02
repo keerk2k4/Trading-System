@@ -1,5 +1,4 @@
-
-        package com.tradingsystem.domain.entities;
+package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.domain.enums.TradingStatus;
 import com.tradingsystem.domain.enums.UserStatus;
@@ -18,7 +17,7 @@ class AccountTest {
     private User user;
 
     @BeforeEach
-    public void createAccount() {
+    void createAccount() {
 
         user = new User(
                 1L,
@@ -42,12 +41,18 @@ class AccountTest {
 
     @Test
     void shouldStoreAccountId() {
-        assertEquals(1001L, account.getAccountId());
+        assertEquals(
+                1001L,
+                account.getAccountId()
+        );
     }
 
     @Test
     void shouldStoreAccountReference() {
-        assertEquals("ACC-001", account.getAccountReference());
+        assertEquals(
+                "ACC-001",
+                account.getAccountReference()
+        );
     }
 
     @Test
@@ -60,7 +65,10 @@ class AccountTest {
 
     @Test
     void shouldStoreHolder() {
-        assertSame(user, account.getHolder());
+        assertSame(
+                user,
+                account.getHolder()
+        );
     }
 
     @Test
@@ -97,7 +105,10 @@ class AccountTest {
 
     @Test
     void shouldReportLoadedVersion() {
-        assertEquals(5L, account.getLoadedVersion());
+        assertEquals(
+                5L,
+                account.getLoadedVersion()
+        );
     }
 
     @Test
@@ -147,17 +158,27 @@ class AccountTest {
 
     @Test
     void canAffordShouldReturnTrueWhenBalanceIsSufficient() {
-        assertTrue(account.canAfford(new BigDecimal("500.00")));
-        assertTrue(account.canAfford(new BigDecimal("1000.00")));
+
+        assertTrue(
+                account.canAfford(new BigDecimal("500.00"))
+        );
+
+        assertTrue(
+                account.canAfford(new BigDecimal("1000.00"))
+        );
     }
 
     @Test
     void canAffordShouldReturnFalseWhenBalanceIsInsufficient() {
-        assertFalse(account.canAfford(new BigDecimal("1000.01")));
+
+        assertFalse(
+                account.canAfford(new BigDecimal("1000.01"))
+        );
     }
 
     @Test
     void creditShouldRejectNegativeAmount() {
+
         assertThrows(
                 InvalidAmountException.class,
                 () -> account.credit(new BigDecimal("-10.00"))
@@ -166,6 +187,7 @@ class AccountTest {
 
     @Test
     void debitShouldRejectNegativeAmount() {
+
         assertThrows(
                 InvalidAmountException.class,
                 () -> account.debit(new BigDecimal("-10.00"))

@@ -1,6 +1,10 @@
+
 package com.tradingsystem.domain.entities;
 
+import com.tradingsystem.domain.enums.AssetClass;
 import com.tradingsystem.domain.enums.ProductType;
+import com.tradingsystem.domain.enums.TradingStatus;
+import com.tradingsystem.domain.enums.UserStatus;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -10,12 +14,23 @@ import static org.junit.jupiter.api.Assertions.*;
 class SettlementTest {
 
     private Account createAccount() {
+
+        User user = new User(
+                1L,
+                "John",
+                "Doe",
+                "john@example.com",
+                "9876543210",
+                "hashed-password",
+                UserStatus.ACTIVE
+        );
+
         return new Account(
                 1001L,
                 "ACC-1001",
-                "John Doe",
+                user,
                 new BigDecimal("10000.00"),
-                com.tradingsystem.domain.enums.TradingStatus.ACTIVE,
+                TradingStatus.ACTIVE,
                 1L
         );
     }
@@ -24,13 +39,14 @@ class SettlementTest {
         return new Instrument(
                 "TCS",
                 "Tata Consultancy Services",
-                com.tradingsystem.domain.enums.AssetClass.EQUITY,
+                AssetClass.EQUITY,
                 "INR"
         );
     }
 
     @Test
     void shouldCreateSettlementWithInitialValues() {
+
         Settlement settlement = new Settlement(
                 5001L,
                 createAccount(),
@@ -40,17 +56,45 @@ class SettlementTest {
                 new BigDecimal("3500.00")
         );
 
-        assertEquals(5001L, settlement.getSettlementId());
-        assertEquals(createAccount().getAccountId(), settlement.getAccount().getAccountId());
-        assertEquals("TCS", settlement.getInstrument().getSymbol());
-        assertEquals(ProductType.DELIVERY, settlement.getProductType());
-        assertEquals(10, settlement.getQuantity());
-        assertEquals(new BigDecimal("3500.00"), settlement.getExecutionPrice());
-        assertEquals(Settlement.SettlementStatus.PENDING, settlement.getStatus());
+        assertEquals(
+                5001L,
+                settlement.getSettlementId()
+        );
+
+        assertEquals(
+                1001L,
+                settlement.getAccount().getAccountId()
+        );
+
+        assertEquals(
+                "TCS",
+                settlement.getInstrument().getSymbol()
+        );
+
+        assertEquals(
+                ProductType.DELIVERY,
+                settlement.getProductType()
+        );
+
+        assertEquals(
+                10,
+                settlement.getQuantity()
+        );
+
+        assertEquals(
+                new BigDecimal("3500.00"),
+                settlement.getExecutionPrice()
+        );
+
+        assertEquals(
+                Settlement.SettlementStatus.PENDING,
+                settlement.getStatus()
+        );
     }
 
     @Test
     void shouldMarkSettlementAsCompleted() {
+
         Settlement settlement = new Settlement(
                 5001L,
                 createAccount(),
@@ -70,6 +114,7 @@ class SettlementTest {
 
     @Test
     void shouldNotCompleteSettlementTwice() {
+
         Settlement settlement = new Settlement(
                 5001L,
                 createAccount(),
@@ -89,6 +134,7 @@ class SettlementTest {
 
     @Test
     void shouldMarkSettlementAsFailed() {
+
         Settlement settlement = new Settlement(
                 5001L,
                 createAccount(),
@@ -108,6 +154,7 @@ class SettlementTest {
 
     @Test
     void shouldNotFailCompletedSettlement() {
+
         Settlement settlement = new Settlement(
                 5001L,
                 createAccount(),
@@ -127,6 +174,7 @@ class SettlementTest {
 
     @Test
     void shouldRejectZeroQuantity() {
+
         assertThrows(
                 IllegalArgumentException.class,
                 () -> new Settlement(
@@ -142,6 +190,7 @@ class SettlementTest {
 
     @Test
     void shouldRejectNegativeQuantity() {
+
         assertThrows(
                 IllegalArgumentException.class,
                 () -> new Settlement(
@@ -157,6 +206,7 @@ class SettlementTest {
 
     @Test
     void shouldRejectNonPositiveExecutionPrice() {
+
         assertThrows(
                 IllegalArgumentException.class,
                 () -> new Settlement(
@@ -170,3 +220,4 @@ class SettlementTest {
         );
     }
 }
+
