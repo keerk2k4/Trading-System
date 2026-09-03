@@ -163,11 +163,9 @@ public class Order {
         this.status = newStatus;
     }
 
-
     public boolean isTerminal() {
         return isTerminal(status);
     }
-
 
     private boolean isTerminal(OrderStatus status) {
         return status == OrderStatus.FILLED
@@ -206,7 +204,6 @@ public class Order {
     private boolean requiresLimitPrice(OrderType orderType) {
         return orderType == OrderType.LIMIT || orderType == OrderType.STOP_LIMIT;
     }
-
 
     private void validateLimitPrice(BigDecimal price) {
 

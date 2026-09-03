@@ -85,28 +85,17 @@ public class Position {
     public Account getAccount() {
         return account;
     }
-
-
     public Instrument getInstrument() {
         return instrument;
     }
-
-
     public ProductType getProductType() {
         return productType;
     }
-
-
     public int getQuantity() {
         return quantity;
     }
-
-
-    public BigDecimal getAveragePrice() {
-        return averagePrice;
+    public BigDecimal getAveragePrice() {return averagePrice;
     }
-
-
     public void buy(
             int boughtQuantity,
             BigDecimal buyPrice
@@ -156,14 +145,12 @@ public class Position {
         quantity -= soldQuantity;
     }
 
-
     private void validateQuantity(int quantity) {
 
         if (quantity <= 0) {
             throw new InvalidOrderArgumentException("quantity", String.valueOf(quantity));
         }
     }
-
 
     private void validatePrice(BigDecimal price) {
 

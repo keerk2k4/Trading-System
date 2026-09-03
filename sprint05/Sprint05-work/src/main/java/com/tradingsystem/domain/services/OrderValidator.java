@@ -69,6 +69,7 @@ public class OrderValidator {
             throw new DuplicateOrderException(key);
         }
     }
+
     private void validateAccount(Order order) {
         TradingStatus tradingStatus =
                 order.getAccount()
