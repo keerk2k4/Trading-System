@@ -1,7 +1,9 @@
-
 package com.tradingsystem.domain.entities;
 
 import com.tradingsystem.domain.enums.*;
+import com.tradingsystem.domain.repositories.IdempotencyStore;
+import com.tradingsystem.domain.repositories.impl.IdempotencyStoreImpl;
+import com.tradingsystem.domain.services.OrderValidator;
 import com.tradingsystem.exception.InvalidOrderArgumentException;
 import org.junit.jupiter.api.Test;
 
@@ -10,7 +12,6 @@ import java.math.BigDecimal;
 import static org.junit.jupiter.api.Assertions.*;
 
 class OrderTest {
-
 
     @Test
     void shouldCreateOrderWithRequiredDetails() {
@@ -29,7 +30,6 @@ class OrderTest {
         );
     }
 
-
     @Test
     void newOrderShouldHaveNewStatus() {
 
@@ -40,7 +40,6 @@ class OrderTest {
                 order.getStatus()
         );
     }
-
 
     @Test
     void shouldMoveFromNewToOpen() {
@@ -55,7 +54,6 @@ class OrderTest {
         );
     }
 
-
     @Test
     void shouldMoveFromOpenToPartiallyFilled() {
 
@@ -69,7 +67,6 @@ class OrderTest {
                 order.getStatus()
         );
     }
-
 
     @Test
     void shouldMoveFromPartiallyFilledToFilled() {
@@ -86,7 +83,6 @@ class OrderTest {
         );
     }
 
-
     @Test
     void shouldAllowCancellationFromNew() {
 
@@ -101,7 +97,6 @@ class OrderTest {
 
         assertTrue(order.isTerminal());
     }
-
 
     @Test
     void shouldAllowRejectionFromNew() {
@@ -118,7 +113,6 @@ class OrderTest {
         assertTrue(order.isTerminal());
     }
 
-
     @Test
     void shouldAllowCancellationFromOpen() {
 
@@ -134,7 +128,6 @@ class OrderTest {
 
         assertTrue(order.isTerminal());
     }
-
 
     @Test
     void shouldAllowCancellationFromPartiallyFilled() {
@@ -153,7 +146,6 @@ class OrderTest {
         assertTrue(order.isTerminal());
     }
 
-
     @Test
     void shouldAllowExpirationFromOpen() {
 
@@ -170,7 +162,6 @@ class OrderTest {
         assertTrue(order.isTerminal());
     }
 
-
     @Test
     void shouldRejectInvalidTransitionFromNewToPartiallyFilled() {
 
@@ -184,7 +175,6 @@ class OrderTest {
         );
     }
 
-
     @Test
     void shouldRejectInvalidTransitionFromNewToFilled() {
 
@@ -197,7 +187,6 @@ class OrderTest {
                 )
         );
     }
-
 
     @Test
     void shouldRejectInvalidTransitionFromPartiallyFilledToOpen() {
@@ -213,7 +202,6 @@ class OrderTest {
         );
     }
 
-
     @Test
     void shouldRejectInvalidTransitionAfterTerminalState() {
 
@@ -228,7 +216,6 @@ class OrderTest {
         );
     }
 
-
     @Test
     void shouldRejectSecondTerminalState() {
 
@@ -242,7 +229,6 @@ class OrderTest {
         );
     }
 
-
     @Test
     void shouldRejectTransitionToNull() {
 
@@ -254,7 +240,6 @@ class OrderTest {
         );
     }
 
-
     @Test
     void shouldIdentifyTerminalOrder() {
 
@@ -265,7 +250,6 @@ class OrderTest {
 
         assertTrue(order.isTerminal());
     }
-
 
     @Test
     void shouldRejectZeroQuantity() {
@@ -279,7 +263,6 @@ class OrderTest {
         );
     }
 
-
     @Test
     void shouldRejectNegativeQuantity() {
 
@@ -291,7 +274,6 @@ class OrderTest {
                 )
         );
     }
-
 
     @Test
     void shouldRejectNullAccount() {
@@ -306,11 +288,11 @@ class OrderTest {
                         OrderSide.BUY,
                         ProductType.DELIVERY,
                         10,
-                        new BigDecimal("100.00")
+                        new BigDecimal("100.00"),
+                        "Test-Key-001"
                 )
         );
     }
-
 
     @Test
     void shouldRejectNullInstrument() {
@@ -325,11 +307,11 @@ class OrderTest {
                         OrderSide.BUY,
                         ProductType.DELIVERY,
                         10,
-                        new BigDecimal("100.00")
+                        new BigDecimal("100.00"),
+                        "Test-Key-001"
                 )
         );
     }
-
 
     @Test
     void shouldRejectLimitOrderWithoutLimitPrice() {
@@ -344,11 +326,11 @@ class OrderTest {
                         OrderSide.BUY,
                         ProductType.DELIVERY,
                         10,
-                        null
+                        null,
+                        "Test-Key-001"
                 )
         );
     }
-
 
     @Test
     void shouldRejectNegativeLimitPrice() {
@@ -362,7 +344,6 @@ class OrderTest {
         );
     }
 
-
     @Test
     void shouldRejectZeroLimitPrice() {
 
@@ -374,7 +355,6 @@ class OrderTest {
                 )
         );
     }
-
 
     @Test
     void shouldRejectLimitPriceWithMoreThanTwoDecimalPlaces() {
@@ -388,7 +368,6 @@ class OrderTest {
         );
     }
 
-
     @Test
     void limitPriceShouldRepresentCustomerSubmittedPrice() {
 
@@ -400,19 +379,27 @@ class OrderTest {
         );
     }
 
-
     private Account createAccount() {
+
+        User user = new User(
+                1L,
+                "John",
+                "Doe",
+                "john@example.com",
+                "9876543210",
+                "hashed-password",
+                UserStatus.ACTIVE
+        );
 
         return new Account(
                 1L,
                 "ACC-001",
-                "John",
+                user,
                 new BigDecimal("1000.00"),
                 TradingStatus.ACTIVE,
                 1L
         );
     }
-
 
     private Instrument createInstrument() {
 
@@ -424,7 +411,6 @@ class OrderTest {
         );
     }
 
-
     private Order createOrder() {
 
         return createOrder(
@@ -433,6 +419,23 @@ class OrderTest {
         );
     }
 
+    @Test
+    void shouldAllowNewIdempotencyKey(){
+
+        IdempotencyStore store = new IdempotencyStoreImpl();
+        OrderValidator validator = new OrderValidator(store);
+        Order order = createOrder();
+        assertDoesNotThrow(()->validator.validate(order,null));
+    }
+
+
+    @Test
+
+    void shouldStoreIdempotencyKey(){
+
+        Order order = createOrder();
+        assertEquals("Test-Key-001",order.getIdempotencyKey());
+    }
 
     private Order createOrder(
             int quantity,
@@ -447,7 +450,8 @@ class OrderTest {
                 OrderSide.BUY,
                 ProductType.DELIVERY,
                 quantity,
-                limitPrice
+                limitPrice,
+                "Test-Key-001"
         );
     }
 }
