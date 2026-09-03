@@ -66,7 +66,7 @@ public class OrderValidator {
         String key =order.getIdempotencyKey();
 
         if(idempotencyStore.exists(key)) {
-            throw new DuplicateIdempotencyKeyException(key);
+            throw new DuplicateOrderException(key);
         }
     }
     private void validateAccount(Order order) {

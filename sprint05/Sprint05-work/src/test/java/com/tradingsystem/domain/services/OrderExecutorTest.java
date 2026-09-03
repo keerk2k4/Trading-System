@@ -60,7 +60,7 @@ class OrderExecutorTest {
                 ProductType.INTRADAY,
                 10,
                 new BigDecimal("3500.00"),
-                "test-key"
+                "Test-Key-001"
         );
 
         executor.execute(order);
@@ -91,7 +91,7 @@ class OrderExecutorTest {
                 ProductType.INTRADAY,
                 10,
                 null,
-                "test-key"
+                "Test-Key-001"
         );
 
         executor.execute(order);
@@ -119,7 +119,7 @@ class OrderExecutorTest {
                 ProductType.INTRADAY,
                 5,
                 new BigDecimal("3600.00"),
-                "test-key"
+                "Test-Key-001"
         );
 
         executor.execute(order);
@@ -150,7 +150,7 @@ class OrderExecutorTest {
                 ProductType.INTRADAY,
                 5,
                 null,
-                "test-key"
+                "Test-Key-001"
         );
 
         executor.execute(order);
@@ -175,7 +175,7 @@ class OrderExecutorTest {
                 ProductType.INTRADAY,
                 10,
                 new BigDecimal("3500.00"),
-                "test-key"
+                "Test-Key-001"
         );
 
         executor.execute(order);
@@ -194,7 +194,7 @@ class OrderExecutorTest {
                 ProductType.INTRADAY,
                 10,
                 new BigDecimal("3500.00"),
-                "test-key"
+                "Test-Key-001"
         );
 
         executor.execute(order);
@@ -219,7 +219,7 @@ class OrderExecutorTest {
                 ProductType.INTRADAY,
                 10,
                 new BigDecimal("3500.00"),
-                "test-key"
+                "Test-Key-001"
         );
 
         doThrow(new RuntimeException("Position update failed"))
@@ -247,7 +247,7 @@ class OrderExecutorTest {
                 ProductType.INTRADAY,
                 10,
                 null,
-                "test-key"
+                "Test-Key-001"
         );
 
         assertThrows(

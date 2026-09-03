@@ -1,9 +1,7 @@
 package com.tradingsystem.domain.repositories.impl;
 
-import com.tradingsystem.domain.entities.Order;
 import com.tradingsystem.domain.repositories.IdempotencyStore;
-import com.tradingsystem.domain.services.OrderValidator;
-import com.tradingsystem.exception.DuplicateIdempotencyKeyException;
+import com.tradingsystem.exception.DuplicateOrderException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -20,9 +18,9 @@ public class IdempotencyKeyStoreTest {
 
         assertTrue(store.exists(key));
 
-        assertThrows(DuplicateIdempotencyKeyException.class,()->{
+        assertThrows(DuplicateOrderException.class,()->{
             if (store.exists(key)) {
-                throw new DuplicateIdempotencyKeyException(key);
+                throw new DuplicateOrderException(key);
             }
         });
     }

@@ -406,22 +406,31 @@ class OrderTest {
         );
     }
 
-//    @Test
-//    void shouldAllowNewIdempotencyKey(){
-//
-//        IdempotencyStore store = new IdempotencyStoreImpl();
-//        OrderValidator validator = new OrderValidator(store);
-//        Order order = createOrder();
-//        assertDoesNotThrow(()->validator.validate(order,null));
-//    }
-
 
     @Test
-
     void shouldStoreIdempotencyKey(){
 
         Order order = createOrder();
         assertEquals("Test-Key-001",order.getIdempotencyKey());
+    }
+
+    @Test
+    void shouldRejectNullIdempotencyKey(){
+
+        assertThrows(
+                InvalidOrderArgumentException.class,
+                () -> new Order(
+                        1L,
+                        createAccount(),
+                        createInstrument(),
+                        OrderType.LIMIT,
+                        OrderSide.BUY,
+                        ProductType.DELIVERY,
+                        10,
+                        new BigDecimal("100.00"),
+                        null
+                )
+        );
     }
 
     private Order createOrder(

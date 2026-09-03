@@ -17,11 +17,7 @@ import com.tradingsystem.domain.repositories.IdempotencyStore;
 import com.tradingsystem.domain.repositories.impl.IdempotencyStoreImpl;
 import com.tradingsystem.domain.repositories.impl.InMemoryHoldingRepository;
 import com.tradingsystem.domain.repositories.impl.InMemoryPositionRepository;
-import com.tradingsystem.exception.AccountNotActiveException;
-import com.tradingsystem.exception.InsufficientFundsException;
-import com.tradingsystem.exception.InsufficientHoldingsException;
-import com.tradingsystem.exception.InstrumentDelistedException;
-import com.tradingsystem.exception.UserNotActiveException;
+import com.tradingsystem.exception.*;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -564,6 +560,80 @@ class OrderValidatorTest {
 
         assertEquals(5, exception.getRequiredQuantity());
         assertEquals(3, exception.getAvailableQuantity());
+    }
+
+    @Test
+    void shouldAllowNewIdempotencyKey(){
+
+        IdempotencyStore store =
+                new IdempotencyStoreImpl();
+
+        OrderValidator validator =
+                new OrderValidator(
+                        new InMemoryPositionRepository(),
+                        new InMemoryHoldingRepository(),
+                        mock(MarketPriceProvider.class),
+                        store
+                );
+
+        Order order = createOrder(
+                createAccount(
+                        1L,
+                        new BigDecimal("10000"),
+                        UserStatus.ACTIVE,
+                        TradingStatus.ACTIVE
+                ),
+                createInstrument("TCS"),
+                OrderType.LIMIT,
+                OrderSide.BUY,
+                ProductType.DELIVERY,
+                1,
+                new BigDecimal("100")
+        );
+
+        assertDoesNotThrow(
+                () -> validator.validate(order)
+        );
+    }
+
+    @Test
+    void shouldRejectDuplicateIdempotencyKey(){
+
+        IdempotencyStore store =
+                new IdempotencyStoreImpl();
+
+        OrderValidator validator =
+                new OrderValidator(
+                        new InMemoryPositionRepository(),
+                        new InMemoryHoldingRepository(),
+                        mock(MarketPriceProvider.class),
+                        store
+                );
+
+
+        Order order = createOrder(
+                createAccount(
+                        1L,
+                        new BigDecimal("10000"),
+                        UserStatus.ACTIVE,
+                        TradingStatus.ACTIVE
+                ),
+                createInstrument("TCS"),
+                OrderType.LIMIT,
+                OrderSide.BUY,
+                ProductType.DELIVERY,
+                1,
+                new BigDecimal("100")
+        );
+
+
+        store.save(order.getIdempotencyKey());
+
+
+        assertThrows(
+                DuplicateOrderException.class,
+                () -> validator.validate(order)
+        );
     }
 
     private OrderValidator createValidator() {
