@@ -58,12 +58,6 @@ echo "Seeding initial data..."
         -f "$file"
 done
 
-psql \
--h "$POSTGRES_HOST" \
--p "$POSTGRES_PORT" \
--U "$POSTGRES_USER" \
--d "$POSTGRES_DB" \
--f seed/001_initial_trading_data.sql
 
 echo "Applying seed data..."
 
