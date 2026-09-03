@@ -1,7 +1,6 @@
 
 BEGIN;
 
--- Drop all existing tables in reverse order of dependencies
 DROP TABLE IF EXISTS watchlist_inst CASCADE;
 DROP TABLE IF EXISTS watchlist CASCADE;
 DROP TABLE IF EXISTS account_transactions CASCADE;
