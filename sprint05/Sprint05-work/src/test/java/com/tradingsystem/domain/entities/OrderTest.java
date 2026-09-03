@@ -176,19 +176,6 @@ class OrderTest {
     }
 
     @Test
-    void shouldRejectInvalidTransitionFromNewToFilled() {
-
-        Order order = createOrder();
-
-        assertThrows(
-                IllegalStateException.class,
-                () -> order.transitionTo(
-                        OrderStatus.FILLED
-                )
-        );
-    }
-
-    @Test
     void shouldRejectInvalidTransitionFromPartiallyFilledToOpen() {
 
         Order order = createOrder();

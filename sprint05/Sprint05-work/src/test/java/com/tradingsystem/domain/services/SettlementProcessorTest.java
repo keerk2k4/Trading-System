@@ -397,7 +397,8 @@ class SettlementProcessorTest {
                 side,
                 productType,
                 quantity,
-                null
+                null,
+                "test-key"
         );
     }
 }

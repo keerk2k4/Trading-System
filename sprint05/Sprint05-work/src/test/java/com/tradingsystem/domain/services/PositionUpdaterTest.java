@@ -446,7 +446,8 @@ class PositionUpdaterTest {
                 side,
                 productType,
                 quantity,
-                null
+                null,
+                "test-key"
         );
     }
 }
