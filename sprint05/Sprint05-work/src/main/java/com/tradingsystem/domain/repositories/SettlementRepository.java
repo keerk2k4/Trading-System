@@ -7,7 +7,5 @@ import java.util.List;
 
 public interface SettlementRepository {
     void save(String accountId, Settlement settlement);
-
-
     List<Settlement> findByAccountId(String accountId);
 }
