@@ -419,14 +419,14 @@ class OrderTest {
         );
     }
 
-    @Test
-    void shouldAllowNewIdempotencyKey(){
-
-        IdempotencyStore store = new IdempotencyStoreImpl();
-        OrderValidator validator = new OrderValidator(store);
-        Order order = createOrder();
-        assertDoesNotThrow(()->validator.validate(order,null));
-    }
+//    @Test
+//    void shouldAllowNewIdempotencyKey(){
+//
+//        IdempotencyStore store = new IdempotencyStoreImpl();
+//        OrderValidator validator = new OrderValidator(store);
+//        Order order = createOrder();
+//        assertDoesNotThrow(()->validator.validate(order,null));
+//    }
 
 
     @Test

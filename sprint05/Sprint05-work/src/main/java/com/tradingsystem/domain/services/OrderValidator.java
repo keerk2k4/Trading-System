@@ -1,46 +1,64 @@
 package com.tradingsystem.domain.services;
 
-import com.tradingsystem.domain.entities.Account;
 import com.tradingsystem.domain.entities.Holding;
 import com.tradingsystem.domain.entities.Order;
+import com.tradingsystem.domain.entities.Position;
 import com.tradingsystem.domain.enums.OrderSide;
+import com.tradingsystem.domain.enums.OrderType;
+import com.tradingsystem.domain.enums.ProductType;
 import com.tradingsystem.domain.enums.TradingStatus;
+import com.tradingsystem.domain.enums.UserStatus;
+import com.tradingsystem.domain.repositories.HoldingRepository;
+import com.tradingsystem.domain.repositories.PositionRepository;
+import com.tradingsystem.exception.*;
 import com.tradingsystem.domain.repositories.IdempotencyStore;
-import com.tradingsystem.exception.DuplicateIdempotencyKeyException;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
 public class OrderValidator {
 
+    private final PositionRepository positionRepository;
+    private final HoldingRepository holdingRepository;
+    private final MarketPriceProvider marketPriceProvider;
     private final IdempotencyStore idempotencyStore;
 
-    public OrderValidator(IdempotencyStore idempotencyStore) {
+
+    public OrderValidator(
+            PositionRepository positionRepository,
+            HoldingRepository holdingRepository,
+            MarketPriceProvider marketPriceProvider,
+            IdempotencyStore idempotencyStore
+    ) {
+        this.positionRepository = positionRepository;
+        this.holdingRepository = holdingRepository;
+        this.marketPriceProvider = marketPriceProvider;
         this.idempotencyStore = idempotencyStore;
-
     }
-    public void validate(Order order, Holding holding) {
 
-        Account account = order.getAccount();
-
-        if (account.getTradingStatus() != TradingStatus.ACTIVE) {
-            throw new IllegalStateException(
-                    "Account is not active"
-            );
-        }
-
-        if (!order.getInstrument().mayBeTraded()) {
-            throw new IllegalStateException(
-                    "Instrument is not available for trading"
-            );
-        }
-
-        if (order.getSide() == OrderSide.BUY) {
-            validateBuy(order);
-        } else {
-            validateSell(order, holding);
-        }
-
+    public void validate(Order order) {
+        validateUser(order);
+        validateAccount(order);
+        validateInstrument(order);
+        validateFunds(order);
         validateIdempotencyOrder(order);
+        validateSellAvailability(order);
+    }
+
+    private void validateUser(Order order) {
+
+        UserStatus userStatus =
+                order.getAccount()
+                        .getHolder()
+                        .getStatus();
+
+        if (userStatus != UserStatus.ACTIVE) {
+            throw new UserNotActiveException(
+                    order.getAccount()
+                            .getHolder()
+                            .getUserId()
+            );
+        }
     }
 
     public void validateIdempotencyOrder(Order order) {
@@ -51,36 +69,127 @@ public class OrderValidator {
             throw new DuplicateIdempotencyKeyException(key);
         }
     }
-
-    private void validateBuy(Order order) {
-
-        if (order.getLimitPrice() == null) {
-            // Market order: execution price is not known yet.
-            return;
-        }
-
-        BigDecimal requiredAmount =
-                order.getLimitPrice()
-                        .multiply(BigDecimal.valueOf(order.getQuantity()));
-
-        if (!order.getAccount().canAfford(requiredAmount)) {
-            throw new IllegalStateException(
-                    "Insufficient account balance"
+    private void validateAccount(Order order) {
+        TradingStatus tradingStatus =
+                order.getAccount()
+                        .getTradingStatus();
+        if (tradingStatus != TradingStatus.ACTIVE) {
+            throw new AccountNotActiveException(
+                    order.getAccount().getAccountId()
             );
         }
     }
 
-    private void validateSell(Order order, Holding holding) {
+    private void validateInstrument(Order order) {
 
-        if (holding == null) {
-            throw new IllegalStateException(
-                    "No holdings available to sell"
+        if (!order.getInstrument().mayBeTraded()) {
+            throw new InstrumentDelistedException(
+                    order.getInstrument().getSymbol()
+            );
+        }
+    }
+
+    private void validateFunds(Order order) {
+
+        if (order.getSide() != OrderSide.BUY) {
+            return;
+        }
+
+        BigDecimal price;
+
+        if (order.getOrderType() == OrderType.LIMIT) {
+            price = order.getLimitPrice();
+        } else if (order.getOrderType() == OrderType.MARKET) {
+            price = marketPriceProvider.getMarketPrice(
+                    order.getInstrument()
+            );
+        } else {
+            return;
+        }
+
+        BigDecimal requiredFunds =
+                price.multiply(
+                        BigDecimal.valueOf(order.getQuantity())
+                );
+
+        if (!order.getAccount().canAfford(requiredFunds)) {
+            throw new InsufficientFundsException(
+                    requiredFunds,
+                    order.getAccount().getCashBalance()
+            );
+        }
+    }
+
+    private void validateSellAvailability(Order order) {
+        if (order.getSide() != OrderSide.SELL) {
+            return;
+        }
+
+        if (order.getProductType() == ProductType.INTRADAY) {
+            validateIntradayPosition(order);
+            return;
+        }
+
+        if (order.getProductType() == ProductType.DELIVERY) {
+            validateDeliveryHolding(order);
+        }
+    }
+
+    private void validateIntradayPosition(Order order) {
+
+        Optional<Position> position =
+                positionRepository
+                        .findByAccountIdAndInstrumentAndProductType(
+                                order.getAccount()
+                                        .getAccountId()
+                                        .toString(),
+                                order.getInstrument(),
+                                ProductType.INTRADAY
+                        );
+
+        if (position.isEmpty()) {
+            throw new InsufficientHoldingsException(
+                    order.getQuantity(),
+                    0
             );
         }
 
-        if (holding.getQuantity() < order.getQuantity()) {
-            throw new IllegalStateException(
-                    "Insufficient holdings to sell"
+        int availableQuantity =
+                position.get().getQuantity();
+
+        if (availableQuantity < order.getQuantity()) {
+            throw new InsufficientHoldingsException(
+                    order.getQuantity(),
+                    availableQuantity
+            );
+        }
+    }
+
+    private void validateDeliveryHolding(Order order) {
+
+        Optional<Holding> holding =
+                holdingRepository
+                        .findByAccountIdAndInstrument(
+                                order.getAccount()
+                                        .getAccountId()
+                                        .toString(),
+                                order.getInstrument()
+                        );
+
+        if (holding.isEmpty()) {
+            throw new InsufficientHoldingsException(
+                    order.getQuantity(),
+                    0
+            );
+        }
+
+        int availableQuantity =
+                holding.get().getQuantity();
+
+        if (availableQuantity < order.getQuantity()) {
+            throw new InsufficientHoldingsException(
+                    order.getQuantity(),
+                    availableQuantity
             );
         }
     }

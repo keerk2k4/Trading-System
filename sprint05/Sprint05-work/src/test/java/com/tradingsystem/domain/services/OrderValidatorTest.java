@@ -1,5 +1,5 @@
 
-        package com.tradingsystem.domain.services;
+package com.tradingsystem.domain.services;
 
 import com.tradingsystem.domain.entities.Account;
 import com.tradingsystem.domain.entities.Holding;
@@ -13,6 +13,8 @@ import com.tradingsystem.domain.enums.OrderType;
 import com.tradingsystem.domain.enums.ProductType;
 import com.tradingsystem.domain.enums.TradingStatus;
 import com.tradingsystem.domain.enums.UserStatus;
+import com.tradingsystem.domain.repositories.IdempotencyStore;
+import com.tradingsystem.domain.repositories.impl.IdempotencyStoreImpl;
 import com.tradingsystem.domain.repositories.impl.InMemoryHoldingRepository;
 import com.tradingsystem.domain.repositories.impl.InMemoryPositionRepository;
 import com.tradingsystem.exception.AccountNotActiveException;
@@ -57,7 +59,8 @@ class OrderValidatorTest {
         OrderValidator validator = new OrderValidator(
                 new InMemoryPositionRepository(),
                 new InMemoryHoldingRepository(),
-                marketPriceProvider
+                marketPriceProvider,
+                new IdempotencyStoreImpl()
         );
 
         assertDoesNotThrow(() -> validator.validate(order));
@@ -93,7 +96,8 @@ class OrderValidatorTest {
         OrderValidator validator = new OrderValidator(
                 new InMemoryPositionRepository(),
                 new InMemoryHoldingRepository(),
-                marketPriceProvider
+                marketPriceProvider,
+                new IdempotencyStoreImpl()
         );
 
         InsufficientFundsException exception =
@@ -146,7 +150,8 @@ class OrderValidatorTest {
         OrderValidator validator = new OrderValidator(
                 new InMemoryPositionRepository(),
                 new InMemoryHoldingRepository(),
-                marketPriceProvider
+                marketPriceProvider,
+                new IdempotencyStoreImpl()
         );
 
         assertDoesNotThrow(() -> validator.validate(order));
@@ -186,7 +191,8 @@ class OrderValidatorTest {
         OrderValidator validator = new OrderValidator(
                 new InMemoryPositionRepository(),
                 new InMemoryHoldingRepository(),
-                marketPriceProvider
+                marketPriceProvider,
+                new IdempotencyStoreImpl()
         );
 
         InsufficientFundsException exception =
@@ -340,7 +346,8 @@ class OrderValidatorTest {
         OrderValidator validator = new OrderValidator(
                 positionRepository,
                 new InMemoryHoldingRepository(),
-                mock(MarketPriceProvider.class)
+                mock(MarketPriceProvider.class),
+                new IdempotencyStoreImpl()
         );
 
         assertDoesNotThrow(() -> validator.validate(order));
@@ -416,7 +423,8 @@ class OrderValidatorTest {
         OrderValidator validator = new OrderValidator(
                 positionRepository,
                 new InMemoryHoldingRepository(),
-                mock(MarketPriceProvider.class)
+                mock(MarketPriceProvider.class),
+                new IdempotencyStoreImpl()
         );
 
         InsufficientHoldingsException exception =
@@ -467,7 +475,8 @@ class OrderValidatorTest {
         OrderValidator validator = new OrderValidator(
                 new InMemoryPositionRepository(),
                 holdingRepository,
-                mock(MarketPriceProvider.class)
+                mock(MarketPriceProvider.class),
+                new IdempotencyStoreImpl()
         );
 
         assertDoesNotThrow(() -> validator.validate(order));
@@ -543,7 +552,8 @@ class OrderValidatorTest {
         OrderValidator validator = new OrderValidator(
                 new InMemoryPositionRepository(),
                 holdingRepository,
-                mock(MarketPriceProvider.class)
+                mock(MarketPriceProvider.class),
+                new IdempotencyStoreImpl()
         );
 
         InsufficientHoldingsException exception =
@@ -560,7 +570,8 @@ class OrderValidatorTest {
         return new OrderValidator(
                 new InMemoryPositionRepository(),
                 new InMemoryHoldingRepository(),
-                mock(MarketPriceProvider.class)
+                mock(MarketPriceProvider.class),
+                new IdempotencyStoreImpl()
         );
     }
 
@@ -581,7 +592,8 @@ class OrderValidatorTest {
                 side,
                 productType,
                 quantity,
-                limitPrice
+                limitPrice,
+                "Test-Key-001"
         );
     }
 
