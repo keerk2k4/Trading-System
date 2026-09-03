@@ -16,8 +16,8 @@ public class OrderValidator {
 
     public OrderValidator(IdempotencyStore idempotencyStore) {
         this.idempotencyStore = idempotencyStore;
-
     }
+
     public void validate(Order order, Holding holding) {
 
         Account account = order.getAccount();
@@ -44,7 +44,6 @@ public class OrderValidator {
     }
 
     public void validateIdempotencyOrder(Order order) {
-
         String key =order.getIdempotencyKey();
 
         if(idempotencyStore.exists(key)) {
@@ -55,13 +54,10 @@ public class OrderValidator {
     private void validateBuy(Order order) {
 
         if (order.getLimitPrice() == null) {
-            // Market order: execution price is not known yet.
             return;
         }
 
-        BigDecimal requiredAmount =
-                order.getLimitPrice()
-                        .multiply(BigDecimal.valueOf(order.getQuantity()));
+        BigDecimal requiredAmount = order.getLimitPrice().multiply(BigDecimal.valueOf(order.getQuantity()));
 
         if (!order.getAccount().canAfford(requiredAmount)) {
             throw new IllegalStateException(
