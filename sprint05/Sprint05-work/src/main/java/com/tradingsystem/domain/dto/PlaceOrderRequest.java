@@ -2,6 +2,7 @@ package com.tradingsystem.domain.dto;
 
 
 import com.tradingsystem.domain.enums.OrderSide;
+import com.tradingsystem.exception.InvalidOrderArgumentException;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Min;
@@ -53,6 +54,35 @@ public class PlaceOrderRequest {
             BigDecimal price,
             String idempotencyKey
     ) {
+
+        if (accountId == null || accountId < 1) {
+            throw new InvalidOrderArgumentException("Account ID");
+        }
+
+        if (symbol == null || symbol.isEmpty() || symbol.length() > 20) {
+            throw new InvalidOrderArgumentException("Symbol");
+        }
+
+        if (side == null) {
+            throw new InvalidOrderArgumentException("Side");
+        }
+
+        if (quantity == null || quantity < 1) {
+            throw new InvalidOrderArgumentException("Quantity");
+        }
+
+        if (price == null
+                || price.compareTo(new BigDecimal("0.01")) < 0
+                || price.precision() - price.scale() > 17
+                || price.scale() > 2) {
+            throw new InvalidOrderArgumentException("Price", String.valueOf(price));
+        }
+
+        if (idempotencyKey == null
+                || idempotencyKey.length() < 8
+                || idempotencyKey.length() > 100) {
+            throw new InvalidOrderArgumentException("idempotencyKey");
+        }
 
         this.accountId = accountId;
         this.symbol = symbol;

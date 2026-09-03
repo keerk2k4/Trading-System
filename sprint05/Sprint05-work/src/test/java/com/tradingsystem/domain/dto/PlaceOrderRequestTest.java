@@ -2,10 +2,7 @@ package com.tradingsystem.domain.dto;
 
 
 import com.tradingsystem.domain.enums.OrderSide;
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
-import jakarta.validation.ValidatorFactory;
-import org.junit.jupiter.api.BeforeEach;
+import com.tradingsystem.exception.InvalidOrderArgumentException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -14,19 +11,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 
 class PlaceOrderRequestTest {
-
-
-    private Validator validator;
-
-
-    @BeforeEach
-    void setup() {
-
-        ValidatorFactory factory =
-                Validation.buildDefaultValidatorFactory();
-
-        validator = factory.getValidator();
-    }
 
 
 
@@ -45,33 +29,66 @@ class PlaceOrderRequestTest {
 
 
     @Test
-    void validRequestShouldPassValidation() {
+    void validRequestShouldBeCreated() {
 
         PlaceOrderRequest request = validRequest();
 
-        assertTrue(
-                validator.validate(request).isEmpty()
+        assertEquals(1L, request.getAccountId());
+        assertEquals("AAPL", request.getSymbol());
+        assertEquals(OrderSide.BUY, request.getSide());
+    }
+
+
+
+    @Test
+    void nullAccountIdShouldBeRejected() {
+
+        assertThrows(
+                InvalidOrderArgumentException.class,
+                () -> new PlaceOrderRequest(
+                        null,
+                        "AAPL",
+                        OrderSide.BUY,
+                        10,
+                        new BigDecimal("150.00"),
+                        "12345678"
+                )
         );
     }
 
 
 
     @Test
-    void nullRequiredFieldShouldBeRejected() {
+    void nullSymbolShouldBeRejected() {
 
-        PlaceOrderRequest request =
-                new PlaceOrderRequest(
+        assertThrows(
+                InvalidOrderArgumentException.class,
+                () -> new PlaceOrderRequest(
+                        1L,
                         null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null
-                );
+                        OrderSide.BUY,
+                        10,
+                        new BigDecimal("150.00"),
+                        "12345678"
+                )
+        );
+    }
 
 
-        assertFalse(
-                validator.validate(request).isEmpty()
+
+    @Test
+    void nullSideShouldBeRejected() {
+
+        assertThrows(
+                InvalidOrderArgumentException.class,
+                () -> new PlaceOrderRequest(
+                        1L,
+                        "AAPL",
+                        null,
+                        10,
+                        new BigDecimal("150.00"),
+                        "12345678"
+                )
         );
     }
 
@@ -80,19 +97,16 @@ class PlaceOrderRequestTest {
     @Test
     void zeroQuantityShouldBeRejected() {
 
-        PlaceOrderRequest request =
-                new PlaceOrderRequest(
+        assertThrows(
+                InvalidOrderArgumentException.class,
+                () -> new PlaceOrderRequest(
                         1L,
                         "AAPL",
                         OrderSide.BUY,
                         0,
                         new BigDecimal("150.00"),
                         "12345678"
-                );
-
-
-        assertFalse(
-                validator.validate(request).isEmpty()
+                )
         );
     }
 
@@ -101,19 +115,16 @@ class PlaceOrderRequestTest {
     @Test
     void negativeQuantityShouldBeRejected() {
 
-        PlaceOrderRequest request =
-                new PlaceOrderRequest(
+        assertThrows(
+                InvalidOrderArgumentException.class,
+                () -> new PlaceOrderRequest(
                         1L,
                         "AAPL",
                         OrderSide.BUY,
                         -1,
                         new BigDecimal("150.00"),
                         "12345678"
-                );
-
-
-        assertFalse(
-                validator.validate(request).isEmpty()
+                )
         );
     }
 
@@ -122,19 +133,16 @@ class PlaceOrderRequestTest {
     @Test
     void zeroPriceShouldBeRejected() {
 
-        PlaceOrderRequest request =
-                new PlaceOrderRequest(
+        assertThrows(
+                InvalidOrderArgumentException.class,
+                () -> new PlaceOrderRequest(
                         1L,
                         "AAPL",
                         OrderSide.BUY,
                         10,
                         BigDecimal.ZERO,
                         "12345678"
-                );
-
-
-        assertFalse(
-                validator.validate(request).isEmpty()
+                )
         );
     }
 
@@ -153,10 +161,8 @@ class PlaceOrderRequestTest {
                         "12345678"
                 );
 
-
-        assertTrue(
-                validator.validate(request).isEmpty()
-        );
+        assertEquals(1, request.getQuantity());
+        assertEquals(new BigDecimal("0.01"), request.getPrice());
     }
 
 
@@ -164,19 +170,16 @@ class PlaceOrderRequestTest {
     @Test
     void idempotencyKeyBelowMinimumShouldFail() {
 
-        PlaceOrderRequest request =
-                new PlaceOrderRequest(
+        assertThrows(
+                InvalidOrderArgumentException.class,
+                () -> new PlaceOrderRequest(
                         1L,
                         "AAPL",
                         OrderSide.BUY,
                         10,
                         new BigDecimal("150.00"),
                         "1234567"
-                );
-
-
-        assertFalse(
-                validator.validate(request).isEmpty()
+                )
         );
     }
 }
