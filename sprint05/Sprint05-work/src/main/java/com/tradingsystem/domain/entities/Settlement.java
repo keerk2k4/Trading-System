@@ -85,21 +85,4 @@ public class Settlement {
         return status;
     }
 
-    public void complete() {
-        if (status != SettlementStatus.PENDING) {
-            throw new IllegalStateException(
-                    "Only pending settlements can be completed"
-            );
-        }
-        status = SettlementStatus.COMPLETED;
-    }
-
-    public void fail() {
-        if (status != SettlementStatus.PENDING) {
-            throw new IllegalStateException(
-                    "Only pending settlements can be failed"
-            );
-        }
-        status = SettlementStatus.FAILED;
-    }
 }

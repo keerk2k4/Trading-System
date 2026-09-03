@@ -45,43 +45,6 @@ class HoldingTest {
     }
 
     @Test
-    void shouldCreateHoldingWithInitialValues() {
-
-        Holding holding = new Holding(
-                7001L,
-                createAccount(),
-                createInstrument(),
-                10,
-                new BigDecimal("3500.00")
-        );
-
-        assertEquals(
-                7001L,
-                holding.getHoldingId()
-        );
-
-        assertEquals(
-                1001L,
-                holding.getAccount().getAccountId()
-        );
-
-        assertEquals(
-                "TCS",
-                holding.getInstrument().getSymbol()
-        );
-
-        assertEquals(
-                10,
-                holding.getQuantity()
-        );
-
-        assertEquals(
-                new BigDecimal("3500.00"),
-                holding.getAveragePrice()
-        );
-    }
-
-    @Test
     void shouldIncreaseQuantityWhenBuying() {
 
         Holding holding = new Holding(

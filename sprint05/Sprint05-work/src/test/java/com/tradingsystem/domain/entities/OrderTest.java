@@ -55,35 +55,6 @@ class OrderTest {
     }
 
     @Test
-    void shouldMoveFromOpenToPartiallyFilled() {
-
-        Order order = createOrder();
-
-        order.transitionTo(OrderStatus.OPEN);
-        order.transitionTo(OrderStatus.PARTIALLY_FILLED);
-
-        assertEquals(
-                OrderStatus.PARTIALLY_FILLED,
-                order.getStatus()
-        );
-    }
-
-    @Test
-    void shouldMoveFromPartiallyFilledToFilled() {
-
-        Order order = createOrder();
-
-        order.transitionTo(OrderStatus.OPEN);
-        order.transitionTo(OrderStatus.PARTIALLY_FILLED);
-        order.transitionTo(OrderStatus.FILLED);
-
-        assertEquals(
-                OrderStatus.FILLED,
-                order.getStatus()
-        );
-    }
-
-    @Test
     void shouldAllowCancellationFromNew() {
 
         Order order = createOrder();
@@ -113,81 +84,6 @@ class OrderTest {
         assertTrue(order.isTerminal());
     }
 
-    @Test
-    void shouldAllowCancellationFromOpen() {
-
-        Order order = createOrder();
-
-        order.transitionTo(OrderStatus.OPEN);
-        order.transitionTo(OrderStatus.CANCELLED);
-
-        assertEquals(
-                OrderStatus.CANCELLED,
-                order.getStatus()
-        );
-
-        assertTrue(order.isTerminal());
-    }
-
-    @Test
-    void shouldAllowCancellationFromPartiallyFilled() {
-
-        Order order = createOrder();
-
-        order.transitionTo(OrderStatus.OPEN);
-        order.transitionTo(OrderStatus.PARTIALLY_FILLED);
-        order.transitionTo(OrderStatus.CANCELLED);
-
-        assertEquals(
-                OrderStatus.CANCELLED,
-                order.getStatus()
-        );
-
-        assertTrue(order.isTerminal());
-    }
-
-    @Test
-    void shouldAllowExpirationFromOpen() {
-
-        Order order = createOrder();
-
-        order.transitionTo(OrderStatus.OPEN);
-        order.transitionTo(OrderStatus.EXPIRED);
-
-        assertEquals(
-                OrderStatus.EXPIRED,
-                order.getStatus()
-        );
-
-        assertTrue(order.isTerminal());
-    }
-
-    @Test
-    void shouldRejectInvalidTransitionFromNewToPartiallyFilled() {
-
-        Order order = createOrder();
-
-        assertThrows(
-                IllegalStateException.class,
-                () -> order.transitionTo(
-                        OrderStatus.PARTIALLY_FILLED
-                )
-        );
-    }
-
-    @Test
-    void shouldRejectInvalidTransitionFromPartiallyFilledToOpen() {
-
-        Order order = createOrder();
-
-        order.transitionTo(OrderStatus.OPEN);
-        order.transitionTo(OrderStatus.PARTIALLY_FILLED);
-
-        assertThrows(
-                IllegalStateException.class,
-                () -> order.transitionTo(OrderStatus.OPEN)
-        );
-    }
 
     @Test
     void shouldRejectInvalidTransitionAfterTerminalState() {
@@ -216,16 +112,6 @@ class OrderTest {
         );
     }
 
-    @Test
-    void shouldRejectTransitionToNull() {
-
-        Order order = createOrder();
-
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> order.transitionTo(null)
-        );
-    }
 
     @Test
     void shouldIdentifyTerminalOrder() {

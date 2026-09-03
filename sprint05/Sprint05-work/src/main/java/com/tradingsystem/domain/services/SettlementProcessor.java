@@ -57,7 +57,7 @@ public class SettlementProcessor {
                 settlement
         );
 
-        settlement.complete();
+
 
         holdingUpdater.update(settlement);
 

@@ -92,85 +92,8 @@ class SettlementTest {
         );
     }
 
-    @Test
-    void shouldMarkSettlementAsCompleted() {
 
-        Settlement settlement = new Settlement(
-                5001L,
-                createAccount(),
-                createInstrument(),
-                ProductType.DELIVERY,
-                10,
-                new BigDecimal("3500.00")
-        );
 
-        settlement.complete();
-
-        assertEquals(
-                Settlement.SettlementStatus.COMPLETED,
-                settlement.getStatus()
-        );
-    }
-
-    @Test
-    void shouldNotCompleteSettlementTwice() {
-
-        Settlement settlement = new Settlement(
-                5001L,
-                createAccount(),
-                createInstrument(),
-                ProductType.DELIVERY,
-                10,
-                new BigDecimal("3500.00")
-        );
-
-        settlement.complete();
-
-        assertThrows(
-                IllegalStateException.class,
-                settlement::complete
-        );
-    }
-
-    @Test
-    void shouldMarkSettlementAsFailed() {
-
-        Settlement settlement = new Settlement(
-                5001L,
-                createAccount(),
-                createInstrument(),
-                ProductType.DELIVERY,
-                10,
-                new BigDecimal("3500.00")
-        );
-
-        settlement.fail();
-
-        assertEquals(
-                Settlement.SettlementStatus.FAILED,
-                settlement.getStatus()
-        );
-    }
-
-    @Test
-    void shouldNotFailCompletedSettlement() {
-
-        Settlement settlement = new Settlement(
-                5001L,
-                createAccount(),
-                createInstrument(),
-                ProductType.DELIVERY,
-                10,
-                new BigDecimal("3500.00")
-        );
-
-        settlement.complete();
-
-        assertThrows(
-                IllegalStateException.class,
-                settlement::fail
-        );
-    }
 
     @Test
     void shouldRejectZeroQuantity() {
