@@ -53,11 +53,11 @@ def create_dashboard(
     def asset_url(asset: str) -> str:
       return Path(os.path.relpath(claims_dir / asset, output.parent)).as_posix()
 
-    sunpharma_chart = asset_url("charts/SUNPHARMA_NS.png")
-    eichermot_chart = asset_url("charts/EICHERMOT_NS.png")
-    hdfcbank_chart = asset_url("charts/HDFCBANK_NS.png")
-    comparison_chart = asset_url("investment_comparison.png")
-    investment_growth_chart = asset_url("../src/charts/investment_growth.png")
+    sunpharma_chart = asset_url("../src/charts/Capture3.png")
+    eichermot_chart = asset_url("../src/charts/Capture4.png")
+    hdfcbank_chart = asset_url("../src/charts/Capture5.png")
+    comparison_chart = asset_url("../src/charts/investment_growth.png")
+    investment_growth_chart = asset_url("../src/charts/portfolio_growth.png")
     
 
     html = f"""<!doctype html>

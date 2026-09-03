@@ -1,0 +1,74 @@
+-------------------------------------------------------------------------------
+Test set: com.tradingsystem.domain.services.OrderExecutorTest
+-------------------------------------------------------------------------------
+Tests run: 7, Failures: 0, Errors: 7, Skipped: 0, Time elapsed: 0.012 s <<< FAILURE! -- in com.tradingsystem.domain.services.OrderExecutorTest
+com.tradingsystem.domain.services.OrderExecutorTest.shouldRejectUnsupportedOrderType -- Time elapsed: 0.002 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problem: 
+	The constructor OrderExecutor(MarketPriceProvider, PositionUpdater) is undefined
+
+	at com.tradingsystem.domain.services.OrderExecutorTest.shouldRejectUnsupportedOrderType(OrderExecutorTest.java:289)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+com.tradingsystem.domain.services.OrderExecutorTest.shouldMarkOrderAsFilledAfterSuccessfulExecution -- Time elapsed: 0.001 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problem: 
+	The constructor OrderExecutor(MarketPriceProvider, PositionUpdater) is undefined
+
+	at com.tradingsystem.domain.services.OrderExecutorTest.shouldMarkOrderAsFilledAfterSuccessfulExecution(OrderExecutorTest.java:209)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+com.tradingsystem.domain.services.OrderExecutorTest.shouldExecuteLimitBuyUsingLimitPrice -- Time elapsed: 0 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problem: 
+	The constructor OrderExecutor(MarketPriceProvider, PositionUpdater) is undefined
+
+	at com.tradingsystem.domain.services.OrderExecutorTest.shouldExecuteLimitBuyUsingLimitPrice(OrderExecutorTest.java:45)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+com.tradingsystem.domain.services.OrderExecutorTest.shouldExecuteLimitSellUsingLimitPrice -- Time elapsed: 0.001 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problem: 
+	The constructor OrderExecutor(MarketPriceProvider, PositionUpdater) is undefined
+
+	at com.tradingsystem.domain.services.OrderExecutorTest.shouldExecuteLimitSellUsingLimitPrice(OrderExecutorTest.java:127)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+com.tradingsystem.domain.services.OrderExecutorTest.shouldExecuteMarketBuyUsingMarketPrice -- Time elapsed: 0.001 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problem: 
+	The constructor OrderExecutor(MarketPriceProvider, PositionUpdater) is undefined
+
+	at com.tradingsystem.domain.services.OrderExecutorTest.shouldExecuteMarketBuyUsingMarketPrice(OrderExecutorTest.java:87)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+com.tradingsystem.domain.services.OrderExecutorTest.shouldNotMarkOrderAsFilledWhenPositionUpdateFails -- Time elapsed: 0.001 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problem: 
+	The constructor OrderExecutor(MarketPriceProvider, PositionUpdater) is undefined
+
+	at com.tradingsystem.domain.services.OrderExecutorTest.shouldNotMarkOrderAsFilledWhenPositionUpdateFails(OrderExecutorTest.java:251)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+com.tradingsystem.domain.services.OrderExecutorTest.shouldExecuteMarketSellUsingMarketPrice -- Time elapsed: 0 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problem: 
+	The constructor OrderExecutor(MarketPriceProvider, PositionUpdater) is undefined
+
+	at com.tradingsystem.domain.services.OrderExecutorTest.shouldExecuteMarketSellUsingMarketPrice(OrderExecutorTest.java:169)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+

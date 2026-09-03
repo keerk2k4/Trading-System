@@ -1,0 +1,81 @@
+-------------------------------------------------------------------------------
+Test set: com.tradingsystem.domain.services.SettlementProcessorTest
+-------------------------------------------------------------------------------
+Tests run: 7, Failures: 0, Errors: 7, Skipped: 0, Time elapsed: 1.543 s <<< FAILURE! -- in com.tradingsystem.domain.services.SettlementProcessorTest
+com.tradingsystem.domain.services.SettlementProcessorTest.shouldCreateCompletedSettlementForDeliveryBuy -- Time elapsed: 1.493 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problem: 
+	The constructor Order(long, Account, Instrument, OrderType, OrderSide, ProductType, int, null) is undefined
+
+	at com.tradingsystem.domain.services.SettlementProcessorTest.createOrder(SettlementProcessorTest.java:392)
+	at com.tradingsystem.domain.services.SettlementProcessorTest.shouldCreateCompletedSettlementForDeliveryBuy(SettlementProcessorTest.java:103)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+com.tradingsystem.domain.services.SettlementProcessorTest.shouldDeleteDeliveryPositionAfterSettlement -- Time elapsed: 0.011 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problem: 
+	The constructor Order(long, Account, Instrument, OrderType, OrderSide, ProductType, int, null) is undefined
+
+	at com.tradingsystem.domain.services.SettlementProcessorTest.createOrder(SettlementProcessorTest.java:392)
+	at com.tradingsystem.domain.services.SettlementProcessorTest.shouldDeleteDeliveryPositionAfterSettlement(SettlementProcessorTest.java:201)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+com.tradingsystem.domain.services.SettlementProcessorTest.shouldIgnoreIntradayOrder -- Time elapsed: 0.010 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problem: 
+	The constructor Order(long, Account, Instrument, OrderType, OrderSide, ProductType, int, null) is undefined
+
+	at com.tradingsystem.domain.services.SettlementProcessorTest.createOrder(SettlementProcessorTest.java:392)
+	at com.tradingsystem.domain.services.SettlementProcessorTest.shouldIgnoreIntradayOrder(SettlementProcessorTest.java:243)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+com.tradingsystem.domain.services.SettlementProcessorTest.shouldIgnoreDeliverySell -- Time elapsed: 0.001 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problem: 
+	The constructor Order(long, Account, Instrument, OrderType, OrderSide, ProductType, int, null) is undefined
+
+	at com.tradingsystem.domain.services.SettlementProcessorTest.createOrder(SettlementProcessorTest.java:392)
+	at com.tradingsystem.domain.services.SettlementProcessorTest.shouldIgnoreDeliverySell(SettlementProcessorTest.java:283)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+com.tradingsystem.domain.services.SettlementProcessorTest.shouldPassCorrectSettlementToHoldingUpdater -- Time elapsed: 0.002 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problem: 
+	The constructor Order(long, Account, Instrument, OrderType, OrderSide, ProductType, int, null) is undefined
+
+	at com.tradingsystem.domain.services.SettlementProcessorTest.createOrder(SettlementProcessorTest.java:392)
+	at com.tradingsystem.domain.services.SettlementProcessorTest.shouldPassCorrectSettlementToHoldingUpdater(SettlementProcessorTest.java:148)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+com.tradingsystem.domain.services.SettlementProcessorTest.shouldSaveSettlementUnderCorrectAccount -- Time elapsed: 0.001 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problem: 
+	The constructor Order(long, Account, Instrument, OrderType, OrderSide, ProductType, int, null) is undefined
+
+	at com.tradingsystem.domain.services.SettlementProcessorTest.createOrder(SettlementProcessorTest.java:392)
+	at com.tradingsystem.domain.services.SettlementProcessorTest.shouldSaveSettlementUnderCorrectAccount(SettlementProcessorTest.java:323)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+com.tradingsystem.domain.services.SettlementProcessorTest.shouldCreateSettlementForDeliveryBuy -- Time elapsed: 0.002 s <<< ERROR!
+java.lang.Error: 
+Unresolved compilation problem: 
+	The constructor Order(long, Account, Instrument, OrderType, OrderSide, ProductType, int, null) is undefined
+
+	at com.tradingsystem.domain.services.SettlementProcessorTest.createOrder(SettlementProcessorTest.java:392)
+	at com.tradingsystem.domain.services.SettlementProcessorTest.shouldCreateSettlementForDeliveryBuy(SettlementProcessorTest.java:49)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+

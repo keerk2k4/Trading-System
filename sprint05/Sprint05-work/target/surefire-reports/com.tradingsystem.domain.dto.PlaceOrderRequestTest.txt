@@ -1,0 +1,67 @@
+-------------------------------------------------------------------------------
+Test set: com.tradingsystem.domain.dto.PlaceOrderRequestTest
+-------------------------------------------------------------------------------
+Tests run: 7, Failures: 0, Errors: 7, Skipped: 0, Time elapsed: 0.321 s <<< FAILURE! -- in com.tradingsystem.domain.dto.PlaceOrderRequestTest
+com.tradingsystem.domain.dto.PlaceOrderRequestTest.minimumBoundaryValuesShouldPass -- Time elapsed: 0.104 s <<< ERROR!
+jakarta.validation.NoProviderFoundException: Unable to create a Configuration, because no Jakarta Validation provider could be found. Add a provider like Hibernate Validator (RI) to your classpath.
+	at jakarta.validation.Validation$GenericBootstrapImpl.configure(Validation.java:291)
+	at jakarta.validation.Validation.buildDefaultValidatorFactory(Validation.java:103)
+	at com.tradingsystem.domain.dto.PlaceOrderRequestTest.setup(PlaceOrderRequestTest.java:26)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+com.tradingsystem.domain.dto.PlaceOrderRequestTest.validRequestShouldPassValidation -- Time elapsed: 0.011 s <<< ERROR!
+jakarta.validation.NoProviderFoundException: Unable to create a Configuration, because no Jakarta Validation provider could be found. Add a provider like Hibernate Validator (RI) to your classpath.
+	at jakarta.validation.Validation$GenericBootstrapImpl.configure(Validation.java:291)
+	at jakarta.validation.Validation.buildDefaultValidatorFactory(Validation.java:103)
+	at com.tradingsystem.domain.dto.PlaceOrderRequestTest.setup(PlaceOrderRequestTest.java:26)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+com.tradingsystem.domain.dto.PlaceOrderRequestTest.negativeQuantityShouldBeRejected -- Time elapsed: 0.002 s <<< ERROR!
+jakarta.validation.NoProviderFoundException: Unable to create a Configuration, because no Jakarta Validation provider could be found. Add a provider like Hibernate Validator (RI) to your classpath.
+	at jakarta.validation.Validation$GenericBootstrapImpl.configure(Validation.java:291)
+	at jakarta.validation.Validation.buildDefaultValidatorFactory(Validation.java:103)
+	at com.tradingsystem.domain.dto.PlaceOrderRequestTest.setup(PlaceOrderRequestTest.java:26)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+com.tradingsystem.domain.dto.PlaceOrderRequestTest.idempotencyKeyBelowMinimumShouldFail -- Time elapsed: 0.004 s <<< ERROR!
+jakarta.validation.NoProviderFoundException: Unable to create a Configuration, because no Jakarta Validation provider could be found. Add a provider like Hibernate Validator (RI) to your classpath.
+	at jakarta.validation.Validation$GenericBootstrapImpl.configure(Validation.java:291)
+	at jakarta.validation.Validation.buildDefaultValidatorFactory(Validation.java:103)
+	at com.tradingsystem.domain.dto.PlaceOrderRequestTest.setup(PlaceOrderRequestTest.java:26)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+com.tradingsystem.domain.dto.PlaceOrderRequestTest.zeroQuantityShouldBeRejected -- Time elapsed: 0.003 s <<< ERROR!
+jakarta.validation.NoProviderFoundException: Unable to create a Configuration, because no Jakarta Validation provider could be found. Add a provider like Hibernate Validator (RI) to your classpath.
+	at jakarta.validation.Validation$GenericBootstrapImpl.configure(Validation.java:291)
+	at jakarta.validation.Validation.buildDefaultValidatorFactory(Validation.java:103)
+	at com.tradingsystem.domain.dto.PlaceOrderRequestTest.setup(PlaceOrderRequestTest.java:26)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+com.tradingsystem.domain.dto.PlaceOrderRequestTest.zeroPriceShouldBeRejected -- Time elapsed: 0.002 s <<< ERROR!
+jakarta.validation.NoProviderFoundException: Unable to create a Configuration, because no Jakarta Validation provider could be found. Add a provider like Hibernate Validator (RI) to your classpath.
+	at jakarta.validation.Validation$GenericBootstrapImpl.configure(Validation.java:291)
+	at jakarta.validation.Validation.buildDefaultValidatorFactory(Validation.java:103)
+	at com.tradingsystem.domain.dto.PlaceOrderRequestTest.setup(PlaceOrderRequestTest.java:26)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+
+com.tradingsystem.domain.dto.PlaceOrderRequestTest.nullRequiredFieldShouldBeRejected -- Time elapsed: 0.001 s <<< ERROR!
+jakarta.validation.NoProviderFoundException: Unable to create a Configuration, because no Jakarta Validation provider could be found. Add a provider like Hibernate Validator (RI) to your classpath.
+	at jakarta.validation.Validation$GenericBootstrapImpl.configure(Validation.java:291)
+	at jakarta.validation.Validation.buildDefaultValidatorFactory(Validation.java:103)
+	at com.tradingsystem.domain.dto.PlaceOrderRequestTest.setup(PlaceOrderRequestTest.java:26)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+

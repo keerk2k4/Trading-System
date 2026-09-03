@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-DEFAULT_DB_PATH = Path(__file__).parents[2] / "analytics.duckdb"
+DEFAULT_DB_PATH = r"C:\Users\Administrator\Desktop\Capstone Project\Sprint 05\chennai-capstone-SE1-team5\sprint04\analytics.duckdb"
 OUTPUT_DIR = Path(__file__).with_name("charts")
 OUTPUT_FILE = OUTPUT_DIR / "investment_growth.png"
 TABLE_NAME = "candles"
