@@ -67,7 +67,6 @@ CREATE TABLE trading_accounts (
         CHECK (account_status IN ('ACTIVE', 'BLOCKED', 'CLOSED'))
 );
 
-
 -- ============================================
 -- 3. DEMAT ACCOUNT
 -- ============================================
