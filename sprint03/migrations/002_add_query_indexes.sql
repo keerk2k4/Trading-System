@@ -109,31 +109,11 @@ ON positions (
 )
 WHERE position_status = 'OPEN';
 
--- Settlements: retrieve settlements for a Demat account
--- Executions lookup by order
-
-CREATE INDEX idx_executions_order_id
-ON executions(order_id);
-
 
 -- Settlements lookup by Demat account
 
 CREATE INDEX idx_settlements_demat_account_id
 ON settlements(demat_account_id);
-
--- Holdings: retrieve holdings for a Demat account
-CREATE INDEX idx_holdings_demat_account_id
-ON holdings(demat_account_id);
-
--- Holdings: retrieve holdings for an instrument
-CREATE INDEX idx_holdings_instrument_id
-ON holdings(instrument_id);
--- Account transaction history
-
--- Account transactions: retrieve transaction history
--- for a particular trading account
-CREATE INDEX idx_account_transactions_trading_account_id
-ON account_transactions(trading_account_id);
 
 
 COMMIT;
