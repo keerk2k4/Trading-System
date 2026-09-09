@@ -8,6 +8,7 @@ import com.tradingsystem.domain.repositories.PositionRepository;
 import com.tradingsystem.domain.repositories.SettlementRepository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public class SettlementProcessor {
 
@@ -44,7 +45,8 @@ public class SettlementProcessor {
                 order.getInstrument(),
                 order.getProductType(),
                 order.getQuantity(),
-                executionPrice
+                executionPrice,
+                LocalDate.now()
         );
 
         String accountId =

@@ -6,6 +6,7 @@ import com.tradingsystem.domain.enums.OrderSide;
 import com.tradingsystem.domain.repositories.PositionRepository;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 public class PositionUpdater {
@@ -46,11 +47,17 @@ public class PositionUpdater {
         }
 
         Position position = new Position(
+                null,
                 order.getAccount(),
                 order.getInstrument(),
                 order.getProductType(),
                 0,
-                executionPrice
+                executionPrice,
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         position.buy(

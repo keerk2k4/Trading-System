@@ -3,6 +3,7 @@ package com.tradingsystem.domain.entities;
 import com.tradingsystem.domain.enums.ProductType;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Objects;
 
 public class Settlement {
@@ -19,6 +20,7 @@ public class Settlement {
     private final ProductType productType;
     private final int quantity;
     private final BigDecimal executionPrice;
+    private final LocalDate settlementDate;
 
     private SettlementStatus status;
 
@@ -28,7 +30,8 @@ public class Settlement {
             Instrument instrument,
             ProductType productType,
             int quantity,
-            BigDecimal executionPrice
+            BigDecimal executionPrice,
+            LocalDate settlementDate
     ) {
         if (settlementId == null) {
             throw new IllegalArgumentException("Settlement ID cannot be null");
@@ -54,12 +57,17 @@ public class Settlement {
             throw new IllegalArgumentException("Execution price must be positive");
         }
 
+        if (settlementDate == null) {
+            throw new IllegalArgumentException("Settlement date cannot be null");
+        }
+
         this.settlementId = settlementId;
         this.account = account;
         this.instrument = instrument;
         this.productType = productType;
         this.quantity = quantity;
         this.executionPrice = executionPrice.setScale(2, java.math.RoundingMode.HALF_UP);
+        this.settlementDate = settlementDate;
         this.status = SettlementStatus.PENDING;
     }
 
@@ -80,6 +88,9 @@ public class Settlement {
     }
     public BigDecimal getExecutionPrice() {
         return executionPrice;
+    }
+    public LocalDate getSettlementDate() {
+        return settlementDate;
     }
     public SettlementStatus getStatus() {
         return status;
