@@ -1,11 +1,11 @@
 package com.tradingsystem.spring_boot_app.controller;
 
 import com.tradingsystem.domain.enums.OrderStatus;
-// import com.tradingsystem.spring_boot_app.dto.AccountResponse;
-// import com.tradingsystem.spring_boot_app.dto.BalanceResponse;
-// import com.tradingsystem.spring_boot_app.dto.OrderHistoryEntry;
-// import com.tradingsystem.spring_boot_app.dto.PositionResponse;
-// import com.tradingsystem.spring_boot_app.service.AccountService;
+import com.tradingsystem.spring_boot_app.dto.AccountResponse;
+import com.tradingsystem.spring_boot_app.dto.BalanceResponse;
+import com.tradingsystem.spring_boot_app.dto.OrderHistoryEntry;
+import com.tradingsystem.spring_boot_app.dto.PositionResponse;
+import com.tradingsystem.spring_boot_app.service.AccountService;
 import jakarta.validation.constraints.Min;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
@@ -23,7 +23,7 @@ import java.util.List;
 
 
 @RestController
-@RequestMapping("/accounts")
+@RequestMapping("/api/v1/accounts")
 @Validated
 public class AccountController {
 

@@ -23,8 +23,8 @@ public interface InstrumentMapper {
      * @return number of rows affected
      */
     @Insert("""
-        INSERT INTO instruments (symbol, exchange, isin, company_name, instrument_type, status, created_at, updated_at)
-        VALUES (#{symbol}, 'NSE', #{isin}, #{displayName}, 'EQUITY', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        INSERT INTO instruments (symbol, display_name, asset_class, quotation_currency, status, availability, price)
+        VALUES (#{symbol}, #{displayName}, #{assetClass}, 'USD', 'ACTIVE', TRUE, 0)
         """)
     @Options(useGeneratedKeys = true, keyProperty = "instrumentId")
     int insertInstrument(
@@ -40,16 +40,22 @@ public interface InstrumentMapper {
      * @return the instrument, or empty if not found
      */
     @Select("""
-        SELECT instrument_id, symbol, exchange, isin, company_name, instrument_type, status, created_at, updated_at
+        SELECT instrument_id, symbol, display_name, asset_class, quotation_currency, status
         FROM instruments
         WHERE instrument_id = #{instrumentId}
         """)
     @Results({
-        @Result(property = "instrumentId", column = "instrument_id"),
         @Result(property = "symbol", column = "symbol"),
-        @Result(property = "displayName", column = "company_name"),
-        @Result(property = "assetClass", column = "instrument_type"),
-        @Result(property = "quotationCurrency", column = "exchange")
+        @Result(property = "displayName", column = "display_name"),
+        @Result(property = "assetClass", column = "asset_class"),
+        @Result(property = "quotationCurrency", column = "quotation_currency")
+    })
+    @ConstructorArgs({
+        @Arg(column = "instrument_id", javaType = Long.class),
+        @Arg(column = "symbol", javaType = String.class),
+        @Arg(column = "display_name", javaType = String.class),
+        @Arg(column = "asset_class", javaType = com.tradingsystem.domain.enums.AssetClass.class),
+        @Arg(column = "quotation_currency", javaType = String.class)
     })
     Optional<Instrument> findInstrumentById(@Param("instrumentId") Long instrumentId);
     
@@ -61,16 +67,22 @@ public interface InstrumentMapper {
      * @return the instrument, or empty if not found
      */
     @Select("""
-        SELECT instrument_id, symbol, exchange, isin, company_name, instrument_type, status, created_at, updated_at
+        SELECT instrument_id, symbol, display_name, asset_class, quotation_currency, status
         FROM instruments
         WHERE symbol = #{symbol}
         """)
     @Results({
-        @Result(property = "instrumentId", column = "instrument_id"),
         @Result(property = "symbol", column = "symbol"),
-        @Result(property = "displayName", column = "company_name"),
-        @Result(property = "assetClass", column = "instrument_type"),
-        @Result(property = "quotationCurrency", column = "exchange")
+        @Result(property = "displayName", column = "display_name"),
+        @Result(property = "assetClass", column = "asset_class"),
+        @Result(property = "quotationCurrency", column = "quotation_currency")
+    })
+    @ConstructorArgs({
+        @Arg(column = "instrument_id", javaType = Long.class),
+        @Arg(column = "symbol", javaType = String.class),
+        @Arg(column = "display_name", javaType = String.class),
+        @Arg(column = "asset_class", javaType = com.tradingsystem.domain.enums.AssetClass.class),
+        @Arg(column = "quotation_currency", javaType = String.class)
     })
     Optional<Instrument> findInstrumentBySymbol(@Param("symbol") String symbol);
     
@@ -80,7 +92,7 @@ public interface InstrumentMapper {
      * @return list of instruments matching the status
      */
     @Select("""
-        SELECT instrument_id, symbol, exchange, isin, company_name, instrument_type, status, created_at, updated_at
+        SELECT instrument_id, symbol, display_name, asset_class, quotation_currency, status
         FROM instruments
         WHERE status = #{status}
         ORDER BY symbol
@@ -88,9 +100,9 @@ public interface InstrumentMapper {
     @Results({
         @Result(property = "instrumentId", column = "instrument_id"),
         @Result(property = "symbol", column = "symbol"),
-        @Result(property = "displayName", column = "company_name"),
-        @Result(property = "assetClass", column = "instrument_type"),
-        @Result(property = "quotationCurrency", column = "exchange")
+        @Result(property = "displayName", column = "display_name"),
+        @Result(property = "assetClass", column = "asset_class"),
+        @Result(property = "quotationCurrency", column = "quotation_currency")
     })
     List<Instrument> findInstrumentsByStatus(@Param("status") String status);
     

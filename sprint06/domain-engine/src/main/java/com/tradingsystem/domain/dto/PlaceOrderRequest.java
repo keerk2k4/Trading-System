@@ -8,6 +8,8 @@ import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.math.BigDecimal;
 
@@ -46,13 +48,14 @@ public class PlaceOrderRequest {
 
 
 
-    public PlaceOrderRequest(
-            Long accountId,
-            String symbol,
-            OrderSide side,
-            Integer quantity,
-            BigDecimal price,
-            String idempotencyKey
+        @JsonCreator
+        public PlaceOrderRequest(
+            @JsonProperty("accountId") Long accountId,
+            @JsonProperty("symbol") String symbol,
+            @JsonProperty("side") OrderSide side,
+            @JsonProperty("quantity") Integer quantity,
+            @JsonProperty("price") BigDecimal price,
+            @JsonProperty("idempotencyKey") String idempotencyKey
     ) {
 
         if (accountId == null || accountId < 1) {

@@ -42,6 +42,15 @@ public interface UserMapper {
         @Result(property = "lastName", column = "last_name"),
         @Result(property = "passwordHash", column = "password_hash")
     })
+    @ConstructorArgs({
+        @Arg(column = "user_id", javaType = Long.class),
+        @Arg(column = "first_name", javaType = String.class),
+        @Arg(column = "last_name", javaType = String.class),
+        @Arg(column = "email", javaType = String.class),
+        @Arg(column = "phone", javaType = String.class),
+        @Arg(column = "password_hash", javaType = String.class),
+        @Arg(column = "status", javaType = UserStatus.class)
+    })
     Optional<User> findUserById(@Param("userId") Long userId);
     
     /**

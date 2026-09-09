@@ -39,7 +39,7 @@ public interface AccountMapper {
      * @return the account, or empty if not found
      */
     @Select("""
-        SELECT trading_account_id, account_number, user_id, status, available_balance, blocked_balance, account_status, created_at, updated_at
+        SELECT trading_account_id, account_number, user_id, available_balance, account_status, version
         FROM trading_accounts
         WHERE trading_account_id = #{accountId}
         """)
@@ -49,6 +49,14 @@ public interface AccountMapper {
         @Result(property = "cashBalance", column = "available_balance"),
         @Result(property = "tradingStatus", column = "account_status"),
         @Result(property = "holder", column = "user_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.UserMapper.findUserById"))
+    })
+    @ConstructorArgs({
+        @Arg(column = "trading_account_id", javaType = Long.class),
+        @Arg(column = "account_number", javaType = String.class),
+        @Arg(column = "user_id", javaType = com.tradingsystem.domain.entities.User.class, select = "com.tradingsystem.spring_boot_app.mapper.UserMapper.findUserById"),
+        @Arg(column = "available_balance", javaType = BigDecimal.class),
+        @Arg(column = "account_status", javaType = com.tradingsystem.domain.enums.TradingStatus.class),
+        @Arg(column = "version", javaType = Long.class)
     })
     Optional<Account> findAccountById(@Param("accountId") Long accountId);
     
@@ -101,10 +109,13 @@ public interface AccountMapper {
      */
     @Update("""
         UPDATE trading_accounts
-        SET available_balance = #{availableBalance}, updated_at = CURRENT_TIMESTAMP
-        WHERE trading_account_id = #{accountId}
+        SET available_balance = #{availableBalance}, version = version + 1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE trading_account_id = #{accountId} AND version = #{version}
         """)
-    int updateAvailableBalance(@Param("accountId") Long accountId, @Param("availableBalance") BigDecimal availableBalance);
+    int updateAvailableBalanceOptimistic(@Param("accountId") Long accountId,
+                                         @Param("availableBalance") BigDecimal availableBalance,
+                                         @Param("version") Long version);
     
     /**
      * Updates the blocked balance for an account.
@@ -114,10 +125,13 @@ public interface AccountMapper {
      */
     @Update("""
         UPDATE trading_accounts
-        SET blocked_balance = #{blockedBalance}, updated_at = CURRENT_TIMESTAMP
-        WHERE trading_account_id = #{accountId}
+        SET blocked_balance = #{blockedBalance}, version = version + 1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE trading_account_id = #{accountId} AND version = #{version}
         """)
-    int updateBlockedBalance(@Param("accountId") Long accountId, @Param("blockedBalance") BigDecimal blockedBalance);
+    int updateBlockedBalance(@Param("accountId") Long accountId,
+                             @Param("blockedBalance") BigDecimal blockedBalance,
+                             @Param("version") Long version);
     
     /**
      * Updates account status.
@@ -127,10 +141,13 @@ public interface AccountMapper {
      */
     @Update("""
         UPDATE trading_accounts
-        SET account_status = #{status}, updated_at = CURRENT_TIMESTAMP
-        WHERE trading_account_id = #{accountId}
+        SET account_status = #{status}, version = version + 1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE trading_account_id = #{accountId} AND version = #{version}
         """)
-    int updateAccountStatus(@Param("accountId") Long accountId, @Param("status") String status);
+    int updateAccountStatus(@Param("accountId") Long accountId,
+                            @Param("status") String status,
+                            @Param("version") Long version);
     
     /**
      * Selects accounts created after a given timestamp.

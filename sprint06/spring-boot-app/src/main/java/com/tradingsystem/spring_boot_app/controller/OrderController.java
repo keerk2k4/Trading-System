@@ -1,9 +1,9 @@
 package com.tradingsystem.spring_boot_app.controller;
 
+import com.tradingsystem.domain.dto.PlaceOrderRequest;
 import com.tradingsystem.exception.InvalidOrderArgumentException;
-// import com.tradingsystem.spring_boot_app.dto.OrderResponse;
-// import com.tradingsystem.spring_boot_app.dto.PlaceOrderRequest;
-// import com.tradingsystem.spring_boot_app.service.OrderService;
+import com.tradingsystem.spring_boot_app.dto.OrderResponse;
+import com.tradingsystem.spring_boot_app.service.OrderService;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/orders")
+@RequestMapping("/api/v1/orders")
 @Validated
 public class OrderController {
 
@@ -54,7 +54,11 @@ public class OrderController {
         try {
             return UUID.fromString(raw).toString();
         } catch (IllegalArgumentException ex) {
-            throw new InvalidOrderArgumentException("id", id);
+            try {
+                return Long.toString(Long.parseLong(raw));
+            } catch (NumberFormatException numberFormatException) {
+                throw new InvalidOrderArgumentException("id", id);
+            }
         }
     }
 }

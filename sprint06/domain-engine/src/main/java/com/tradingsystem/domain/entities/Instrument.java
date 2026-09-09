@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 
 public class Instrument {
 
+    private final Long instrumentId;
     @NotBlank
     @Size(max = 20)
     private final String symbol;
@@ -30,6 +31,16 @@ public class Instrument {
             AssetClass assetClass,
             String quotationCurrency
     ) {
+        this(null, symbol, displayName, assetClass, quotationCurrency);
+        }
+
+        public Instrument(
+            Long instrumentId,
+            String symbol,
+            String displayName,
+            AssetClass assetClass,
+            String quotationCurrency
+        ) {
         validateString(symbol, "Symbol");
         validateString(displayName, "Display name");
         validateString(quotationCurrency, "Quotation currency");
@@ -40,6 +51,7 @@ public class Instrument {
             );
         }
 
+        this.instrumentId = instrumentId;
         this.symbol = symbol;
         this.displayName = displayName;
         this.assetClass = assetClass;
@@ -48,6 +60,7 @@ public class Instrument {
     }
 
 
+    public Long getInstrumentId() {return instrumentId;}
     public String getSymbol() {return symbol;}
     public String getDisplayName() {return displayName;}
     public AssetClass getAssetClass() {return assetClass;}

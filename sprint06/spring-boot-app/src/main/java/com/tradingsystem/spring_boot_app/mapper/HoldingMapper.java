@@ -74,11 +74,12 @@ public interface HoldingMapper {
         FROM holdings
         WHERE demat_account_id = #{accountId} AND instrument_id = #{instrumentId}
         """)
-    @Results({
-        @Result(property = "holdingId", column = "holding_id"),
-        @Result(property = "account", column = "demat_account_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.AccountMapper.findAccountById")),
-        @Result(property = "instrument", column = "instrument_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.InstrumentMapper.findInstrumentById")),
-        @Result(property = "averagePrice", column = "average_price")
+    @ConstructorArgs({
+        @Arg(column = "holding_id", javaType = Long.class),
+        @Arg(column = "demat_account_id", javaType = com.tradingsystem.domain.entities.Account.class, select = "com.tradingsystem.spring_boot_app.mapper.AccountMapper.findAccountById"),
+        @Arg(column = "instrument_id", javaType = com.tradingsystem.domain.entities.Instrument.class, select = "com.tradingsystem.spring_boot_app.mapper.InstrumentMapper.findInstrumentById"),
+        @Arg(column = "quantity", javaType = int.class),
+        @Arg(column = "average_price", javaType = BigDecimal.class)
     })
     Optional<Holding> findHoldingByAccountAndInstrument(@Param("accountId") Long accountId, @Param("instrumentId") Long instrumentId);
     
