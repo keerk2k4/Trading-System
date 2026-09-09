@@ -1,7 +1,7 @@
 package com.tradingsystem.spring_boot_app;
 
-import com.tradingsystem.domain.entities.User;
-import com.tradingsystem.domain.enums.UserStatus;
+//import com.tradingsystem.domain.entities.User;
+//import com.tradingsystem.domain.enums.UserStatus;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
