@@ -300,6 +300,7 @@ class SettlementProcessorTest {
                 productType,
                 quantity,
                 null,
+                null,
                 "test-key"
         );
     }

@@ -13,6 +13,7 @@ import com.tradingsystem.domain.repositories.impl.InMemoryHoldingRepository;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -36,7 +37,8 @@ class HoldingUpdaterTest {
                 instrument,
                 ProductType.DELIVERY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                LocalDate.now()
         );
 
         holdingUpdater.update(settlement);
@@ -83,7 +85,8 @@ class HoldingUpdaterTest {
                 instrument,
                 ProductType.DELIVERY,
                 10,
-                new BigDecimal("4000.00")
+                new BigDecimal("4000.00"),
+                LocalDate.now()
         );
 
         holdingUpdater.update(settlement);
@@ -127,7 +130,8 @@ class HoldingUpdaterTest {
                 instrument,
                 ProductType.DELIVERY,
                 5,
-                new BigDecimal("4000.00")
+                new BigDecimal("4000.00"),
+                LocalDate.now()
         );
 
         holdingUpdater.update(settlement);
@@ -163,7 +167,8 @@ class HoldingUpdaterTest {
                 tcs,
                 ProductType.DELIVERY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                LocalDate.now()
         );
 
         holdingUpdater.update(settlement);
@@ -174,7 +179,8 @@ class HoldingUpdaterTest {
                 infy,
                 ProductType.DELIVERY,
                 5,
-                new BigDecimal("1500.00")
+                new BigDecimal("1500.00"),
+                LocalDate.now()
         );
 
         holdingUpdater.update(secondSettlement);
@@ -221,7 +227,8 @@ class HoldingUpdaterTest {
                 instrument,
                 ProductType.DELIVERY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                LocalDate.now()
         );
 
         Settlement secondSettlement = new Settlement(
@@ -230,7 +237,8 @@ class HoldingUpdaterTest {
                 instrument,
                 ProductType.DELIVERY,
                 20,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                LocalDate.now()
         );
 
         holdingUpdater.update(firstSettlement);

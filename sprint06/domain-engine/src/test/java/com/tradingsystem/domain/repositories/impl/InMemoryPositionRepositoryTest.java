@@ -12,6 +12,7 @@ import com.tradingsystem.domain.enums.UserStatus;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,11 +28,17 @@ class InMemoryPositionRepositoryTest {
         Instrument instrument = createInstrument("TCS");
 
         Position position = new Position(
+                null,
                 account,
                 instrument,
                 ProductType.DELIVERY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         repository.save("1", position);
@@ -50,11 +57,17 @@ class InMemoryPositionRepositoryTest {
         Instrument instrument = createInstrument("TCS");
 
         Position position = new Position(
+                null,
                 account,
                 instrument,
                 ProductType.INTRADAY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         repository.save("1", position);
@@ -78,11 +91,17 @@ class InMemoryPositionRepositoryTest {
         Instrument instrument = createInstrument("TCS");
 
         Position position = new Position(
+                null,
                 account,
                 instrument,
                 ProductType.INTRADAY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         repository.save("1", position);
@@ -106,11 +125,17 @@ class InMemoryPositionRepositoryTest {
         Instrument infy = createInstrument("INFY");
 
         Position position = new Position(
+                null,
                 account,
                 tcs,
                 ProductType.INTRADAY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         repository.save("1", position);
@@ -132,19 +157,31 @@ class InMemoryPositionRepositoryTest {
         Account account = createAccount(1L);
 
         Position position1 = new Position(
+                null,
                 account,
                 createInstrument("TCS"),
                 ProductType.DELIVERY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         Position position2 = new Position(
+                null,
                 account,
                 createInstrument("INFY"),
                 ProductType.INTRADAY,
                 20,
-                new BigDecimal("1500.00")
+                new BigDecimal("1500.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         repository.save("1", position1);
@@ -165,19 +202,31 @@ class InMemoryPositionRepositoryTest {
         Instrument instrument = createInstrument("TCS");
 
         Position intradayPosition = new Position(
+                null,
                 account,
                 instrument,
                 ProductType.INTRADAY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         Position deliveryPosition = new Position(
+                null,
                 account,
                 instrument,
                 ProductType.DELIVERY,
                 20,
-                new BigDecimal("3600.00")
+                new BigDecimal("3600.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         repository.save("1", intradayPosition);
@@ -198,19 +247,31 @@ class InMemoryPositionRepositoryTest {
         Instrument instrument = createInstrument("TCS");
 
         Position existingPosition = new Position(
+                null,
                 account,
                 instrument,
                 ProductType.INTRADAY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         Position duplicatePosition = new Position(
+                null,
                 account,
                 instrument,
                 ProductType.INTRADAY,
                 20,
-                new BigDecimal("3600.00")
+                new BigDecimal("3600.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         repository.save("1", existingPosition);
@@ -230,19 +291,31 @@ class InMemoryPositionRepositoryTest {
         Account account2 = createAccount(2L);
 
         Position position1 = new Position(
+                null,
                 account1,
                 createInstrument("TCS"),
                 ProductType.DELIVERY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         Position position2 = new Position(
+                null,
                 account2,
                 createInstrument("INFY"),
                 ProductType.DELIVERY,
                 20,
-                new BigDecimal("1500.00")
+                new BigDecimal("1500.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         repository.save("1", position1);
