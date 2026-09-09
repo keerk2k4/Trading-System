@@ -162,6 +162,7 @@ class OrderTest {
                         ProductType.DELIVERY,
                         10,
                         new BigDecimal("100.00"),
+                        null,
                         "Test-Key-001"
                 )
         );
@@ -181,6 +182,7 @@ class OrderTest {
                         ProductType.DELIVERY,
                         10,
                         new BigDecimal("100.00"),
+                        null,
                         "Test-Key-001"
                 )
         );
@@ -199,6 +201,7 @@ class OrderTest {
                         OrderSide.BUY,
                         ProductType.DELIVERY,
                         10,
+                        null,
                         null,
                         "Test-Key-001"
                 )
@@ -314,6 +317,7 @@ class OrderTest {
                         ProductType.DELIVERY,
                         10,
                         new BigDecimal("100.00"),
+                        null,
                         null
                 )
         );
@@ -333,6 +337,7 @@ class OrderTest {
                 ProductType.DELIVERY,
                 quantity,
                 limitPrice,
+                null,
                 "Test-Key-001"
         );
     }

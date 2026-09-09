@@ -10,6 +10,7 @@ import com.tradingsystem.exception.InvalidOrderArgumentException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -183,11 +184,17 @@ class PositionTest {
         );
 
         return new Position(
+                null,
                 account,
                 instrument,
                 ProductType.DELIVERY,
                 10,
-                new BigDecimal("100.00")
+                new BigDecimal("100.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
     }
 }

@@ -302,6 +302,11 @@ class OrderExecutorTest {
             BigDecimal limitPrice,
             String idempotencyKey
     ) {
+        BigDecimal stopPrice = null;
+        if (orderType == OrderType.STOP_LOSS || orderType == OrderType.STOP_LIMIT) {
+            stopPrice = new BigDecimal("100.00");
+        }
+        
         return new Order(
                 1L,
                 account,
@@ -311,6 +316,7 @@ class OrderExecutorTest {
                 productType,
                 quantity,
                 limitPrice,
+                stopPrice,
                 idempotencyKey
         );
     }

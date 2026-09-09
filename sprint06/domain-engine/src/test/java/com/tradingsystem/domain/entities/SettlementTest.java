@@ -8,6 +8,7 @@ import com.tradingsystem.domain.enums.UserStatus;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -53,7 +54,8 @@ class SettlementTest {
                 createInstrument(),
                 ProductType.DELIVERY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                LocalDate.now()
         );
 
         assertEquals(
@@ -106,7 +108,8 @@ class SettlementTest {
                         createInstrument(),
                         ProductType.DELIVERY,
                         0,
-                        new BigDecimal("3500.00")
+                        new BigDecimal("3500.00"),
+                        LocalDate.now()
                 )
         );
     }
@@ -122,7 +125,8 @@ class SettlementTest {
                         createInstrument(),
                         ProductType.DELIVERY,
                         -5,
-                        new BigDecimal("3500.00")
+                        new BigDecimal("3500.00"),
+                        LocalDate.now()
                 )
         );
     }
@@ -138,7 +142,8 @@ class SettlementTest {
                         createInstrument(),
                         ProductType.DELIVERY,
                         10,
-                        BigDecimal.ZERO
+                        BigDecimal.ZERO,
+                        LocalDate.now()
                 )
         );
     }

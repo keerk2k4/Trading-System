@@ -11,6 +11,7 @@ import com.tradingsystem.domain.enums.UserStatus;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -31,7 +32,8 @@ class InMemorySettlementRepositoryTest {
                 instrument,
                 ProductType.DELIVERY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                LocalDate.now()
         );
 
         repository.save("1", settlement);
@@ -56,7 +58,8 @@ class InMemorySettlementRepositoryTest {
                 createInstrument("TCS"),
                 ProductType.DELIVERY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                LocalDate.now()
         );
 
         Settlement settlement2 = new Settlement(
@@ -65,7 +68,8 @@ class InMemorySettlementRepositoryTest {
                 createInstrument("INFY"),
                 ProductType.DELIVERY,
                 20,
-                new BigDecimal("1500.00")
+                new BigDecimal("1500.00"),
+                LocalDate.now()
         );
 
         repository.save("1", settlement1);
@@ -93,7 +97,8 @@ class InMemorySettlementRepositoryTest {
                 createInstrument("TCS"),
                 ProductType.DELIVERY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                LocalDate.now()
         );
 
         Settlement settlement2 = new Settlement(
@@ -102,7 +107,8 @@ class InMemorySettlementRepositoryTest {
                 createInstrument("INFY"),
                 ProductType.DELIVERY,
                 20,
-                new BigDecimal("1500.00")
+                new BigDecimal("1500.00"),
+                LocalDate.now()
         );
 
         repository.save("1", settlement1);

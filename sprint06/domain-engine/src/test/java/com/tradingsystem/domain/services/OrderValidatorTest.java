@@ -21,6 +21,7 @@ import com.tradingsystem.exception.*;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -317,11 +318,17 @@ class OrderValidatorTest {
         Instrument instrument = createInstrument("TCS");
 
         Position position = new Position(
+                null,
                 account,
                 instrument,
                 ProductType.INTRADAY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         InMemoryPositionRepository positionRepository =
@@ -394,11 +401,17 @@ class OrderValidatorTest {
         Instrument instrument = createInstrument("TCS");
 
         Position position = new Position(
+                null,
                 account,
                 instrument,
                 ProductType.INTRADAY,
                 3,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         InMemoryPositionRepository positionRepository =
@@ -654,6 +667,11 @@ class OrderValidatorTest {
             int quantity,
             BigDecimal limitPrice
     ) {
+        BigDecimal stopPrice = null;
+        if (orderType == OrderType.STOP_LOSS || orderType == OrderType.STOP_LIMIT) {
+            stopPrice = new BigDecimal("100.00");
+        }
+        
         return new Order(
                 1L,
                 account,
@@ -663,6 +681,7 @@ class OrderValidatorTest {
                 productType,
                 quantity,
                 limitPrice,
+                stopPrice,
                 "Test-Key-001"
         );
     }
