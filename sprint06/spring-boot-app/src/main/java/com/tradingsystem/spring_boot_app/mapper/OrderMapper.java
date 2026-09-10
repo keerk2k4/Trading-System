@@ -53,6 +53,7 @@ public interface OrderMapper {
         @Arg(column = "stop_price", javaType = java.math.BigDecimal.class),
         @Arg(column = "idempotency_key", javaType = String.class)
     })
+    @Result(property = "status", column = "status")
     Optional<Order> findOrderById(@Param("orderId") Long orderId);
 
     @Select("SELECT COUNT(*) > 0 FROM orders WHERE idempotency_key = #{idempotencyKey}")
@@ -66,20 +67,26 @@ public interface OrderMapper {
      * @return the order, or empty if not found
      */
     @Select("""
-        SELECT order_id, trading_account_id, instrument_id, order_type, side, product_type, quantity, limit_price, stop_price, status, idempotency_key
+        SELECT order_id, trading_account_id, instrument_id, order_type, side, product_type, quantity,
+               CAST(limit_price AS numeric(18,2)) AS limit_price,
+               CAST(stop_price AS numeric(18,2)) AS stop_price,
+               status, idempotency_key
         FROM orders
         WHERE idempotency_key = #{idempotencyKey}
         """)
-    @Results({
-        @Result(property = "orderId", column = "order_id"),
-        @Result(property = "account", column = "trading_account_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.AccountMapper.findAccountById")),
-        @Result(property = "instrument", column = "instrument_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.InstrumentMapper.findInstrumentById")),
-        @Result(property = "orderType", column = "order_type"),
-        @Result(property = "side", column = "side"),
-        @Result(property = "productType", column = "product_type"),
-        @Result(property = "limitPrice", column = "limit_price"),
-        @Result(property = "idempotencykey", column = "idempotency_key")
+    @ConstructorArgs({
+        @Arg(column = "order_id", javaType = Long.class),
+        @Arg(column = "trading_account_id", javaType = com.tradingsystem.domain.entities.Account.class, select = "com.tradingsystem.spring_boot_app.mapper.AccountMapper.findAccountById"),
+        @Arg(column = "instrument_id", javaType = com.tradingsystem.domain.entities.Instrument.class, select = "com.tradingsystem.spring_boot_app.mapper.InstrumentMapper.findInstrumentById"),
+        @Arg(column = "order_type", javaType = com.tradingsystem.domain.enums.OrderType.class),
+        @Arg(column = "side", javaType = com.tradingsystem.domain.enums.OrderSide.class),
+        @Arg(column = "product_type", javaType = com.tradingsystem.domain.enums.ProductType.class),
+        @Arg(column = "quantity", javaType = int.class),
+        @Arg(column = "limit_price", javaType = java.math.BigDecimal.class),
+        @Arg(column = "stop_price", javaType = java.math.BigDecimal.class),
+        @Arg(column = "idempotency_key", javaType = String.class)
     })
+    @Result(property = "status", column = "status")
     Optional<Order> findOrderByIdempotencyKey(@Param("idempotencyKey") String idempotencyKey);
     
     /**
@@ -88,21 +95,27 @@ public interface OrderMapper {
      * @return list of orders for the account
      */
     @Select("""
-        SELECT order_id, trading_account_id, instrument_id, order_type, side, product_type, quantity, limit_price, stop_price, status, idempotency_key
+        SELECT order_id, trading_account_id, instrument_id, order_type, side, product_type, quantity,
+               CAST(limit_price AS numeric(18,2)) AS limit_price,
+               CAST(stop_price AS numeric(18,2)) AS stop_price,
+               status, idempotency_key
         FROM orders
         WHERE trading_account_id = #{accountId}
         ORDER BY created_at DESC
         """)
-    @Results({
-        @Result(property = "orderId", column = "order_id"),
-        @Result(property = "account", column = "trading_account_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.AccountMapper.findAccountById")),
-        @Result(property = "instrument", column = "instrument_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.InstrumentMapper.findInstrumentById")),
-        @Result(property = "orderType", column = "order_type"),
-        @Result(property = "side", column = "side"),
-        @Result(property = "productType", column = "product_type"),
-        @Result(property = "limitPrice", column = "limit_price"),
-        @Result(property = "idempotencykey", column = "idempotency_key")
+    @ConstructorArgs({
+        @Arg(column = "order_id", javaType = Long.class),
+        @Arg(column = "trading_account_id", javaType = com.tradingsystem.domain.entities.Account.class, select = "com.tradingsystem.spring_boot_app.mapper.AccountMapper.findAccountById"),
+        @Arg(column = "instrument_id", javaType = com.tradingsystem.domain.entities.Instrument.class, select = "com.tradingsystem.spring_boot_app.mapper.InstrumentMapper.findInstrumentById"),
+        @Arg(column = "order_type", javaType = com.tradingsystem.domain.enums.OrderType.class),
+        @Arg(column = "side", javaType = com.tradingsystem.domain.enums.OrderSide.class),
+        @Arg(column = "product_type", javaType = com.tradingsystem.domain.enums.ProductType.class),
+        @Arg(column = "quantity", javaType = int.class),
+        @Arg(column = "limit_price", javaType = java.math.BigDecimal.class),
+        @Arg(column = "stop_price", javaType = java.math.BigDecimal.class),
+        @Arg(column = "idempotency_key", javaType = String.class)
     })
+    @Result(property = "status", column = "status")
     List<Order> findOrdersByAccountId(@Param("accountId") Long accountId);
     
     /**
@@ -111,21 +124,27 @@ public interface OrderMapper {
      * @return list of orders matching the status
      */
     @Select("""
-        SELECT order_id, trading_account_id, instrument_id, order_type, side, product_type, quantity, limit_price, stop_price, status, idempotency_key
+        SELECT order_id, trading_account_id, instrument_id, order_type, side, product_type, quantity,
+               CAST(limit_price AS numeric(18,2)) AS limit_price,
+               CAST(stop_price AS numeric(18,2)) AS stop_price,
+               status, idempotency_key
         FROM orders
         WHERE status = #{status}
         ORDER BY order_id
         """)
-    @Results({
-        @Result(property = "orderId", column = "order_id"),
-        @Result(property = "account", column = "trading_account_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.AccountMapper.findAccountById")),
-        @Result(property = "instrument", column = "instrument_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.InstrumentMapper.findInstrumentById")),
-        @Result(property = "orderType", column = "order_type"),
-        @Result(property = "side", column = "side"),
-        @Result(property = "productType", column = "product_type"),
-        @Result(property = "limitPrice", column = "limit_price"),
-        @Result(property = "idempotencykey", column = "idempotency_key")
+    @ConstructorArgs({
+        @Arg(column = "order_id", javaType = Long.class),
+        @Arg(column = "trading_account_id", javaType = com.tradingsystem.domain.entities.Account.class, select = "com.tradingsystem.spring_boot_app.mapper.AccountMapper.findAccountById"),
+        @Arg(column = "instrument_id", javaType = com.tradingsystem.domain.entities.Instrument.class, select = "com.tradingsystem.spring_boot_app.mapper.InstrumentMapper.findInstrumentById"),
+        @Arg(column = "order_type", javaType = com.tradingsystem.domain.enums.OrderType.class),
+        @Arg(column = "side", javaType = com.tradingsystem.domain.enums.OrderSide.class),
+        @Arg(column = "product_type", javaType = com.tradingsystem.domain.enums.ProductType.class),
+        @Arg(column = "quantity", javaType = int.class),
+        @Arg(column = "limit_price", javaType = java.math.BigDecimal.class),
+        @Arg(column = "stop_price", javaType = java.math.BigDecimal.class),
+        @Arg(column = "idempotency_key", javaType = String.class)
     })
+    @Result(property = "status", column = "status")
     List<Order> findOrdersByStatus(@Param("status") OrderStatus status);
     
     /**
