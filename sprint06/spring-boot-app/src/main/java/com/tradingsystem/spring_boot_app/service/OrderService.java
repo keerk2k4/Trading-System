@@ -70,26 +70,29 @@ public class OrderService {
                 new DatabaseIdempotencyStore());
         validator.validate(order);
 
+        // FIX (issues 1 & 2): both sides now move money AND both sides go
+        // through the same Position-updating path via OrderExecutor. Previously
+        // SELL skipped account.credit() entirely and bypassed Position by
+        // manipulating Holding directly -- this unifies both sides correctly.
+        BigDecimal tradeValue = request.getPrice().multiply(BigDecimal.valueOf(request.getQuantity()));
+
         if (request.getSide() == OrderSide.BUY) {
-            account.debit(request.getPrice().multiply(BigDecimal.valueOf(request.getQuantity())));
-            if (accounts.updateAvailableBalanceOptimistic(account.getAccountId(),
-                    account.getCashBalance(), account.getLoadedVersion()) == 0) {
-                throw new OptimisticLockException(account.getAccountId());
-            }
+            account.debit(tradeValue);
+        } else {
+            account.credit(tradeValue);
+        }
+
+        if (accounts.updateAvailableBalanceOptimistic(account.getAccountId(),
+                account.getCashBalance(), account.getLoadedVersion()) == 0) {
+            throw new OptimisticLockException(account.getAccountId());
         }
 
         orders.insertOrder(order);
-        if (request.getSide() == OrderSide.BUY) {
-            new OrderExecutor(instrument1 -> instrument1.getSymbol().equals(instrument.getSymbol())
-                    ? request.getPrice() : BigDecimal.ZERO,
-                    new DatabasePositionUpdater(), new DatabaseIdempotencyStore()).execute(order);
-        } else {
-            Holding holding = new DatabaseHoldingRepository()
-                    .findByAccountIdAndInstrument(request.getAccountId().toString(), instrument).orElseThrow();
-            holding.sell(request.getQuantity());
-            holdingMapper.updateHolding(holding.getHoldingId(), holding.getQuantity(), holding.getAveragePrice());
-            order.transitionTo(OrderStatus.FILLED);
-        }
+
+        new OrderExecutor(instrument1 -> instrument1.getSymbol().equals(instrument.getSymbol())
+                ? request.getPrice() : BigDecimal.ZERO,
+                new DatabasePositionUpdater(), new DatabaseIdempotencyStore()).execute(order);
+
         orders.updateOrderStatus(order.getOrderId(), order.getStatus());
         return new OrderResponse("ORD-" + order.getOrderId(), OrderStatus.FILLED,
                 "Order executed", instrument.getSymbol(), request.getSide(), request.getQuantity(), request.getPrice());
