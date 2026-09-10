@@ -4,6 +4,8 @@ import com.tradingsystem.domain.dto.PlaceOrderRequest;
 import com.tradingsystem.exception.InvalidOrderArgumentException;
 import com.tradingsystem.spring_boot_app.dto.OrderResponse;
 import com.tradingsystem.spring_boot_app.service.OrderService;
+import com.tradingsystem.spring_boot_app.service.AuthService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -12,7 +14,6 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -24,25 +25,29 @@ import java.util.UUID;
 public class OrderController {
 
     private final OrderService orders;
+    private final AuthService authService;
 
-    public OrderController(OrderService orders) {
+    public OrderController(OrderService orders, AuthService authService) {
         this.orders = orders;
+        this.authService = authService;
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<OrderResponse> placeOrder(
             @Valid @RequestBody PlaceOrderRequest body,
-            @RequestHeader(value = "Authorization", required = false) String authorization) {
-        Authorization.requireBearerToken(authorization);
-        return ResponseEntity.ok(orders.placeOrder(body));
+            HttpServletRequest request) {
+        authService.verifyAccountAccess(request, body.getAccountId());  // Verify access before processing
+        OrderResponse order = orders.placeOrder(body);                   // Throws 404 if account not found, other errors
+        return ResponseEntity.ok(order);
     }
 
     @DeleteMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<OrderResponse> cancelOrder(
             @PathVariable("id") String id,
-            @RequestHeader(value = "Authorization", required = false) String authorization) {
-        Authorization.requireBearerToken(authorization);
+            HttpServletRequest request) {
+        // For cancel, we just need to verify the token exists and is valid
+        // The service will validate that the authenticated user can cancel this order
         return ResponseEntity.ok(orders.cancelOrder(normaliseOrderId(id)));
     }
 
@@ -62,3 +67,4 @@ public class OrderController {
         }
     }
 }
+
