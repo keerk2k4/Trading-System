@@ -11,6 +11,15 @@ fi
 
 export PGPASSWORD="$POSTGRES_PASSWORD"
 
+# Drop all existing tables and start fresh
+echo "Dropping all existing tables..."
+psql \
+    -h "$POSTGRES_HOST" \
+    -p "$POSTGRES_PORT" \
+    -U "$POSTGRES_USER" \
+    -d "$DATABASE" \
+    -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
+
 for file in migrations/*.sql
 do
     echo "Applying migration: $file"
