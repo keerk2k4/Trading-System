@@ -46,8 +46,7 @@ public class OrderController {
     public ResponseEntity<OrderResponse> cancelOrder(
             @PathVariable("id") String id,
             HttpServletRequest request) {
-        // For cancel, we just need to verify the token exists and is valid
-        // The service will validate that the authenticated user can cancel this order
+        authService.requireBearerToken(request);
         return ResponseEntity.ok(orders.cancelOrder(normaliseOrderId(id)));
     }
 

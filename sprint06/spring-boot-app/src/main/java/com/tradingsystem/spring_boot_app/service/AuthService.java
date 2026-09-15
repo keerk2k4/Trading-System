@@ -1,6 +1,7 @@
 package com.tradingsystem.spring_boot_app.service;
 
 import com.tradingsystem.exception.AccountNotActiveException;
+import com.tradingsystem.spring_boot_app.exception.UnauthorisedException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +22,19 @@ public class AuthService {
     
     private static final String ACCOUNT_ID_ATTRIBUTE = "accountId";
 
+    public void requireBearerToken(HttpServletRequest request) {
+        String authorization = request.getHeader("Authorization");
+        if (authorization == null || authorization.isBlank()) {
+            throw new UnauthorisedException();
+        }
+        if (!authorization.startsWith("Bearer ")) {
+            throw new UnauthorisedException();
+        }
+        if (authorization.substring("Bearer ".length()).isBlank()) {
+            throw new UnauthorisedException();
+        }
+    }
+
     /**
      * Verifies that the account ID from the JWT token matches the requested account.
      * 
@@ -32,6 +46,7 @@ public class AuthService {
      * @throws AccountNotActiveException if the account IDs don't match
      */
     public void verifyAccountAccess(HttpServletRequest request, long requestedAccountId) {
+        requireBearerToken(request);
         Long tokenAccountId = (Long) request.getAttribute(ACCOUNT_ID_ATTRIBUTE);
         
         if (tokenAccountId == null || !tokenAccountId.equals(requestedAccountId)) {

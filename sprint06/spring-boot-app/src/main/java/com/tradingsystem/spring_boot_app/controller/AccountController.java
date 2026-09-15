@@ -40,8 +40,8 @@ public class AccountController {
     public ResponseEntity<AccountResponse> getAccount(
             @PathVariable("id") @Min(1) long id,
             HttpServletRequest request) {
-        AccountResponse account = accounts.getAccount(id);  // Throws 404 if not found
-        authService.verifyAccountAccess(request, id);       // Throws 403 if no access
+        authService.verifyAccountAccess(request, id);
+        AccountResponse account = accounts.getAccount(id);
         return ResponseEntity.ok(account);
     }
 
@@ -49,8 +49,8 @@ public class AccountController {
     public ResponseEntity<BalanceResponse> getBalance(
             @PathVariable("id") @Min(1) long id,
             HttpServletRequest request) {
-        BalanceResponse balance = accounts.getBalance(id);   // Throws 404 if not found
-        authService.verifyAccountAccess(request, id);        // Throws 403 if no access
+        authService.verifyAccountAccess(request, id);
+        BalanceResponse balance = accounts.getBalance(id);
         return ResponseEntity.ok(balance);
     }
 
@@ -58,8 +58,8 @@ public class AccountController {
     public ResponseEntity<List<PositionResponse>> getPositions(
             @PathVariable("id") @Min(1) long id,
             HttpServletRequest request) {
-        List<PositionResponse> positions = accounts.getPositions(id);  // Throws 404 if not found
-        authService.verifyAccountAccess(request, id);                  // Throws 403 if no access
+        authService.verifyAccountAccess(request, id);
+        List<PositionResponse> positions = accounts.getPositions(id);
         return ResponseEntity.ok(positions);
     }
 
@@ -72,8 +72,8 @@ public class AccountController {
             @RequestParam(value = "to", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime to,
             HttpServletRequest request) {
-        List<OrderHistoryEntry> orders = accounts.getOrders(id, status, from, to);  // Throws 404 if not found
-        authService.verifyAccountAccess(request, id);                                // Throws 403 if no access
+        authService.verifyAccountAccess(request, id);
+        List<OrderHistoryEntry> orders = accounts.getOrders(id, status, from, to);
         return ResponseEntity.ok(orders);
     }
 }

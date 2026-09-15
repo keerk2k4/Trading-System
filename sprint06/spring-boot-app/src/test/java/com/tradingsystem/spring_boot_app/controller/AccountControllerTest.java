@@ -9,7 +9,11 @@ import com.tradingsystem.spring_boot_app.dto.AccountStatus;
 import com.tradingsystem.spring_boot_app.dto.BalanceResponse;
 import com.tradingsystem.spring_boot_app.dto.OrderHistoryEntry;
 import com.tradingsystem.spring_boot_app.dto.PositionResponse;
+import com.tradingsystem.spring_boot_app.exception.UnauthorisedException;
 import com.tradingsystem.spring_boot_app.service.AccountService;
+import com.tradingsystem.spring_boot_app.service.AuthService;
+import jakarta.servlet.http.HttpServletRequest;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -21,7 +25,9 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -40,6 +46,23 @@ class AccountControllerTest {
 
     @MockitoBean
     private AccountService accounts;
+
+    @MockitoBean
+    private AuthService authService;
+
+    @BeforeEach
+    void mockAuthGuard() {
+        doAnswer(invocation -> {
+            HttpServletRequest request = invocation.getArgument(0);
+            String authorization = request.getHeader("Authorization");
+            if (authorization == null || authorization.isBlank()
+                    || !authorization.startsWith("Bearer ")
+                    || authorization.substring("Bearer ".length()).isBlank()) {
+                throw new UnauthorisedException();
+            }
+            return null;
+        }).when(authService).verifyAccountAccess(any(HttpServletRequest.class), anyLong());
+    }
 
     @Test
     void getAccountAnswers200WithBusinessReferenceAccountId() throws Exception {
