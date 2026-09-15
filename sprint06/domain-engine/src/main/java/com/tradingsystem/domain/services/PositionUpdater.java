@@ -37,6 +37,10 @@ public class PositionUpdater {
                     order,
                     executionPrice
             );
+            positionRepository.save(
+                    accountId,
+                    existingPosition.get()
+            );
             return;
         }
 
