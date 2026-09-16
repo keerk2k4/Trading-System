@@ -4,9 +4,9 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.example</groupId>
-    <artifactId>Sprint05-work</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <groupId>com.tradingsystem</groupId>
+    <artifactId>domain-engine</artifactId>
+    <version>1</version>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
@@ -18,6 +18,12 @@
     </properties>
 
     <dependencies>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>2.19.2</version>
+        </dependency>
 
         <dependency>
             <groupId>jakarta.validation</groupId>

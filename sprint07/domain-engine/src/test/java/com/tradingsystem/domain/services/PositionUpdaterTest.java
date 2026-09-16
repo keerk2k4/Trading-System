@@ -15,6 +15,10 @@ import com.tradingsystem.domain.repositories.impl.InMemoryPositionRepository;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.Optional;
+
+import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -74,11 +78,17 @@ class PositionUpdaterTest {
         Instrument instrument = createInstrument();
 
         Position existingPosition = new Position(
+                null,
                 account,
                 instrument,
                 ProductType.INTRADAY,
                 10,
-                new BigDecimal("3000.00")
+                new BigDecimal("3000.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         repository.save("1", existingPosition);
@@ -122,11 +132,17 @@ class PositionUpdaterTest {
         Instrument instrument = createInstrument();
 
         Position existingPosition = new Position(
+                null,
                 account,
                 instrument,
                 ProductType.INTRADAY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         repository.save("1", existingPosition);
@@ -201,19 +217,31 @@ class PositionUpdaterTest {
         Instrument instrument = createInstrument();
 
         Position intradayPosition = new Position(
+                null,
                 account,
                 instrument,
                 ProductType.INTRADAY,
                 10,
-                new BigDecimal("3000.00")
+                new BigDecimal("3000.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         Position deliveryPosition = new Position(
+                null,
                 account,
                 instrument,
                 ProductType.DELIVERY,
                 5,
-                new BigDecimal("3200.00")
+                new BigDecimal("3200.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         repository.save("1", intradayPosition);
@@ -261,11 +289,17 @@ class PositionUpdaterTest {
         Instrument instrument = createInstrument();
 
         Position existingPosition = new Position(
+                null,
                 account,
                 instrument,
                 ProductType.INTRADAY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         repository.save("1", existingPosition);
@@ -355,11 +389,17 @@ class PositionUpdaterTest {
         Instrument instrument = createInstrument();
 
         Position position = new Position(
+                null,
                 account,
                 instrument,
                 ProductType.INTRADAY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                BigDecimal.ZERO,
+                "OPEN",
+                LocalDateTime.now(),
+                null,
+                LocalDateTime.now()
         );
 
         repository.save("1", position);
@@ -447,7 +487,8 @@ class PositionUpdaterTest {
                 productType,
                 quantity,
                 null,
-                "idem-key-" + System.nanoTime()
+                null,
+                "test-key"
         );
     }
 }

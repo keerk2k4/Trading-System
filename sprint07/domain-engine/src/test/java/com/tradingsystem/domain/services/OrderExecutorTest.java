@@ -12,18 +12,43 @@ import com.tradingsystem.domain.enums.ProductType;
 import com.tradingsystem.domain.enums.TradingStatus;
 import com.tradingsystem.domain.enums.UserStatus;
 import com.tradingsystem.domain.repositories.IdempotencyStore;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 class OrderExecutorTest {
 
+    private MarketPriceProvider marketPriceProvider;
+    private PositionUpdater positionUpdater;
+    private IdempotencyStore idempotencyStore;
+    private OrderExecutor executor;
+
+    @BeforeEach
+    void setUp() {
+        marketPriceProvider = mock(MarketPriceProvider.class);
+        positionUpdater = mock(PositionUpdater.class);
+        idempotencyStore = mock(IdempotencyStore.class);
+
+        executor = new OrderExecutor(
+                marketPriceProvider,
+                positionUpdater,
+                idempotencyStore
+        );
+    }
+
     @Test
     void shouldExecuteLimitBuyUsingLimitPrice() {
-
         Account account = createAccount();
         Instrument instrument = createInstrument();
 
@@ -34,22 +59,8 @@ class OrderExecutorTest {
                 OrderSide.BUY,
                 ProductType.INTRADAY,
                 10,
-                new BigDecimal("3500.00")
-        );
-
-        MarketPriceProvider marketPriceProvider =
-                mock(MarketPriceProvider.class);
-
-        PositionUpdater positionUpdater =
-                mock(PositionUpdater.class);
-
-        IdempotencyStore idempotencyStore =
-                mock(IdempotencyStore.class);
-
-        OrderExecutor executor = new OrderExecutor(
-                marketPriceProvider,
-                positionUpdater,
-                idempotencyStore
+                new BigDecimal("3500.00"),
+                "Test-Key-001"
         );
 
         executor.execute(order);
@@ -58,29 +69,19 @@ class OrderExecutorTest {
                 order,
                 new BigDecimal("3500.00")
         );
-
         verifyNoInteractions(marketPriceProvider);
+        verify(idempotencyStore).save(order.getIdempotencyKey());
 
         assertEquals(OrderStatus.FILLED, order.getStatus());
     }
 
     @Test
     void shouldExecuteMarketBuyUsingMarketPrice() {
-
         Account account = createAccount();
         Instrument instrument = createInstrument();
 
-        MarketPriceProvider marketPriceProvider =
-                mock(MarketPriceProvider.class);
-
         when(marketPriceProvider.getMarketPrice(instrument))
                 .thenReturn(new BigDecimal("3525.00"));
-
-        PositionUpdater positionUpdater =
-                mock(PositionUpdater.class);
-
-        IdempotencyStore idempotencyStore =
-                mock(IdempotencyStore.class);
 
         Order order = createOrder(
                 account,
@@ -89,31 +90,24 @@ class OrderExecutorTest {
                 OrderSide.BUY,
                 ProductType.INTRADAY,
                 10,
-                null
-        );
-
-        OrderExecutor executor = new OrderExecutor(
-                marketPriceProvider,
-                positionUpdater,
-                idempotencyStore
+                null,
+                "Test-Key-001"
         );
 
         executor.execute(order);
 
-        verify(marketPriceProvider)
-                .getMarketPrice(instrument);
-
+        verify(marketPriceProvider).getMarketPrice(instrument);
         verify(positionUpdater).update(
                 order,
                 new BigDecimal("3525.00")
         );
+        verify(idempotencyStore).save(order.getIdempotencyKey());
 
         assertEquals(OrderStatus.FILLED, order.getStatus());
     }
 
     @Test
     void shouldExecuteLimitSellUsingLimitPrice() {
-
         Account account = createAccount();
         Instrument instrument = createInstrument();
 
@@ -124,22 +118,8 @@ class OrderExecutorTest {
                 OrderSide.SELL,
                 ProductType.INTRADAY,
                 5,
-                new BigDecimal("3600.00")
-        );
-
-        MarketPriceProvider marketPriceProvider =
-                mock(MarketPriceProvider.class);
-
-        PositionUpdater positionUpdater =
-                mock(PositionUpdater.class);
-
-        IdempotencyStore idempotencyStore =
-                mock(IdempotencyStore.class);
-
-        OrderExecutor executor = new OrderExecutor(
-                marketPriceProvider,
-                positionUpdater,
-                idempotencyStore
+                new BigDecimal("3600.00"),
+                "Test-Key-001"
         );
 
         executor.execute(order);
@@ -148,29 +128,19 @@ class OrderExecutorTest {
                 order,
                 new BigDecimal("3600.00")
         );
-
         verifyNoInteractions(marketPriceProvider);
+        verify(idempotencyStore).save(order.getIdempotencyKey());
 
         assertEquals(OrderStatus.FILLED, order.getStatus());
     }
 
     @Test
     void shouldExecuteMarketSellUsingMarketPrice() {
-
         Account account = createAccount();
         Instrument instrument = createInstrument();
 
-        MarketPriceProvider marketPriceProvider =
-                mock(MarketPriceProvider.class);
-
         when(marketPriceProvider.getMarketPrice(instrument))
                 .thenReturn(new BigDecimal("3450.00"));
-
-        PositionUpdater positionUpdater =
-                mock(PositionUpdater.class);
-
-        IdempotencyStore idempotencyStore =
-                mock(IdempotencyStore.class);
 
         Order order = createOrder(
                 account,
@@ -179,145 +149,105 @@ class OrderExecutorTest {
                 OrderSide.SELL,
                 ProductType.INTRADAY,
                 5,
-                null
-        );
-
-        OrderExecutor executor = new OrderExecutor(
-                marketPriceProvider,
-                positionUpdater,
-                idempotencyStore
+                null,
+                "Test-Key-001"
         );
 
         executor.execute(order);
 
-        verify(marketPriceProvider)
-                .getMarketPrice(instrument);
-
+        verify(marketPriceProvider).getMarketPrice(instrument);
         verify(positionUpdater).update(
                 order,
                 new BigDecimal("3450.00")
         );
+        verify(idempotencyStore).save(order.getIdempotencyKey());
 
         assertEquals(OrderStatus.FILLED, order.getStatus());
     }
 
     @Test
     void shouldMarkOrderAsFilledAfterSuccessfulExecution() {
-
-        Account account = createAccount();
-        Instrument instrument = createInstrument();
-
         Order order = createOrder(
-                account,
-                instrument,
+                createAccount(),
+                createInstrument(),
                 OrderType.LIMIT,
                 OrderSide.BUY,
                 ProductType.INTRADAY,
                 10,
-                new BigDecimal("3500.00")
-        );
-
-        MarketPriceProvider marketPriceProvider =
-                mock(MarketPriceProvider.class);
-
-        PositionUpdater positionUpdater =
-                mock(PositionUpdater.class);
-
-        IdempotencyStore idempotencyStore =
-                mock(IdempotencyStore.class);
-
-        OrderExecutor executor = new OrderExecutor(
-                marketPriceProvider,
-                positionUpdater,
-                idempotencyStore
+                new BigDecimal("3500.00"),
+                "Test-Key-001"
         );
 
         executor.execute(order);
 
-        assertEquals(
-                OrderStatus.FILLED,
-                order.getStatus()
-        );
+        assertEquals(OrderStatus.FILLED, order.getStatus());
+        verify(idempotencyStore).save(order.getIdempotencyKey());
     }
 
     @Test
-    void shouldNotMarkOrderAsFilledWhenPositionUpdateFails() {
-
-        Account account = createAccount();
-        Instrument instrument = createInstrument();
-
+    void shouldSaveIdempotencyKeyAfterSuccessfulExecution() {
         Order order = createOrder(
-                account,
-                instrument,
+                createAccount(),
+                createInstrument(),
                 OrderType.LIMIT,
                 OrderSide.BUY,
                 ProductType.INTRADAY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                "Test-Key-001"
         );
 
-        MarketPriceProvider marketPriceProvider =
-                mock(MarketPriceProvider.class);
+        executor.execute(order);
 
-        PositionUpdater positionUpdater =
-                mock(PositionUpdater.class);
+        var orderedCalls = inOrder(positionUpdater, idempotencyStore);
 
-        IdempotencyStore idempotencyStore =
-                mock(IdempotencyStore.class);
+        orderedCalls.verify(positionUpdater).update(
+                order,
+                new BigDecimal("3500.00")
+        );
+        orderedCalls.verify(idempotencyStore)
+                .save(order.getIdempotencyKey());
+    }
+
+    @Test
+    void shouldNotMarkOrderAsFilledWhenPositionUpdateFails() {
+        Order order = createOrder(
+                createAccount(),
+                createInstrument(),
+                OrderType.LIMIT,
+                OrderSide.BUY,
+                ProductType.INTRADAY,
+                10,
+                new BigDecimal("3500.00"),
+                "Test-Key-001"
+        );
 
         doThrow(new RuntimeException("Position update failed"))
                 .when(positionUpdater)
-                .update(
-                        order,
-                        new BigDecimal("3500.00")
-                );
-
-        OrderExecutor executor = new OrderExecutor(
-                marketPriceProvider,
-                positionUpdater,
-                idempotencyStore
-        );
+                .update(order, new BigDecimal("3500.00"));
 
         assertThrows(
                 RuntimeException.class,
                 () -> executor.execute(order)
         );
 
-        assertEquals(
-                OrderStatus.NEW,
-                order.getStatus()
+        assertEquals(OrderStatus.NEW, order.getStatus());
+        verify(idempotencyStore, never()).save(
+                order.getIdempotencyKey()
         );
     }
 
     @Test
     void shouldRejectUnsupportedOrderType() {
-
-        Account account = createAccount();
-        Instrument instrument = createInstrument();
-
         Order order = createOrder(
-                account,
-                instrument,
+                createAccount(),
+                createInstrument(),
                 OrderType.STOP_LOSS,
                 OrderSide.BUY,
                 ProductType.INTRADAY,
                 10,
-                null
-        );
-
-        MarketPriceProvider marketPriceProvider =
-                mock(MarketPriceProvider.class);
-
-        PositionUpdater positionUpdater =
-                mock(PositionUpdater.class);
-
-        IdempotencyStore idempotencyStore =
-                mock(IdempotencyStore.class);
-
-        OrderExecutor executor = new OrderExecutor(
-                marketPriceProvider,
-                positionUpdater,
-                idempotencyStore
+                null,
+                "Test-Key-001"
         );
 
         assertThrows(
@@ -327,15 +257,12 @@ class OrderExecutorTest {
 
         verifyNoInteractions(positionUpdater);
         verifyNoInteractions(marketPriceProvider);
+        verifyNoInteractions(idempotencyStore);
 
-        assertEquals(
-                OrderStatus.NEW,
-                order.getStatus()
-        );
+        assertEquals(OrderStatus.NEW, order.getStatus());
     }
 
     private Account createAccount() {
-
         User user = new User(
                 1L,
                 "John",
@@ -357,7 +284,6 @@ class OrderExecutorTest {
     }
 
     private Instrument createInstrument() {
-
         return new Instrument(
                 "TCS",
                 "TCS Limited",
@@ -373,9 +299,14 @@ class OrderExecutorTest {
             OrderSide side,
             ProductType productType,
             int quantity,
-            BigDecimal limitPrice
+            BigDecimal limitPrice,
+            String idempotencyKey
     ) {
-
+        BigDecimal stopPrice = null;
+        if (orderType == OrderType.STOP_LOSS || orderType == OrderType.STOP_LIMIT) {
+            stopPrice = new BigDecimal("100.00");
+        }
+        
         return new Order(
                 1L,
                 account,
@@ -385,7 +316,8 @@ class OrderExecutorTest {
                 productType,
                 quantity,
                 limitPrice,
-                "idem-key-" + System.nanoTime()
+                stopPrice,
+                idempotencyKey
         );
     }
 }

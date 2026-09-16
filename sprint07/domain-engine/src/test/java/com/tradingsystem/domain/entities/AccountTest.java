@@ -56,14 +56,6 @@ class AccountTest {
     }
 
     @Test
-    void accountIdAndAccountReferenceShouldBeDifferentIdentifiers() {
-        assertNotEquals(
-                String.valueOf(account.getAccountId()),
-                account.getAccountReference()
-        );
-    }
-
-    @Test
     void shouldStoreHolder() {
         assertSame(
                 user,

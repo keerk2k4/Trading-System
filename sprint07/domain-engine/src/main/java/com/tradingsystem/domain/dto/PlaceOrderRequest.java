@@ -2,11 +2,14 @@ package com.tradingsystem.domain.dto;
 
 
 import com.tradingsystem.domain.enums.OrderSide;
+import com.tradingsystem.exception.InvalidOrderArgumentException;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.math.BigDecimal;
 
@@ -45,14 +48,44 @@ public class PlaceOrderRequest {
 
 
 
-    public PlaceOrderRequest(
-            Long accountId,
-            String symbol,
-            OrderSide side,
-            Integer quantity,
-            BigDecimal price,
-            String idempotencyKey
+        @JsonCreator
+        public PlaceOrderRequest(
+            @JsonProperty("accountId") Long accountId,
+            @JsonProperty("symbol") String symbol,
+            @JsonProperty("side") OrderSide side,
+            @JsonProperty("quantity") Integer quantity,
+            @JsonProperty("price") BigDecimal price,
+            @JsonProperty("idempotencyKey") String idempotencyKey
     ) {
+
+        if (accountId == null || accountId < 1) {
+            throw new InvalidOrderArgumentException("Account ID");
+        }
+
+        if (symbol == null || symbol.isEmpty() || symbol.length() > 20) {
+            throw new InvalidOrderArgumentException("Symbol");
+        }
+
+        if (side == null) {
+            throw new InvalidOrderArgumentException("Side");
+        }
+
+        if (quantity == null || quantity < 1) {
+            throw new InvalidOrderArgumentException("Quantity");
+        }
+
+        if (price == null
+                || price.compareTo(new BigDecimal("0.01")) < 0
+                || price.precision() - price.scale() > 17
+                || price.scale() > 2) {
+            throw new InvalidOrderArgumentException("Price", String.valueOf(price));
+        }
+
+        if (idempotencyKey == null
+                || idempotencyKey.length() < 8
+                || idempotencyKey.length() > 100) {
+            throw new InvalidOrderArgumentException("idempotencyKey");
+        }
 
         this.accountId = accountId;
         this.symbol = symbol;

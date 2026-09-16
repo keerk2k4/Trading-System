@@ -56,23 +56,18 @@ public class Account {
     public Long getAccountId() {
         return accountId;
     }
-
     public String getAccountReference() {
         return accountReference;
     }
-
     public User getHolder() {
         return holder;
     }
-
     public BigDecimal getCashBalance() {
         return cashBalance;
     }
-
     public TradingStatus getTradingStatus() {
         return tradingStatus;
     }
-
     public Long getLoadedVersion() {
         return loadedVersion;
     }

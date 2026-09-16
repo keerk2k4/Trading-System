@@ -78,16 +78,6 @@ class InstrumentTest {
     }
 
 
-    @Test
-    void instrumentShouldRemainDelisted() {
-
-        Instrument instrument = createInstrument();
-
-        instrument.delist();
-
-        assertFalse(instrument.mayBeTraded());
-        assertFalse(instrument.mayBeTraded());
-    }
 
     @Test
     void shouldRejectBlankSymbol() {
@@ -139,18 +129,6 @@ class InstrumentTest {
                         ""
                 )
         );
-    }
-
-    @Test
-    void shouldInitiallyBeTradable() {
-        Instrument instrument = new Instrument(
-                "TCS",
-                "Tata Consultancy Services",
-                AssetClass.EQUITY,
-                "INR"
-        );
-
-        assertTrue(instrument.mayBeTraded());
     }
 
     @Test

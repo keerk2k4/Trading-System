@@ -11,8 +11,11 @@ import jakarta.validation.constraints.PositiveOrZero;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 
 public class Position {
+
+    private final Long positionId;
 
     @NotNull
     private final Account account;
@@ -31,13 +34,31 @@ public class Position {
     @Digits(integer = 17, fraction = 2)
     private BigDecimal averagePrice;
 
+    @NotNull
+    @DecimalMin(value = "0.00")
+    @Digits(integer = 17, fraction = 2)
+    private BigDecimal realizedPnl;
+
+    @NotNull
+    private String positionStatus;
+
+    private LocalDateTime openedAt;
+    private LocalDateTime closedAt;
+    private LocalDateTime updatedAt;
+
 
     public Position(
+            Long positionId,
             Account account,
             Instrument instrument,
             ProductType productType,
             int quantity,
-            BigDecimal averagePrice
+            BigDecimal averagePrice,
+            BigDecimal realizedPnl,
+            String positionStatus,
+            LocalDateTime openedAt,
+            LocalDateTime closedAt,
+            LocalDateTime updatedAt
     ) {
 
         if (account == null) {
@@ -71,6 +92,7 @@ public class Position {
             );
         }
 
+        this.positionId = positionId;
         this.account = account;
         this.instrument = instrument;
         this.productType = productType;
@@ -79,34 +101,47 @@ public class Position {
                 2,
                 RoundingMode.HALF_UP
         );
+        this.realizedPnl = realizedPnl != null ? realizedPnl.setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+        this.positionStatus = positionStatus;
+        this.openedAt = openedAt;
+        this.closedAt = closedAt;
+        this.updatedAt = updatedAt;
     }
 
 
     public Account getAccount() {
         return account;
     }
-
-
+    public Long getPositionId() {
+        return positionId;
+    }
     public Instrument getInstrument() {
         return instrument;
     }
-
-
     public ProductType getProductType() {
         return productType;
     }
-
-
     public int getQuantity() {
         return quantity;
     }
-
-
     public BigDecimal getAveragePrice() {
         return averagePrice;
     }
-
-
+    public BigDecimal getRealizedPnl() {
+        return realizedPnl;
+    }
+    public String getPositionStatus() {
+        return positionStatus;
+    }
+    public LocalDateTime getOpenedAt() {
+        return openedAt;
+    }
+    public LocalDateTime getClosedAt() {
+        return closedAt;
+    }
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
     public void buy(
             int boughtQuantity,
             BigDecimal buyPrice
@@ -156,14 +191,12 @@ public class Position {
         quantity -= soldQuantity;
     }
 
-
     private void validateQuantity(int quantity) {
 
         if (quantity <= 0) {
             throw new InvalidOrderArgumentException("quantity", String.valueOf(quantity));
         }
     }
-
 
     private void validatePrice(BigDecimal price) {
 

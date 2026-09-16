@@ -36,6 +36,10 @@ public class Order {
     @Digits(integer = 17, fraction = 2)
     private final BigDecimal limitPrice;
 
+    @DecimalMin(value = "0.01")
+    @Digits(integer = 17, fraction = 2)
+    private final BigDecimal stopPrice;
+
     private final String idempotencykey;
 
     @NotNull
@@ -51,6 +55,7 @@ public class Order {
             ProductType productType,
             int quantity,
             BigDecimal limitPrice,
+            BigDecimal stopPrice,
             String idempotencyKey
     ) {
 
@@ -86,8 +91,16 @@ public class Order {
             validateLimitPrice(limitPrice);
         }
 
+        if (stopPrice != null) {
+            validateStopPrice(stopPrice);
+        }
+
         if (requiresLimitPrice(orderType) && limitPrice == null) {
             throw new InvalidOrderArgumentException("Limit Price");
+        }
+
+        if (requiresStopPrice(orderType) && stopPrice == null) {
+            throw new InvalidOrderArgumentException("Stop Price");
         }
 
         if(idempotencyKey == null || idempotencyKey.isBlank()) {
@@ -102,6 +115,7 @@ public class Order {
         this.productType = productType;
         this.quantity = quantity;
         this.limitPrice = limitPrice;
+        this.stopPrice = stopPrice;
         this.idempotencykey = idempotencyKey;
         this.status = OrderStatus.NEW;
     }
@@ -130,6 +144,9 @@ public class Order {
     }
     public BigDecimal getLimitPrice() {
         return limitPrice;
+    }
+    public BigDecimal getStopPrice() {
+        return stopPrice;
     }
     public String getIdempotencyKey() {
         return idempotencykey;
@@ -163,11 +180,9 @@ public class Order {
         this.status = newStatus;
     }
 
-
     public boolean isTerminal() {
         return isTerminal(status);
     }
-
 
     private boolean isTerminal(OrderStatus status) {
         return status == OrderStatus.FILLED
@@ -207,6 +222,9 @@ public class Order {
         return orderType == OrderType.LIMIT || orderType == OrderType.STOP_LIMIT;
     }
 
+    private boolean requiresStopPrice(OrderType orderType) {
+        return orderType == OrderType.STOP_LOSS || orderType == OrderType.STOP_LIMIT;
+    }
 
     private void validateLimitPrice(BigDecimal price) {
 
@@ -216,6 +234,17 @@ public class Order {
 
         if (price.scale() > 2) {
             throw new InvalidOrderArgumentException("Limit Price", price.toString());
+        }
+    }
+
+    private void validateStopPrice(BigDecimal price) {
+
+        if (price.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidOrderArgumentException("Stop Price", price.toString());
+        }
+
+        if (price.scale() > 2) {
+            throw new InvalidOrderArgumentException("Stop Price", price.toString());
         }
     }
 }

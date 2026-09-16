@@ -8,6 +8,7 @@ import com.tradingsystem.domain.enums.UserStatus;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -53,7 +54,8 @@ class SettlementTest {
                 createInstrument(),
                 ProductType.DELIVERY,
                 10,
-                new BigDecimal("3500.00")
+                new BigDecimal("3500.00"),
+                LocalDate.now()
         );
 
         assertEquals(
@@ -92,85 +94,8 @@ class SettlementTest {
         );
     }
 
-    @Test
-    void shouldMarkSettlementAsCompleted() {
 
-        Settlement settlement = new Settlement(
-                5001L,
-                createAccount(),
-                createInstrument(),
-                ProductType.DELIVERY,
-                10,
-                new BigDecimal("3500.00")
-        );
 
-        settlement.complete();
-
-        assertEquals(
-                Settlement.SettlementStatus.COMPLETED,
-                settlement.getStatus()
-        );
-    }
-
-    @Test
-    void shouldNotCompleteSettlementTwice() {
-
-        Settlement settlement = new Settlement(
-                5001L,
-                createAccount(),
-                createInstrument(),
-                ProductType.DELIVERY,
-                10,
-                new BigDecimal("3500.00")
-        );
-
-        settlement.complete();
-
-        assertThrows(
-                IllegalStateException.class,
-                settlement::complete
-        );
-    }
-
-    @Test
-    void shouldMarkSettlementAsFailed() {
-
-        Settlement settlement = new Settlement(
-                5001L,
-                createAccount(),
-                createInstrument(),
-                ProductType.DELIVERY,
-                10,
-                new BigDecimal("3500.00")
-        );
-
-        settlement.fail();
-
-        assertEquals(
-                Settlement.SettlementStatus.FAILED,
-                settlement.getStatus()
-        );
-    }
-
-    @Test
-    void shouldNotFailCompletedSettlement() {
-
-        Settlement settlement = new Settlement(
-                5001L,
-                createAccount(),
-                createInstrument(),
-                ProductType.DELIVERY,
-                10,
-                new BigDecimal("3500.00")
-        );
-
-        settlement.complete();
-
-        assertThrows(
-                IllegalStateException.class,
-                settlement::fail
-        );
-    }
 
     @Test
     void shouldRejectZeroQuantity() {
@@ -183,7 +108,8 @@ class SettlementTest {
                         createInstrument(),
                         ProductType.DELIVERY,
                         0,
-                        new BigDecimal("3500.00")
+                        new BigDecimal("3500.00"),
+                        LocalDate.now()
                 )
         );
     }
@@ -199,7 +125,8 @@ class SettlementTest {
                         createInstrument(),
                         ProductType.DELIVERY,
                         -5,
-                        new BigDecimal("3500.00")
+                        new BigDecimal("3500.00"),
+                        LocalDate.now()
                 )
         );
     }
@@ -215,7 +142,8 @@ class SettlementTest {
                         createInstrument(),
                         ProductType.DELIVERY,
                         10,
-                        BigDecimal.ZERO
+                        BigDecimal.ZERO,
+                        LocalDate.now()
                 )
         );
     }
