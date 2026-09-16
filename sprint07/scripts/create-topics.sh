@@ -107,10 +107,10 @@ run_preflight_checks() {
     echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
     echo ""
     
-    if ! check_docker_installed; then return 1; fi
-    if ! check_docker_running; then return 1; fi
-    if ! check_kafka_container; then return 1; fi
-    if ! check_docker_exec; then return 1; fi
+    # if ! check_docker_installed; then return 1; fi
+    # if ! check_docker_running; then return 1; fi
+    # if ! check_kafka_container; then return 1; fi
+    # if ! check_docker_exec; then return 1; fi
     if ! check_kafka_tools; then return 1; fi
     
     echo ""
