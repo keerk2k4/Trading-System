@@ -6,7 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
-
+import com.tradeexecutor.kafka.EventEnvelope;
 /**
  * Kafka consumer for ORDER_PLACED events.
  * 
@@ -38,21 +38,21 @@ public class OrderPlacedConsumer {
      * @param event The ORDER_PLACED event
      */
     @KafkaListener(
-        topics = TOPIC,
-        groupId = CONSUMER_GROUP,
-        containerFactory = "kafkaListenerContainerFactory"
-    )
-    public void onOrderPlaced(OrderPlacedEvent event) {
-        logger.info("Received ORDER_PLACED event: {}", event);
-        
-        try {
-            executionService.processOrderPlaced(event);
-            logger.info("Successfully processed ORDER_PLACED for order {}", event.getOrderId());
-        } catch (Exception e) {
-            logger.error("Error processing ORDER_PLACED event for order {}: {}", 
-                event.getOrderId(), e.getMessage(), e);
-            // Note: Kafka will retry based on error handler configuration
-        }
+    topics = TOPIC,
+    groupId = CONSUMER_GROUP,
+    containerFactory = "kafkaListenerContainerFactory"
+)
+public void onOrderPlaced(EventEnvelope<OrderPlacedEvent> envelope) {
+    OrderPlacedEvent event = envelope.getPayload();
+    logger.info("Received ORDER_PLACED event: {}", event);
+
+    try {
+        executionService.processOrderPlaced(event);
+        logger.info("Successfully processed ORDER_PLACED for order {}", event.getOrderId());
+    } catch (Exception e) {
+        logger.error("Error processing ORDER_PLACED event for order {}: {}",
+            event.getOrderId(), e.getMessage(), e);
     }
+}
 }
 

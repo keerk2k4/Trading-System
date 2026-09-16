@@ -6,34 +6,36 @@ import com.tradingsystem.domain.entities.Instrument;
 import com.tradingsystem.domain.entities.Order;
 import com.tradingsystem.domain.entities.Position;
 import com.tradingsystem.domain.entities.Holding;
-import com.tradingsystem.domain.enums.OrderSide;
 import com.tradingsystem.domain.enums.OrderStatus;
 import com.tradingsystem.domain.enums.OrderType;
 import com.tradingsystem.domain.enums.ProductType;
-import com.tradingsystem.exception.AccountNotActiveException;
 import com.tradingsystem.exception.AccountNotFoundException;
-import com.tradingsystem.exception.DuplicateOrderException;
-import com.tradingsystem.exception.InstrumentDelistedException;
 import com.tradingsystem.exception.InstrumentNotFoundException;
-import com.tradingsystem.exception.OptimisticLockException;
 import com.tradingsystem.domain.repositories.HoldingRepository;
 import com.tradingsystem.domain.repositories.IdempotencyStore;
 import com.tradingsystem.domain.repositories.PositionRepository;
-import com.tradingsystem.domain.services.OrderExecutor;
 import com.tradingsystem.domain.services.OrderValidator;
 import com.tradingsystem.spring_boot_app.dto.OrderResponse;
 import com.tradingsystem.spring_boot_app.exception.OrderNotFoundException;
+import com.tradingsystem.spring_boot_app.kafka.KafkaMessageEnvelope;
+import com.tradingsystem.spring_boot_app.kafka.OrderPlacedPayload;
 import com.tradingsystem.spring_boot_app.mapper.AccountMapper;
 import com.tradingsystem.spring_boot_app.mapper.InstrumentMapper;
 import com.tradingsystem.spring_boot_app.mapper.HoldingMapper;
 import com.tradingsystem.spring_boot_app.mapper.OrderMapper;
 import com.tradingsystem.spring_boot_app.mapper.PositionMapper;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class OrderService {
@@ -42,22 +44,27 @@ public class OrderService {
     private final OrderMapper orders;
     private final PositionMapper positions;
     private final HoldingMapper holdingMapper;
+    private final KafkaTemplate<String, KafkaMessageEnvelope<OrderPlacedPayload>> kafkaTemplate;
 
     public OrderService(AccountMapper accounts, InstrumentMapper instruments,
-                        OrderMapper orders, PositionMapper positions, HoldingMapper holdingMapper) {
+                        OrderMapper orders, PositionMapper positions, HoldingMapper holdingMapper,
+                        KafkaTemplate<String, KafkaMessageEnvelope<OrderPlacedPayload>> kafkaTemplate) {
         this.accounts = accounts;
         this.instruments = instruments;
         this.orders = orders;
         this.positions = positions;
         this.holdingMapper = holdingMapper;
+        this.kafkaTemplate = kafkaTemplate;
     }
 
     @Transactional
     public OrderResponse placeOrder(PlaceOrderRequest request) {
-        Account account = accounts.findAccountById(request.getAccountId()).orElseThrow(() ->
-                new AccountNotFoundException(request.getAccountId()));
-        Instrument instrument = instruments.findInstrumentBySymbol(request.getSymbol()).orElseThrow(() ->
-                new InstrumentNotFoundException(request.getSymbol()));
+
+        Account account = accounts.findAccountById(request.getAccountId())
+                .orElseThrow(() -> new AccountNotFoundException(request.getAccountId()));
+
+        Instrument instrument = instruments.findInstrumentBySymbol(request.getSymbol())
+                .orElseThrow(() -> new InstrumentNotFoundException(request.getSymbol()));
 
         Order order = new Order(orders.nextOrderId(), account, instrument, OrderType.LIMIT,
                 request.getSide(), ProductType.DELIVERY, request.getQuantity(), request.getPrice(), null,
@@ -70,32 +77,47 @@ public class OrderService {
                 new DatabaseIdempotencyStore());
         validator.validate(order);
 
-        // FIX (issues 1 & 2): both sides now move money AND both sides go
-        // through the same Position-updating path via OrderExecutor. Previously
-        // SELL skipped account.credit() entirely and bypassed Position by
-        // manipulating Holding directly -- this unifies both sides correctly.
-        BigDecimal tradeValue = request.getPrice().multiply(BigDecimal.valueOf(request.getQuantity()));
-
-        if (request.getSide() == OrderSide.BUY) {
-            account.debit(tradeValue);
-        } else {
-            account.credit(tradeValue);
-        }
-
-        if (accounts.updateAvailableBalanceOptimistic(account.getAccountId(),
-                account.getCashBalance(), account.getLoadedVersion()) == 0) {
-            throw new OptimisticLockException(account.getAccountId());
-        }
-
         orders.insertOrder(order);
 
-        new OrderExecutor(instrument1 -> instrument1.getSymbol().equals(instrument.getSymbol())
-                ? request.getPrice() : BigDecimal.ZERO,
-                new DatabasePositionUpdater(), new DatabaseIdempotencyStore()).execute(order);
+        String key = String.valueOf(account.getAccountId());
+        KafkaMessageEnvelope<OrderPlacedPayload> event = buildOrderPlacedEvent(order, account, instrument, request);
 
-        orders.updateOrderStatus(order.getOrderId(), order.getStatus());
-        return new OrderResponse("ORD-" + order.getOrderId(), OrderStatus.FILLED,
-                "Order executed", instrument.getSymbol(), request.getSide(), request.getQuantity(), request.getPrice());
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                kafkaTemplate.send("orders", key, event);
+            }
+        });
+
+        return new OrderResponse("ORD-" + order.getOrderId(), OrderStatus.NEW,
+                "Order accepted, pending execution", instrument.getSymbol(), request.getSide(),
+                request.getQuantity(), request.getPrice());
+    }
+
+    private KafkaMessageEnvelope<OrderPlacedPayload> buildOrderPlacedEvent(
+            Order order, Account account, Instrument instrument, PlaceOrderRequest request) {
+
+        String nowIso = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+
+        OrderPlacedPayload payload = new OrderPlacedPayload(
+                String.valueOf(order.getOrderId()),
+                account.getAccountId(),
+                instrument.getSymbol(),
+                request.getSide().name(),
+                request.getQuantity(),
+                request.getPrice(),
+                request.getIdempotencyKey(),
+                nowIso
+        );
+
+        return new KafkaMessageEnvelope<>(
+                UUID.randomUUID().toString(),
+                "ORDER_PLACED",
+                nowIso,
+                "trade-api",
+                1,
+                payload
+        );
     }
 
     @Transactional
@@ -138,10 +160,6 @@ public class OrderService {
             return findByAccountId(accountId).stream().filter(p -> p.getInstrument().getInstrumentId().equals(instrument.getInstrumentId()) && p.getProductType() == productType).findFirst();
         }
         public void delete(String accountId, Instrument instrument, ProductType productType) { }
-    }
-
-    private class DatabasePositionUpdater extends com.tradingsystem.domain.services.PositionUpdater {
-        DatabasePositionUpdater() { super(new DatabasePositionRepository()); }
     }
 
     private class DatabaseHoldingRepository implements HoldingRepository {
