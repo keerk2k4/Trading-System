@@ -81,5 +81,9 @@ public class PositionUpdater {
         } else {
             position.sell(order.getQuantity());
         }
+        
+        // Persist the updated position back to the repository
+        String accountId = order.getAccount().getAccountId().toString();
+        positionRepository.save(accountId, position);
     }
 }
