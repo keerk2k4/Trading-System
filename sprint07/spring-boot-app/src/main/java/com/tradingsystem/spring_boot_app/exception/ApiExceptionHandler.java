@@ -78,7 +78,8 @@ public class ApiExceptionHandler {
         @ExceptionHandler({InvalidOrderArgumentException.class, MethodArgumentNotValidException.class,
             ConstraintViolationException.class, MethodArgumentTypeMismatchException.class,
             HttpMessageNotReadableException.class})
-    ResponseEntity<ErrorResponse> invalidInput() {
+    ResponseEntity<ErrorResponse> invalidInput(Exception exception) {
+        LOGGER.warn("Invalid order input: {} - {}", exception.getClass().getSimpleName(), exception.getMessage());
         return response(HttpStatus.UNPROCESSABLE_ENTITY, "VAL-422", "Invalid input");
     }
 

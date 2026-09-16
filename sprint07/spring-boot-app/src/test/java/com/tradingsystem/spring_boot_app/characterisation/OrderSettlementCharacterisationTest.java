@@ -16,6 +16,8 @@ import com.tradingsystem.exception.DuplicateOrderException;
 import com.tradingsystem.exception.InsufficientFundsException;
 import com.tradingsystem.exception.InstrumentNotFoundException;
 import com.tradingsystem.spring_boot_app.dto.OrderResponse;
+import com.tradingsystem.spring_boot_app.kafka.KafkaMessageEnvelope;
+import com.tradingsystem.spring_boot_app.kafka.OrderPlacedPayload;
 import com.tradingsystem.spring_boot_app.mapper.AccountMapper;
 import com.tradingsystem.spring_boot_app.mapper.HoldingMapper;
 import com.tradingsystem.spring_boot_app.mapper.InstrumentMapper;
@@ -23,15 +25,18 @@ import com.tradingsystem.spring_boot_app.mapper.OrderMapper;
 import com.tradingsystem.spring_boot_app.mapper.PositionMapper;
 import com.tradingsystem.spring_boot_app.service.OrderService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
-import java.util.Collections;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -39,7 +44,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -77,11 +81,18 @@ class OrderSettlementCharacterisationTest {
 
     @BeforeEach
     void setUp() {
-        service = new OrderService(accounts, instruments, orders, positions, holdingMapper);
+        TransactionSynchronizationManager.initSynchronization();
+        KafkaTemplate<String, KafkaMessageEnvelope<OrderPlacedPayload>> kafkaTemplate = Mockito.mock(KafkaTemplate.class);
+        service = new OrderService(accounts, instruments, orders, positions, holdingMapper, kafkaTemplate);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TransactionSynchronizationManager.clearSynchronization();
     }
 
     @Test
-    @DisplayName("accepted BUY writes order row, debits cash and creates position, answers FILLED")
+    @DisplayName("accepted BUY writes a NEW order row and answers pending")
     void acceptedBuyWritesOrderCashAndPosition() {
         Account account = activeAccount(new BigDecimal("10000.00"));
         Instrument instrument = acme();
@@ -90,40 +101,28 @@ class OrderSettlementCharacterisationTest {
         when(instruments.findInstrumentBySymbol("ACME")).thenReturn(Optional.of(instrument));
         when(orders.nextOrderId()).thenReturn(7L);
         when(orders.existsByIdempotencyKey(KEY)).thenReturn(false);
-        when(accounts.updateAvailableBalanceOptimistic(eq(1L), any(BigDecimal.class), eq(0L))).thenReturn(1);
-        when(positions.findPositionsByAccountId(1L)).thenReturn(Collections.emptyList());
-        when(positions.nextPositionId()).thenReturn(11L);
 
         OrderResponse response = service.placeOrder(buyTenAt2550());
 
-        // Response pins the pre-Sprint-7 synchronous fill.
+        // Sprint 7 accepts the order and defers execution to the trade executor.
         assertEquals("ORD-7", response.orderId());
-        assertEquals(OrderStatus.FILLED, response.status());
-        assertEquals("Order executed", response.message());
+        assertEquals(OrderStatus.NEW, response.status());
+        assertEquals("Order accepted, pending execution", response.message());
         assertEquals("ACME", response.symbol());
         assertEquals(OrderSide.BUY, response.side());
         assertEquals(10, response.quantity());
         assertTrue(new BigDecimal("25.50").compareTo(response.price()) == 0);
 
-        // Cash: 10000.00 - 10 * 25.50 = 9745.00, written via the optimistic-lock update.
-        ArgumentCaptor<BigDecimal> cash = ArgumentCaptor.forClass(BigDecimal.class);
-        verify(accounts).updateAvailableBalanceOptimistic(eq(1L), cash.capture(), eq(0L));
-        assertTrue(new BigDecimal("9745.00").compareTo(cash.getValue()) == 0);
-
-        // Order row: inserted, then status moved to FILLED.
+        // The order row is inserted as NEW; execution and settlement happen asynchronously.
         ArgumentCaptor<Order> inserted = ArgumentCaptor.forClass(Order.class);
         verify(orders).insertOrder(inserted.capture());
         assertEquals(7L, inserted.getValue().getOrderId());
         assertEquals(10, inserted.getValue().getQuantity());
         assertTrue(new BigDecimal("25.50").compareTo(inserted.getValue().getLimitPrice()) == 0);
         assertEquals(KEY, inserted.getValue().getIdempotencyKey());
-        verify(orders).updateOrderStatus(7L, OrderStatus.FILLED);
-
-        // Position: fresh account inserts one DELIVERY position of 10 @ 25.50.
-        ArgumentCaptor<Position> position = ArgumentCaptor.forClass(Position.class);
-        verify(positions).insertPosition(position.capture());
-        assertEquals(10, position.getValue().getQuantity());
-        assertTrue(new BigDecimal("25.50").compareTo(position.getValue().getAveragePrice()) == 0);
+        verify(orders, never()).updateOrderStatus(anyLong(), any(OrderStatus.class));
+        verify(accounts, never()).updateAvailableBalanceOptimistic(anyLong(), any(BigDecimal.class), anyLong());
+        verify(positions, never()).insertPosition(any(Position.class));
     }
 
     @Test

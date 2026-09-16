@@ -56,11 +56,14 @@ services:
       DB_USERNAME: postgres
       DB_PASSWORD: postgres
       JWT_SECRET: your-256-bit-secret-key-for-hmac-sha256-token-signing
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
       postgres:
         condition: service_healthy
       migrations:
         condition: service_completed_successfully
+      kafka:
+        condition: service_started
     networks:
       - trading-net
   kafka:

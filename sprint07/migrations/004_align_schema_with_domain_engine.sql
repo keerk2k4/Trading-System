@@ -125,6 +125,7 @@ ALTER TABLE order_history ADD CONSTRAINT chk_order_history_status
 
 ALTER TABLE positions RENAME COLUMN account_id TO trading_account_id;
 ALTER TABLE positions RENAME COLUMN total_quantity TO quantity;
+ALTER TABLE positions DROP CONSTRAINT chk_position_price;
 ALTER TABLE positions DROP COLUMN total_price;
 ALTER TABLE positions RENAME COLUMN status TO position_status;
 
@@ -147,6 +148,7 @@ ALTER TABLE positions ALTER COLUMN position_status SET DEFAULT 'OPEN';
 
 ALTER TABLE holdings RENAME COLUMN account_id TO demat_account_id;
 ALTER TABLE holdings RENAME COLUMN total_quantity TO quantity;
+ALTER TABLE holdings DROP CONSTRAINT chk_holding_price;
 ALTER TABLE holdings DROP COLUMN total_price;
 ALTER TABLE holdings ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE holdings RENAME COLUMN as_of_date TO created_at_date;

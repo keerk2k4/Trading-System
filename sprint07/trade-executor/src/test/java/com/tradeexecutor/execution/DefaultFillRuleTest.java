@@ -149,9 +149,7 @@ class DefaultFillRuleTest {
     @Test
     @DisplayName("Null quote price -> REJECTED")
     void testNullQuotePrice() {
-        // Given: A BUY order and null quote price
-        when(mockBuyOrder.getSide()).thenReturn(OrderSide.BUY);
-        when(mockBuyOrder.getLimitPrice()).thenReturn(new BigDecimal("150.00"));
+        // Given: An order and null quote price
         
         // When: Apply fill rule
         ExecutionResult result = fillRule.evaluate(mockBuyOrder, null);
@@ -165,7 +163,6 @@ class DefaultFillRuleTest {
     @DisplayName("Null limit price -> REJECTED")
     void testNullLimitPrice() {
         // Given: An order with null limit price (edge case)
-        when(mockBuyOrder.getSide()).thenReturn(OrderSide.BUY);
         when(mockBuyOrder.getLimitPrice()).thenReturn(null);
         BigDecimal quotePrice = new BigDecimal("150.00");
         
