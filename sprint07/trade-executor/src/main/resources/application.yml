@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: trade-executor
+
+  # Kafka Configuration
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP:trade-executor-group}
+      auto-offset-reset: earliest
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+    producer:
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+  # PostgreSQL Configuration
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/trade_executor}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  # JPA/Hibernate Configuration
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+# Application-specific Configuration
+app:
+  # Fauxnance Configuration
+  fauxnance:
+    base-url: ${FAUXNANCE_BASE_URL:http://localhost:8080}
+    api-key: ${FAUXNANCE_API_KEY:}
+    retry:
+      max-attempts: ${FAUXNANCE_RETRY_MAX_ATTEMPTS:3}
+      delay-ms: ${FAUXNANCE_RETRY_DELAY_MS:100}
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    com.tradeexecutor: DEBUG
+

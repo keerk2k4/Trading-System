@@ -21,7 +21,7 @@
 set -e
 
 # Configuration
-BOOTSTRAP_SERVER="${KAFKA_BOOTSTRAP_SERVER:-10.8.66.137:9092}"
+BOOTSTRAP_SERVER="${KAFKA_BOOTSTRAP_SERVER:-kafka:9092}"
 KAFKA_BIN_DIR="${KAFKA_HOME:-/opt/kafka}/bin"
 
 # Color codes for output
@@ -48,52 +48,54 @@ declare -A DLT_TOPICS=(
 # Pre-flight Checks
 ###############################################################################
 
-check_docker_installed() {
-    log_info "Checking if Docker is installed..."
-    if ! command -v docker &> /dev/null; then
-        log_error "Docker is not installed or not in PATH"
-        return 1
-    fi
-    log_success "Docker is installed"
-    return 0
-}
+# check_docker_installed() {
+#     log_info "Checking if Docker is installed..."
+#     if ! command -v docker &> /dev/null; then
+#         log_error "Docker is not installed or not in PATH"
+#         return 1
+#     fi
+#     log_success "Docker is installed"
+#     return 0
+# }
 
-check_docker_running() {
-    log_info "Checking if Docker daemon is running..."
-    if ! docker ps > /dev/null 2>&1; then
-        log_error "Docker daemon is not running. Start Docker and try again"
-        return 1
-    fi
-    log_success "Docker daemon is running"
-    return 0
-}
+# check_docker_running() {
+#     log_info "Checking if Docker daemon is running..."
+#     if ! docker ps > /dev/null 2>&1; then
+#         log_error "Docker daemon is not running. Start Docker and try again"
+#         return 1
+#     fi
+#     log_success "Docker daemon is running"
+#     return 0
+# }
 
-check_kafka_container() {
-    log_info "Checking if Kafka container 'kafka' is running..."
-    if ! docker ps | grep -q "kafka"; then
-        log_error "Kafka container 'kafka' is not running"
-        return 1
-    fi
-    log_success "Kafka container is running"
-    return 0
-}
+# check_kafka_container() {
+#     log_info "Checking if Kafka container 'kafka' is running..."
+#     if ! docker ps | grep -q "kafka"; then
+#         log_error "Kafka container 'kafka' is not running"
+#         return 1
+#     fi
+#     log_success "Kafka container is running"
+#     return 0
+# }
 
-check_docker_exec() {
-    log_info "Checking if docker exec can run commands in Kafka container..."
-    if ! docker exec kafka echo "Docker exec works" > /dev/null 2>&1; then
-        log_error "Cannot execute commands in Kafka container"
-        return 1
-    fi
-    log_success "Docker exec is functional"
-    return 0
-}
+# check_docker_exec() {
+#     log_info "Checking if docker exec can run commands in Kafka container..."
+#     if ! docker exec kafka echo "Docker exec works" > /dev/null 2>&1; then
+#         log_error "Cannot execute commands in Kafka container"
+#         return 1
+#     fi
+#     log_success "Docker exec is functional"
+#     return 0
+# }
 
 check_kafka_tools() {
-    log_info "Checking if kafka-topics.sh exists in container..."
-    if ! docker exec kafka test -f /opt/kafka/bin/kafka-topics.sh 2>/dev/null; then
-        log_error "kafka-topics.sh not found at /opt/kafka/bin/kafka-topics.sh in container"
+    log_info "Checking if kafka-topics.sh exists..."
+
+    if ! test -f /opt/kafka/bin/kafka-topics.sh; then
+        log_error "kafka-topics.sh not found"
         return 1
     fi
+
     log_success "kafka-topics.sh found"
     return 0
 }
@@ -140,7 +142,7 @@ log_error() {
 check_broker_connectivity() {
     log_info "Checking Kafka broker connectivity at $BOOTSTRAP_SERVER..."
     
-    if docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP_SERVER" --list > /dev/null 2>&1; then
+    if /opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP_SERVER" --list > /dev/null 2>&1; then
         log_success "Broker is reachable"
         return 0
     else
@@ -151,13 +153,13 @@ check_broker_connectivity() {
 
 topic_exists() {
     local topic=$1
-    docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP_SERVER" --list 2>/dev/null | grep -q "^${topic}$"
+    /opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP_SERVER" --list 2>/dev/null | grep -q "^${topic}$"
 }
 
 delete_topic() {
     local topic=$1
     log_info "Deleting topic: $topic"
-    docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP_SERVER" --delete --topic "$topic" || true
+    /opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP_SERVER" --delete --topic "$topic" || true
     sleep 1
 }
 
@@ -173,7 +175,7 @@ create_topic() {
     fi
     
     log_info "Creating topic: $topic (partitions=$partitions, retention=${retention}ms)"
-    docker exec kafka /opt/kafka/bin/kafka-topics.sh \
+    /opt/kafka/bin/kafka-topics.sh \
         --bootstrap-server "$BOOTSTRAP_SERVER" \
         --create \
         --topic "$topic" \
@@ -188,7 +190,7 @@ describe_topics() {
     log_info "Describing all trading system topics..."
     echo ""
     
-    docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP_SERVER" --describe \
+    /opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP_SERVER" --describe \
         --topics-with-overrides | grep -E "(orders|trade-events|market-data|DLT)" || true
     
     echo ""
