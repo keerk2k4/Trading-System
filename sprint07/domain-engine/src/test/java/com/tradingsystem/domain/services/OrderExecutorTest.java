@@ -11,6 +11,7 @@ import com.tradingsystem.domain.enums.OrderType;
 import com.tradingsystem.domain.enums.ProductType;
 import com.tradingsystem.domain.enums.TradingStatus;
 import com.tradingsystem.domain.enums.UserStatus;
+import com.tradingsystem.domain.repositories.IdempotencyStore;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -42,9 +43,13 @@ class OrderExecutorTest {
         PositionUpdater positionUpdater =
                 mock(PositionUpdater.class);
 
+        IdempotencyStore idempotencyStore =
+                mock(IdempotencyStore.class);
+
         OrderExecutor executor = new OrderExecutor(
                 marketPriceProvider,
-                positionUpdater
+                positionUpdater,
+                idempotencyStore
         );
 
         executor.execute(order);
@@ -74,6 +79,9 @@ class OrderExecutorTest {
         PositionUpdater positionUpdater =
                 mock(PositionUpdater.class);
 
+        IdempotencyStore idempotencyStore =
+                mock(IdempotencyStore.class);
+
         Order order = createOrder(
                 account,
                 instrument,
@@ -86,7 +94,8 @@ class OrderExecutorTest {
 
         OrderExecutor executor = new OrderExecutor(
                 marketPriceProvider,
-                positionUpdater
+                positionUpdater,
+                idempotencyStore
         );
 
         executor.execute(order);
@@ -124,9 +133,13 @@ class OrderExecutorTest {
         PositionUpdater positionUpdater =
                 mock(PositionUpdater.class);
 
+        IdempotencyStore idempotencyStore =
+                mock(IdempotencyStore.class);
+
         OrderExecutor executor = new OrderExecutor(
                 marketPriceProvider,
-                positionUpdater
+                positionUpdater,
+                idempotencyStore
         );
 
         executor.execute(order);
@@ -156,6 +169,9 @@ class OrderExecutorTest {
         PositionUpdater positionUpdater =
                 mock(PositionUpdater.class);
 
+        IdempotencyStore idempotencyStore =
+                mock(IdempotencyStore.class);
+
         Order order = createOrder(
                 account,
                 instrument,
@@ -168,7 +184,8 @@ class OrderExecutorTest {
 
         OrderExecutor executor = new OrderExecutor(
                 marketPriceProvider,
-                positionUpdater
+                positionUpdater,
+                idempotencyStore
         );
 
         executor.execute(order);
@@ -206,9 +223,13 @@ class OrderExecutorTest {
         PositionUpdater positionUpdater =
                 mock(PositionUpdater.class);
 
+        IdempotencyStore idempotencyStore =
+                mock(IdempotencyStore.class);
+
         OrderExecutor executor = new OrderExecutor(
                 marketPriceProvider,
-                positionUpdater
+                positionUpdater,
+                idempotencyStore
         );
 
         executor.execute(order);
@@ -241,6 +262,9 @@ class OrderExecutorTest {
         PositionUpdater positionUpdater =
                 mock(PositionUpdater.class);
 
+        IdempotencyStore idempotencyStore =
+                mock(IdempotencyStore.class);
+
         doThrow(new RuntimeException("Position update failed"))
                 .when(positionUpdater)
                 .update(
@@ -250,7 +274,8 @@ class OrderExecutorTest {
 
         OrderExecutor executor = new OrderExecutor(
                 marketPriceProvider,
-                positionUpdater
+                positionUpdater,
+                idempotencyStore
         );
 
         assertThrows(
@@ -286,9 +311,13 @@ class OrderExecutorTest {
         PositionUpdater positionUpdater =
                 mock(PositionUpdater.class);
 
+        IdempotencyStore idempotencyStore =
+                mock(IdempotencyStore.class);
+
         OrderExecutor executor = new OrderExecutor(
                 marketPriceProvider,
-                positionUpdater
+                positionUpdater,
+                idempotencyStore
         );
 
         assertThrows(
@@ -355,7 +384,8 @@ class OrderExecutorTest {
                 side,
                 productType,
                 quantity,
-                limitPrice
+                limitPrice,
+                "idem-key-" + System.nanoTime()
         );
     }
 }
