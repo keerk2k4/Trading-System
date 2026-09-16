@@ -82,6 +82,12 @@
 			<version>0.12.5</version>
 			<scope>runtime</scope>
 		</dependency>
+		
+		<!-- Kafka for event streaming -->
+		<dependency>
+			<groupId>org.springframework.kafka</groupId>
+			<artifactId>spring-kafka</artifactId>
+		</dependency>
     </dependencies>
 
 	<build>
