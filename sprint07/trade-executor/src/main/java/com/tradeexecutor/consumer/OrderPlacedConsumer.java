@@ -60,28 +60,50 @@ public class OrderPlacedConsumer {
     )
     public void onOrderPlaced(@Payload KafkaMessageEnvelope<OrderPlacedEvent> envelope,
                              Acknowledgment ack) {
+        logger.info("=== ORDER CONSUMPTION STARTED ===");
+        logger.info("Kafka message received - Topic: orders, ConsumerGroup: {}", CONSUMER_GROUP);
+        
         if (envelope == null || envelope.payload() == null) {
-            logger.error("Received null envelope or payload");
+            logger.error("ERROR: Received null envelope or payload");
             if (ack != null) ack.acknowledge();
             return;
         }
         
         OrderPlacedEvent event = envelope.payload();
-        logger.info("Received ORDER_PLACED event: orderId={}, accountId={}, symbol={}, quantity={}", 
-                   event.getOrderId(), event.getAccountId(), event.getSymbol(), event.getQuantity());
+        logger.info("✓ Envelope deserialized successfully");
+        logger.info("  Event Details:");
+        logger.info("    - Event ID: {}", envelope.eventId());
+        logger.info("    - Event Type: {}", envelope.eventType());
+        logger.info("    - Source: {}", envelope.source());
+        logger.info("    - Event Time: {}", envelope.eventTime());
+        logger.info("  Order Details:");
+        logger.info("    - Order ID: {}", event.getOrderId());
+        logger.info("    - Account ID: {}", event.getAccountId());
+        logger.info("    - Symbol: {}", event.getSymbol());
+        logger.info("    - Side: {}", event.getSide());
+        logger.info("    - Quantity: {}", event.getQuantity());
+        logger.info("    - Price: {}", event.getPrice());
+        logger.info("    - Idempotency Key: {}", event.getIdempotencyKey());
+        logger.info("    - Created On: {}", event.getCreatedOn());
 
         try {
+            logger.info("Processing order through ExecutionService...");
             // Step 1: Execute the order (determine FILLED or REJECTED)
             executionService.processOrderPlaced(event);
-            logger.info("Successfully processed ORDER_PLACED for order {}", event.getOrderId());
+            
+            logger.info("✓ Order execution completed successfully for order {}", event.getOrderId());
+            logger.info("  Trade event has been published to 'trade-events' topic");
 
             if (ack != null) {
                 ack.acknowledge();
-                logger.debug("Acknowledged ORDER_PLACED event for order {}", event.getOrderId());
+                logger.info("✓ Kafka message acknowledged for order {}", event.getOrderId());
+                logger.info("=== ORDER CONSUMPTION COMPLETED SUCCESSFULLY ===");
             }
         } catch (Exception e) {
-            logger.error("Error processing ORDER_PLACED event for order {}: {}",
-                event.getOrderId(), e.getMessage(), e);
+            logger.error("✗ ERROR processing ORDER_PLACED event for order {}", event.getOrderId());
+            logger.error("  Error Message: {}", e.getMessage());
+            logger.error("  Stack Trace: ", e);
+            logger.warn("  Message will NOT be acknowledged and will be retried from Kafka");
             // Do not acknowledge - message will be retried
             // Could optionally send to dead-letter queue depending on exception type
         }

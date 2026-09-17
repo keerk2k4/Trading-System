@@ -55,9 +55,11 @@ public class ExecutionService {
      * @param event The ORDER_PLACED event from Kafka
      */
     public void processOrderPlaced(OrderPlacedEvent event) {
+        logger.info("=== EXECUTION SERVICE STARTED ===");
         logger.info("Processing ORDER_PLACED event for order {}", event.getOrderId());
         
         if (event == null || event.getOrderId() == null) {
+            logger.error("Invalid ORDER_PLACED event: event is null or orderId is missing");
             throw new IllegalArgumentException("Invalid ORDER_PLACED event");
         }
         
@@ -65,29 +67,53 @@ public class ExecutionService {
         Long orderId;
         try {
             orderId = Long.parseLong(event.getOrderId());
+            logger.debug("Order ID parsed successfully: {}", orderId);
         } catch (NumberFormatException e) {
+            logger.error("Failed to parse order ID: {}. Error: {}", event.getOrderId(), e.getMessage());
             throw new IllegalArgumentException("Invalid order ID format: " + event.getOrderId(), e);
         }
         
         Long accountId = event.getAccountId();
         if (accountId == null) {
+            logger.error("Account ID is missing from order placed event for order {}", orderId);
             throw new IllegalArgumentException("Account ID is missing from order placed event");
         }
+        logger.info("Account ID: {}", accountId);
         
         // Step 1: Load Order from database
+        logger.info("Step 1: Loading order from database...");
         Order order = orderMapper.findOrderById(orderId)
-            .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+            .orElseThrow(() -> {
+                logger.error("Order not found in database: {}", orderId);
+                return new IllegalArgumentException("Order not found: " + orderId);
+            });
+        logger.info("✓ Order loaded: quantity={}, side={}", 
+                   order.getQuantity(), order.getSide());
         
         // Step 2: Load Instrument from database
+        logger.info("Step 2: Loading instrument from database: {}", event.getSymbol());
         Instrument instrument = instrumentMapper.findInstrumentBySymbol(event.getSymbol())
-            .orElseThrow(() -> new IllegalArgumentException("Instrument not found: " + event.getSymbol()));
+            .orElseThrow(() -> {
+                logger.error("Instrument not found: {}", event.getSymbol());
+                return new IllegalArgumentException("Instrument not found: " + event.getSymbol());
+            });
+        logger.info("✓ Instrument loaded for symbol {}", event.getSymbol());
         
         // Step 3: Execute the order
+        logger.info("Step 3: Executing order with OrderExecutor...");
         ExecutionDecision decision = orderExecutor.execute(order, instrument);
-        logger.info("Execution decision for order {}: {}", orderId, decision);
+        logger.info("✓ Execution decision made: {}", decision);
+        logger.info("  Fill status: {}", decision.isFilled());
+        logger.info("  Result status: {}", decision.getResult().getStatus());
+        logger.info("  Execution price: {}", decision.getResult().getExecutionPrice());
+        if (decision.getResult().getReason() != null) {
+            logger.info("  Reason: {}", decision.getResult().getReason());
+        }
         
         // Step 4: Settle the order
+        logger.info("Step 4: Settling order...");
         if (decision.isFilled()) {
+            logger.info("  Order FILLED - updating account and position");
             settlementService.settleOrder(
                 orderId,
                 accountId,
@@ -97,6 +123,7 @@ public class ExecutionService {
                 decision.getResult()
             );
         } else if (decision.getResult().getStatus().toString().equals("REJECTED")) {
+            logger.info("  Order REJECTED - updating order status");
             settlementService.settleOrder(
                 orderId,
                 accountId,
@@ -108,5 +135,7 @@ public class ExecutionService {
         } else {
             logger.warn("Execution result not FILLED or REJECTED: {}", decision.getResult().getStatus());
         }
+        
+        logger.info("=== EXECUTION SERVICE COMPLETED ===");
     }
 }

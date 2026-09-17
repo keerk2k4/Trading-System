@@ -83,19 +83,27 @@ public class SettlementService {
     @Transactional(rollbackFor = Exception.class)
     public void settleOrder(Long orderId, Long accountId, BigDecimal executionPrice,
                            int quantity, OrderSide side, ExecutionResult executionResult) {
+        logger.info("=== SETTLEMENT SERVICE STARTED ===");
         logger.info("Settling order {} for account {}", orderId, accountId);
+        logger.info("  Execution Result Status: {}", executionResult.getStatus());
         
         if (executionResult.getStatus() == ExecutionResult.Status.FILLED) {
+            logger.info("Settling FILLED order...");
             settleFilled(orderId, accountId, executionPrice, quantity, side);
+            logger.info("✓ Order settled as FILLED");
         } else if (executionResult.getStatus() == ExecutionResult.Status.REJECTED) {
+            logger.info("Settling REJECTED order...");
             settleRejected(orderId);
+            logger.info("✓ Order settled as REJECTED");
         } else {
             logger.warn("Unsupported execution result status: {}", executionResult.getStatus());
             return;
         }
         
         // Publish the event after commit
+        logger.info("Publishing trade event to Kafka topic 'trade-events'...");
         publishTradeEvent(orderId, accountId, executionResult);
+        logger.info("=== SETTLEMENT SERVICE COMPLETED ===");
     }
     
     /**
@@ -103,6 +111,7 @@ public class SettlementService {
      */
     private void settleFilled(Long orderId, Long accountId, BigDecimal executionPrice,
                              int quantity, OrderSide side) {
+        logger.info("  Updating order status to FILLED in database...");
         // Step 1: Update order status atomically (detect duplicate delivery)
         int rowsUpdated = orderMapper.updateOrderStatusWithCurrentStatus(
             orderId, "NEW", "FILLED"
@@ -110,34 +119,43 @@ public class SettlementService {
         
         if (rowsUpdated == 0) {
             // Duplicate delivery - order already settled
-            logger.info("Order {} already settled (0 rows updated). Treating as duplicate delivery.", orderId);
+            logger.warn("  Duplicate delivery detected: Order {} already settled (0 rows updated)", orderId);
             return;
         }
+        logger.info("  ✓ Order status updated to FILLED in database");
         
         // Step 2: Update account cash with optimistic locking
+        logger.info("  Updating account {} cash balance...", accountId);
+        BigDecimal totalCost = executionPrice.multiply(BigDecimal.valueOf(quantity));
+        logger.info("    - Execution Price: {}", executionPrice);
+        logger.info("    - Quantity: {}", quantity);
+        logger.info("    - Total Cost/Proceeds: {}", totalCost);
+        logger.info("    - Order Side: {}", side);
         updateAccountCashWithOptimisticLocking(accountId, executionPrice, quantity, side);
+        logger.info("  ✓ Account cash balance updated");
         
         // Step 3: Update position
+        logger.info("  Updating position for account {}...", accountId);
         updatePosition(accountId, orderId, executionPrice, quantity, side);
-        
-        logger.info("Order {} settled as FILLED", orderId);
+        logger.info("  ✓ Position updated");
     }
     
     /**
      * Settle a rejected order: just update status to REJECTED.
      */
     private void settleRejected(Long orderId) {
+        logger.info("  Updating order status to REJECTED in database...");
         int rowsUpdated = orderMapper.updateOrderStatusWithCurrentStatus(
             orderId, "NEW", "REJECTED"
         );
         
         if (rowsUpdated == 0) {
             // Duplicate delivery
-            logger.info("Order {} already settled (0 rows updated). Treating as duplicate delivery.", orderId);
+            logger.warn("  Duplicate delivery detected: Order {} already settled (0 rows updated)", orderId);
             return;
         }
         
-        logger.info("Order {} settled as REJECTED", orderId);
+        logger.info("  ✓ Order status updated to REJECTED in database");
     }
     
     /**
@@ -156,25 +174,34 @@ public class SettlementService {
         // SELL: credit cash (increase available balance)
         if (side == OrderSide.BUY) {
             cashMovement = cashMovement.negate();
+            logger.debug("    Order is BUY - debiting cash by {}", cashMovement);
+        } else {
+            logger.debug("    Order is SELL - crediting cash by {}", cashMovement);
         }
         
         int retries = 0;
         while (retries <= maxOptimisticLockRetries) {
+            logger.debug("    Attempt {} to update account cash (max {} retries)", retries, maxOptimisticLockRetries);
+            
             // Read current account balance and version
             Optional<Account> accountOpt = accountMapper.findAccountById(accountId);
             if (accountOpt.isEmpty()) {
+                logger.error("    Account {} not found", accountId);
                 throw new IllegalArgumentException("Account " + accountId + " not found");
             }
             
             Account account = accountOpt.get();
             BigDecimal newBalance = account.getCashBalance().add(cashMovement);
+            logger.debug("    Current balance: {}, New balance: {}", account.getCashBalance(), newBalance);
             
             // Get the current version for optimistic locking
             Optional<Long> versionOpt = accountMapper.getAccountVersion(accountId);
             if (versionOpt.isEmpty()) {
+                logger.error("    Account {} version not found", accountId);
                 throw new IllegalArgumentException("Account " + accountId + " version not found");
             }
             long currentVersion = versionOpt.get();
+            logger.debug("    Current version: {}", currentVersion);
             
             // Attempt optimistic lock update
             int rowsUpdated = accountMapper.updateAvailableBalanceOptimistic(
@@ -182,17 +209,18 @@ public class SettlementService {
             );
             
             if (rowsUpdated > 0) {
-                logger.info("Account {} cash updated successfully. Balance: {}", accountId, newBalance);
+                logger.info("    ✓ Account {} cash updated successfully. New balance: {}", accountId, newBalance);
                 return;
             }
             
             // Update failed due to version mismatch - retry
             retries++;
-            logger.debug("Optimistic lock failed for account {}. Retry {} of {}", 
+            logger.warn("    Optimistic lock failed for account {} (version mismatch). Retry {}/{}", 
                 accountId, retries, maxOptimisticLockRetries);
         }
         
         // Exhausted retries
+        logger.error("    Failed to update account {} after {} retries", accountId, maxOptimisticLockRetries);
         throw new IllegalStateException(
             "Failed to update account " + accountId + " cash balance after " +
             maxOptimisticLockRetries + " optimistic lock retries"
@@ -215,14 +243,24 @@ public class SettlementService {
      */
     private void publishTradeEvent(Long orderId, Long accountId, ExecutionResult executionResult) {
         try {
+            logger.info("  Preparing trade event for publication...");
             TradeEvent tradeEvent = new TradeEvent(orderId, accountId, 
                 executionResult.getStatus().name(), executionResult.getExecutionPrice(),
                 executionResult.getReason());
             
+            logger.info("  Trade Event Details:");
+            logger.info("    - Order ID: {}", tradeEvent.getOrderId());
+            logger.info("    - Account ID: {}", tradeEvent.getAccountId());
+            logger.info("    - Status: {}", tradeEvent.getStatus());
+            logger.info("    - Execution Price: {}", tradeEvent.getExecutionPrice());
+            logger.info("    - Reason: {}", tradeEvent.getReason());
+            
             kafkaProducer.publishTradeEvent(accountId.toString(), tradeEvent);
-            logger.info("Published trade event for order {} to Kafka", orderId);
+            logger.info("  ✓ Trade event published to 'trade-events' topic");
+            logger.info("    Message Key (Account ID): {}", accountId);
         } catch (Exception e) {
-            logger.error("Failed to publish trade event for order {}: {}", orderId, e.getMessage(), e);
+            logger.error("  ✗ Failed to publish trade event for order {}: {}", orderId, e.getMessage());
+            logger.error("    Stack trace: ", e);
             throw new RuntimeException("Failed to publish trade event", e);
         }
     }

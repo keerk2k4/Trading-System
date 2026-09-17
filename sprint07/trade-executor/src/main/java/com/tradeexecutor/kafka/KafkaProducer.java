@@ -83,19 +83,27 @@ public class KafkaProducer {
      * @param tradeEvent The TradeEvent containing order settlement information
      */
     public void publishTradeEvent(String accountId, TradeEvent tradeEvent) {
+        logger.info("=== KAFKA PRODUCER: Publishing Trade Event ===");
+        
         if (accountId == null || accountId.trim().isEmpty()) {
-            logger.error("Cannot publish trade event: accountId is null or empty");
+            logger.error("ERROR: Cannot publish trade event - accountId is null or empty");
             return;
         }
         
         if (tradeEvent == null) {
-            logger.error("Cannot publish trade event: payload is null");
+            logger.error("ERROR: Cannot publish trade event - payload is null");
             return;
         }
         
         try {
+            logger.info("Creating KafkaMessageEnvelope...");
             String eventId = UUID.randomUUID().toString();
             String nowIso = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+            
+            logger.info("  Event ID: {}", eventId);
+            logger.info("  Event Time: {}", nowIso);
+            logger.info("  Source: trade-executor");
+            logger.info("  Schema Version: 1");
             
             // Determine event type based on status
             String eventType;
@@ -107,6 +115,14 @@ public class KafkaProducer {
                 eventType = "ORDER_" + tradeEvent.getStatus();
             }
             
+            logger.info("  Event Type: {}", eventType);
+            logger.info("  Payload:");
+            logger.info("    - Order ID: {}", tradeEvent.getOrderId());
+            logger.info("    - Account ID: {}", tradeEvent.getAccountId());
+            logger.info("    - Status: {}", tradeEvent.getStatus());
+            logger.info("    - Execution Price: {}", tradeEvent.getExecutionPrice());
+            logger.info("    - Reason: {}", tradeEvent.getReason());
+            
             KafkaMessageEnvelope<TradeEvent> event = new KafkaMessageEnvelope<>(
                     eventId,
                     eventType,
@@ -117,13 +133,20 @@ public class KafkaProducer {
             );
             
             // Publish keyed by account ID for per-account ordering
+            logger.info("Sending message to Kafka topic 'trade-events'...");
+            logger.info("  Message Key: {} (Account ID)", accountId);
             kafkaTemplate.send("trade-events", accountId, event);
-            logger.info("Published {} event for order {} to trade-events topic", 
-                eventType, tradeEvent.getOrderId());
+            
+            logger.info("✓ Trade event published successfully!");
+            logger.info("  - Topic: trade-events");
+            logger.info("  - Event Type: {}", eventType);
+            logger.info("  - Order ID: {}", tradeEvent.getOrderId());
+            logger.info("=== KAFKA PRODUCER: Trade Event Publication Complete ===");
             
         } catch (Exception e) {
-            logger.error("Failed to publish trade event for order {}: {}", 
-                tradeEvent.getOrderId(), e.getMessage(), e);
+            logger.error("✗ FAILED to publish trade event");
+            logger.error("  Error: {}", e.getMessage());
+            logger.error("  Stack trace: ", e);
             throw new RuntimeException("Failed to publish trade event", e);
         }
     }
