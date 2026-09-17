@@ -15,7 +15,7 @@ import com.tradeexecutor.kafka.KafkaMessageEnvelope;
  * Kafka consumer for ORDER_PLACED events.
  * 
  * Consumes ORDER_PLACED events from the 'orders' topic.
- * - Consumer group: "trade-executor"
+ * - Consumer group: configured via spring.kafka.consumer.group-id
  * - For each event, passes to ExecutionService for processing
  * - After successful settlement and event publishing, acknowledges the Kafka message
  * 
@@ -30,7 +30,6 @@ public class OrderPlacedConsumer {
     
     private static final Logger logger = LoggerFactory.getLogger(OrderPlacedConsumer.class);
     private static final String TOPIC = "orders";
-    private static final String CONSUMER_GROUP = "trade-executor";
     
     private final ExecutionService executionService;
     private final SettlementService settlementService;
@@ -45,7 +44,7 @@ public class OrderPlacedConsumer {
      * 
      * Kafka configuration:
      * - Topic: "orders"
-     * - Consumer group: "trade-executor"
+    * - Consumer group: configured via spring.kafka.consumer.group-id
      * - Message: KafkaMessageEnvelope<OrderPlacedEvent> (JSON)
      * - Acknowledgment mode: MANUAL (acknowledge only after successful processing)
      * - Message Key: accountId (for per-account ordering)
@@ -55,13 +54,12 @@ public class OrderPlacedConsumer {
      */
     @KafkaListener(
         topics = TOPIC,
-        groupId = CONSUMER_GROUP,
         containerFactory = "kafkaListenerContainerFactory"
     )
     public void onOrderPlaced(@Payload KafkaMessageEnvelope<OrderPlacedEvent> envelope,
                              Acknowledgment ack) {
         logger.info("=== ORDER CONSUMPTION STARTED ===");
-        logger.info("Kafka message received - Topic: orders, ConsumerGroup: {}", CONSUMER_GROUP);
+        logger.info("Kafka message received - Topic: {}", TOPIC);
         
         if (envelope == null || envelope.payload() == null) {
             logger.error("ERROR: Received null envelope or payload");

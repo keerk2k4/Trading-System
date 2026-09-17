@@ -3,24 +3,26 @@ FROM maven:3.9-eclipse-temurin-21 AS builder
 WORKDIR /workspace
 
 # Build domain engine dependency
-COPY ../domain-engine/pom.xml domain-engine/pom.xml
+COPY domain-engine/pom.xml domain-engine/pom.xml
 RUN mvn -f domain-engine/pom.xml dependency:go-offline
 
-COPY ../domain-engine/src domain-engine/src
+COPY domain-engine/src domain-engine/src
 RUN mvn -f domain-engine/pom.xml clean install -DskipTests
 
 # Build trade executor
-COPY pom.xml .
-COPY src/ src/
+COPY trade-executor/pom.xml trade-executor/pom.xml
+RUN mvn -f trade-executor/pom.xml dependency:go-offline
 
-RUN mvn clean package -DskipTests
+COPY trade-executor/src trade-executor/src
+
+RUN mvn -f trade-executor/pom.xml clean package -DskipTests
 
 # Runtime stage
 FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-COPY --from=builder /workspace/target/trade-executor-1.0.0.jar app.jar
+COPY --from=builder /workspace/trade-executor/target/trade-executor-1.0.0.jar app.jar
 
 EXPOSE 8080
 
