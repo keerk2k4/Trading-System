@@ -46,9 +46,9 @@ public class IncrementalTradesETLService {
     private final JdbcTemplate warehouseJdbcTemplate; // For writing to DuckDB warehouse
     
     public IncrementalTradesETLService(
-            @Qualifier("postgresJdbcTemplate") JdbcTemplate postgresJdbcTemplate,
+            JdbcTemplate jdbcTemplate,
             @Qualifier("warehouseJdbcTemplate") JdbcTemplate warehouseJdbcTemplate) {
-        this.postgresJdbcTemplate = postgresJdbcTemplate;
+        this.postgresJdbcTemplate = jdbcTemplate;
         this.warehouseJdbcTemplate = warehouseJdbcTemplate;
     }
     
