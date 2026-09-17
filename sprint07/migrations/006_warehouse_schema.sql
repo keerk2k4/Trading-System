@@ -122,7 +122,7 @@ CREATE INDEX IF NOT EXISTS idx_dim_instrument_current ON dim_instrument(is_curre
 -- ============================================================
 -- DIM_ACCOUNT
 -- ============================================================
--- Account dimension referencing accounts table.
+-- Account dimension referencing trading_accounts table.
 -- Surrogate key for fact table joins.
 -- ============================================================
 
@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS dim_account (
     
     CONSTRAINT fk_dim_account_source
         FOREIGN KEY (account_id)
-        REFERENCES accounts(account_id),
+        REFERENCES trading_accounts(account_id),
     
     CONSTRAINT chk_dim_account_status
         CHECK (account_status IN ('ACTIVE', 'SUSPENDED', 'CLOSED'))
