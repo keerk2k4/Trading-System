@@ -30,9 +30,22 @@ public interface AccountMapper {
         @Result(property = "accountReference", column = "account_number"),
         @Result(property = "cashBalance", column = "available_balance"),
         @Result(property = "tradingStatus", column = "account_status"),
+        @Result(property = "version", column = "version"),
         @Result(property = "holder", column = "user_id", one = @One(select = "findUserById"))
     })
     Optional<Account> findAccountById(@Param("accountId") Long accountId);
+    
+    /**
+     * Get the current version of an account for optimistic locking.
+     * @param accountId the account ID (bound parameter)
+     * @return the current version, or empty if account not found
+     */
+    @Select("""
+        SELECT version
+        FROM trading_accounts
+        WHERE trading_account_id = #{accountId}
+        """)
+    Optional<Long> getAccountVersion(@Param("accountId") Long accountId);
     
     /**
      * Find an account by account number.

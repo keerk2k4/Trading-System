@@ -5,10 +5,21 @@ import com.tradeexecutor.kafka.DeadLetterPublisher;
 import com.tradeexecutor.kafka.RetryHandler;
 import com.tradeexecutor.model.OrderPlacedEvent;
 import com.tradeexecutor.service.ExecutionService;
+<<<<<<< HEAD
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+=======
+import com.tradeexecutor.service.SettlementService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.kafka.support.Acknowledgment;
+>>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
 
 import java.math.BigDecimal;
 
@@ -23,14 +34,27 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @DisplayName("OrderPlacedConsumer Happy Path Tests")
 class OrderPlacedConsumerTest {
     
+<<<<<<< HEAD
     private TestExecutionService executionService;
     private TestDeadLetterPublisher deadLetterPublisher;
     private RetryHandler retryHandler;
     private ObjectMapper objectMapper;
+=======
+    @Mock
+    private ExecutionService executionService;
+    
+    @Mock
+    private SettlementService settlementService;
+    
+    @Mock
+    private Acknowledgment acknowledgment;
+    
+>>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
     private OrderPlacedConsumer consumer;
     
     @BeforeEach
     void setUp() {
+<<<<<<< HEAD
         executionService = new TestExecutionService();
         deadLetterPublisher = new TestDeadLetterPublisher();
         retryHandler = new RetryHandler();
@@ -89,6 +113,9 @@ class OrderPlacedConsumerTest {
                 org.apache.kafka.common.header.Headers originalHeaders) {
             publishCount++;
         }
+=======
+        consumer = new OrderPlacedConsumer(executionService, settlementService);
+>>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
     }
     
     @Test
@@ -115,6 +142,7 @@ class OrderPlacedConsumerTest {
         );
         
         // When: Consumer receives the event
+<<<<<<< HEAD
         consumer.onOrderPlaced(record);
         
         // Then: ExecutionService.processOrderPlaced was called once
@@ -122,6 +150,15 @@ class OrderPlacedConsumerTest {
         
         // And: Dead-letter publisher was not called (success case)
         assertEquals(0, deadLetterPublisher.getPublishCount());
+=======
+        consumer.onOrderPlaced(envelope, acknowledgment);
+        
+        // Then: ExecutionService.processOrderPlaced is called with the event
+        verify(executionService, times(1)).processOrderPlaced(event);
+        
+        // And: Kafka message is acknowledged
+        verify(acknowledgment, times(1)).acknowledge();
+>>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
     }
     
     @Test

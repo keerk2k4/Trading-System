@@ -83,5 +83,23 @@ public interface OrderMapper {
         WHERE order_id = #{orderId}
         """)
     int updateOrderStatus(@Param("orderId") Long orderId, @Param("status") String status);
+    
+    /**
+     * Atomically update order status with a condition on the current status.
+     * This is used for settlement to detect duplicate deliveries.
+     * 
+     * @param orderId the order ID (bound parameter)
+     * @param currentStatus the expected current status (bound parameter)
+     * @param newStatus the new status (bound parameter)
+     * @return number of rows affected (0 if status didn't match, 1 if successful)
+     */
+    @Update("""
+        UPDATE orders
+        SET status = #{newStatus}, updated_at = CURRENT_TIMESTAMP
+        WHERE order_id = #{orderId} AND status = #{currentStatus}
+        """)
+    int updateOrderStatusWithCurrentStatus(@Param("orderId") Long orderId,
+                                          @Param("currentStatus") String currentStatus,
+                                          @Param("newStatus") String newStatus);
 }
 

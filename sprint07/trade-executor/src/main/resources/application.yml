@@ -21,7 +21,11 @@ spring:
 
   # PostgreSQL Configuration
   datasource:
+<<<<<<< HEAD
     url: ${DB_URL:jdbc:postgresql://10.8.66.137:5432/trading_system}
+=======
+    url: ${DB_URL:jdbc:postgresql://postgres:5432/trading_system}
+>>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:n3u3d4!}
     driver-class-name: org.postgresql.Driver
@@ -44,12 +48,22 @@ app:
 
   # Fauxnance Configuration
   fauxnance:
+<<<<<<< HEAD
     base-url: ${FAUXNANCE_BASE_URL:http://localhost:8080}
     api-key: ${FAUXNANCE_API_KEY:fnx_dev_CvXEv1ohuj4MUkfZjn0kmyDFguxcvofA}
+=======
+    base-url: ${FAUXNANCE_BASE_URL:url}
+    api-key: ${FAUXNANCE_API_KEY:key}
+>>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
     retry:
-      max-attempts: ${FAUXNANCE_RETRY_MAX_ATTEMPTS:3}
+      max-attempts: ${FAUXNANCE_RETRY_MAX_ATTEMPTS:1}
       delay-ms: ${FAUXNANCE_RETRY_DELAY_MS:100}
   
+  # Market Data Poller Configuration
+  poller:
+    poll-interval-ms: ${POLL_INTERVAL_SECONDS:30000}
+    min-interval-ms: 30000
+
   # Market Data Poller Configuration
   poller:
     poll-interval-ms: ${POLL_INTERVAL_SECONDS:30000}
