@@ -1,7 +1,8 @@
 package com.tradingsystem.spring_boot_app.warehouse;
 
 import com.tradingsystem.domain.dto.PlaceOrderRequest;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -14,9 +15,9 @@ import java.time.LocalDateTime;
  * Writes order events to DuckDB in real-time as they're processed.
  * DuckDB serves as the analytics data warehouse for reporting and querying.
  */
-@Slf4j
 @Service
 public class WarehouseService {
+    private static final Logger log = LoggerFactory.getLogger(WarehouseService.class);
 
     private final JdbcTemplate warehouseJdbcTemplate;
 

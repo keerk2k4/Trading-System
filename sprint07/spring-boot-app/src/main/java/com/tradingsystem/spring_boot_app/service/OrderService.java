@@ -97,7 +97,7 @@ public class OrderService {
                         order.getSide().name(),
                         order.getOrderType().name(),
                         order.getLimitPrice(),
-                        order.getQuantity(),
+                        new BigDecimal(String.valueOf(order.getQuantity())),
                         order.getIdempotencyKey()
                 );
 

@@ -1,6 +1,7 @@
 package com.tradingsystem.spring_boot_app.warehouse;
 
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -14,9 +15,9 @@ import org.springframework.stereotype.Component;
  * 2. Sync existing orders from PostgreSQL to DuckDB
  * 3. Ensure warehouse is ready for analytics queries
  */
-@Slf4j
 @Component
 public class WarehouseInitializer {
+    private static final Logger log = LoggerFactory.getLogger(WarehouseInitializer.class);
 
     private final JdbcTemplate warehouseJdbcTemplate;
     private final JdbcTemplate primaryJdbcTemplate;

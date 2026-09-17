@@ -83,7 +83,8 @@ class OrderSettlementCharacterisationTest {
     void setUp() {
         TransactionSynchronizationManager.initSynchronization();
         KafkaTemplate<String, KafkaMessageEnvelope<OrderPlacedPayload>> kafkaTemplate = Mockito.mock(KafkaTemplate.class);
-        service = new OrderService(accounts, instruments, orders, positions, holdingMapper, kafkaTemplate);
+        com.tradingsystem.spring_boot_app.warehouse.WarehouseService warehouseService = Mockito.mock(com.tradingsystem.spring_boot_app.warehouse.WarehouseService.class);
+        service = new OrderService(accounts, instruments, orders, positions, holdingMapper, kafkaTemplate, warehouseService);
     }
 
     @AfterEach
