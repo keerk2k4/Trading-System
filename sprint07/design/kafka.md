@@ -468,6 +468,144 @@ Shows the current state of all topics on the broker.
 
 ---
 
+## Market Data Poller: Quota & Design
+
+The market-data poller is a scheduled component inside the Trade Executor that fetches quotes from Fauxnance and publishes them to the market-data topic. It optimizes both HTTP quota and Kafka ordering.
+
+### Quota Calculation
+
+**Requirement:** Stay within 2000 requests per day on Fauxnance.
+
+**Formula:**
+```
+Requests per day = 86400 seconds/day ÷ interval_seconds ÷ ceiling(symbol_count ÷ 25)
+```
+
+The denominator has two parts:
+1. **interval_seconds:** How often the poller runs (enforced minimum: 30 seconds)
+2. **ceiling(symbol_count ÷ 25):** How many batches needed (25 symbols per HTTP request)
+
+**Examples at different intervals:**
+
+With **8 symbols** (typical test load):
+
+| Interval | Batches | Requests/Day | Status |
+|----------|---------|--------------|--------|
+| 30s | 1 | 2880 | ⚠️ **EXCEEDS quota** |
+| 40s | 1 | 2160 | ⚠️ **EXCEEDS quota** |
+| 43s | 1 | 2009 | ⚠️ **Just exceeds** |
+| 44s | 1 | 1964 | ✓ **Within quota** |
+| 60s | 1 | 1440 | ✓ **Safe margin** |
+
+With **25 symbols** (one batch max):
+
+| Interval | Batches | Requests/Day | Status |
+|----------|---------|--------------|--------|
+| 30s | 1 | 2880 | ⚠️ **EXCEEDS quota** |
+| 60s | 1 | 1440 | ✓ **Within quota** |
+| 120s | 1 | 720 | ✓ **Plenty of room** |
+
+With **26 symbols** (two batches):
+
+| Interval | Batches | Requests/Day | Status |
+|----------|---------|--------------|--------|
+| 30s | 2 | 1440 | ✓ **Within quota** |
+| 60s | 2 | 720 | ✓ **Safe** |
+
+### Production Recommendation
+
+For 8 symbols (the typical test load in development):
+- **Set `POLL_INTERVAL_SECONDS=44`** to stay safely within 2000 req/day quota
+- Gives 1964 requests/day, safe margin above quota
+- Allows ~2 minutes for quote freshness without quota concerns
+
+### Batching Strategy
+
+**HTTP Request Optimization:**
+- Poller batches up to 25 symbols per Fauxnance HTTP call
+- With 8 symbols: 1 batch per poll (1 HTTP request every 44 seconds)
+- With 26+ symbols: multiple batches within one poll cycle
+- Dramatically reduces quota burn: 8 symbols/30s = 23,040 req/day (one at a time) vs 2,880 req/day (batched)
+
+**Kafka Message Design:**
+- Each quote is **one separate message** to market-data, keyed by symbol
+- NOT one message per batch (which would put all symbols behind one key)
+- Preserves per-symbol ordering: each symbol's quotes are ordered within a partition
+- Allows per-symbol consumers to subscribe to specific symbols if needed
+
+**Why split Kafka messages?**
+```
+WRONG (batched messages):
+  Batch 1: [AAPL, GOOG, MSFT] 
+    → All three go to same partition (one key)
+    → Per-symbol ordering lost
+    → Quote consumer can't know which quotes are "latest" per symbol
+    
+CORRECT (per-symbol messages):
+  Message 1: AAPL quote
+    → Key: "AAPL" → partition X
+  Message 2: GOOG quote
+    → Key: "GOOG" → partition Y
+  Message 3: MSFT quote
+    → Key: "MSFT" → partition Z
+  → Each symbol's quotes ordered within its partition
+  → Consumer knows latest AAPL, latest GOOG, latest MSFT independently
+```
+
+### Interval Floor Enforcement
+
+The poller enforces a **minimum interval of 30 seconds in code**, not in documentation:
+
+```java
+public QuotePollerService(
+        ...,
+        @Value("${app.poller.poll-interval-seconds:30}") int pollIntervalSeconds) {
+    
+    if (pollIntervalSeconds < MIN_INTERVAL_SECONDS) {
+        logger.warn(
+            "Configured poll interval {} seconds is below minimum {}. Using minimum interval.",
+            pollIntervalSeconds, MIN_INTERVAL_SECONDS);
+        this.pollIntervalSeconds = MIN_INTERVAL_SECONDS;
+    } else {
+        this.pollIntervalSeconds = pollIntervalSeconds;
+    }
+}
+```
+
+**Why code, not config?**
+- If interval floor is only documented, someone sets `POLL_INTERVAL_SECONDS=5` and quota burns in 4 hours
+- Code enforcement catches the misconfiguration at startup
+- Logs a clear warning so operators know why their intended interval was changed
+
+### Symbol Discovery
+
+The poller discovers symbols by querying `PositionRepository.findAllDistinctSymbols()`:
+
+```sql
+SELECT DISTINCT p.symbol FROM Position p
+```
+
+This returns all symbols with open positions (anyone holding or owing shares). The poller then:
+1. Fetches quotes for these symbols in batches
+2. Publishes one message per symbol
+3. Subscribes to positions table changes (future: could trigger on-demand quotes for new positions)
+
+### Consumer Implications
+
+The poller broadcasts to `market-data` with no consumer group (all listeners see all quotes):
+
+```
+market-data topic
+  ├─ Portfolio service (listens to all quotes)
+  ├─ Watchlist service (listens to all quotes)
+  ├─ Advice engine (listens to all quotes)
+  └─ Any other price consumer
+```
+
+Each maintains its own subscription state and is unaware of others.
+
+---
+
 ## SonarQube Quality Gates
 
 This design passes:

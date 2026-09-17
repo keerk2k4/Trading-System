@@ -3,10 +3,16 @@ package com.tradeexecutor.client;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.RestClientException;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -43,6 +49,85 @@ public class FauxnanceClient {
         this.retryDelayMs = retryDelayMs;
     }
     
+
+    /**
+     * Fetch quotes for a batch of symbols from Fauxnance.
+     * 
+     * Batches up to 25 symbols per HTTP request for quota efficiency.
+     * Implements the same retry logic as getQuote.
+     * 
+     * @param symbols List of stock symbols to fetch (will batch in chunks of 25)
+     * @return List of QuoteResponse objects; empty list if request fails after retries
+     */
+    public List<QuoteResponse> getQuotesBatch(List<String> symbols) {
+        if (symbols == null || symbols.isEmpty()) {
+            logger.warn("No symbols provided for batch quote fetch");
+            return new ArrayList<>();
+        }
+        
+        // Batch into chunks of up to 25 symbols
+        List<QuoteResponse> allQuotes = new ArrayList<>();
+        int batchSize = 25;
+        
+        for (int i = 0; i < symbols.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, symbols.size());
+            List<String> batch = symbols.subList(i, end);
+            
+            logger.debug("Fetching batch of {} symbols (symbols {}-{})", batch.size(), i + 1, end);
+            
+            String batchUrl = buildBatchQuoteUrl(batch);
+            
+            for (int attempt = 1; attempt <= maxRetryAttempts; attempt++) {
+                try {
+                    logger.debug("Fetching batch (attempt {}/{})", attempt, maxRetryAttempts);
+                    HttpHeaders headers = createHeaders();
+                    HttpEntity<String> entity = new HttpEntity<>(headers);
+                    ResponseEntity<BatchQuotesResponseWrapper> response = restTemplate.exchange(batchUrl, HttpMethod.GET, entity, BatchQuotesResponseWrapper.class);
+                    BatchQuotesResponseWrapper wrapper = response.getBody();
+                    
+                    if (wrapper != null && wrapper.getData() != null && wrapper.getData().getQuotes() != null) {
+                        for (BatchQuoteItem item : wrapper.getData().getQuotes()) {
+                            if (item != null && !item.hasError() && item.getQuote() != null) {
+                                QuoteResponse quote = item.getQuote();
+                                allQuotes.add(quote);
+                                logger.debug("Added quote for {}: {}", quote.getSymbol(), quote.getPrice());
+                            } else if (item != null && item.hasError()) {
+                                logger.warn("Error fetching quote for {}: {}", item.getSymbol(), item.getError());
+                            }
+                        }
+                        logger.info("Successfully fetched {} quotes from batch", wrapper.getData().getQuotes().size());
+                        break;  // Success, move to next batch
+                    }
+                } catch (RestClientException e) {
+                    logger.warn("Attempt {} failed to fetch batch: {}", attempt, e.getMessage());
+                    
+                    if (attempt < maxRetryAttempts) {
+                        try {
+                            Thread.sleep(retryDelayMs);
+                        } catch (InterruptedException ie) {
+                            logger.warn("Retry sleep interrupted during batch fetch");
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    } else {
+                        logger.error("Failed to fetch batch after {} attempts", maxRetryAttempts);
+                    }
+                }
+            }
+        }
+        
+        logger.info("Batch fetch complete: {} total quotes", allQuotes.size());
+        return allQuotes;
+    }
+    
+    private HttpHeaders createHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        if (apiKey != null && !apiKey.isEmpty()) {
+            headers.set("X-Api-Key", apiKey);
+        }
+        return headers;
+    }
+
     /**
      * Fetch a quote for a single symbol from Fauxnance.
      * 
@@ -65,9 +150,15 @@ public class FauxnanceClient {
         for (int attempt = 1; attempt <= maxRetryAttempts; attempt++) {
             try {
                 logger.debug("Fetching quote for {} (attempt {}/{})", symbol, attempt, maxRetryAttempts);
-                QuoteResponse quote = restTemplate.getForObject(url, QuoteResponse.class);
-                logger.info("Successfully fetched quote for {}: {}", symbol, quote);
-                return Optional.of(quote);
+                HttpHeaders headers = createHeaders();
+                HttpEntity<String> entity = new HttpEntity<>(headers);
+                ResponseEntity<QuoteResponseWrapper> response = restTemplate.exchange(url, HttpMethod.GET, entity, QuoteResponseWrapper.class);
+                QuoteResponseWrapper wrapper = response.getBody();
+                if (wrapper != null && wrapper.getData() != null) {
+                    QuoteResponse quote = wrapper.getData();
+                    logger.info("Successfully fetched quote for {}: {}", symbol, quote);
+                    return Optional.of(quote);
+                }
             } catch (RestClientException e) {
                 logger.warn("Attempt {} failed to fetch quote for {}: {}", attempt, symbol, e.getMessage());
                 
@@ -88,15 +179,30 @@ public class FauxnanceClient {
         return Optional.empty();
     }
     
+    private String buildBatchQuoteUrl(List<String> symbols) {
+        StringBuilder url = new StringBuilder(baseUrl);
+        if (!baseUrl.endsWith("/")) {
+            url.append("/");
+        }
+        
+        // Use /quotes endpoint with symbols parameter for batch fetch
+        url.append("quotes?symbols=");
+        for (int i = 0; i < symbols.size(); i++) {
+            if (i > 0) {
+                url.append(",");
+            }
+            url.append(symbols.get(i));
+        }
+        
+        return url.toString();
+    }
+    
     private String buildQuoteUrl(String symbol) {
         StringBuilder url = new StringBuilder(baseUrl);
         if (!baseUrl.endsWith("/")) {
             url.append("/");
         }
         url.append("quotes/").append(symbol);
-        if (apiKey != null && !apiKey.isEmpty()) {
-            url.append("?key=").append(apiKey);
-        }
         return url.toString();
     }
 }
