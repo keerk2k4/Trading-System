@@ -1,5 +1,4 @@
 services:
-
   postgres:
     image: postgres:17
     container_name: trading-postgres
@@ -30,8 +29,8 @@ services:
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: trading
     volumes:
       - ./migrations:/workspace/migrations
@@ -52,11 +51,16 @@ services:
     ports:
       - 8080:8080
     environment:
-      DB_URL: jdbc:postgresql://postgres:5432/trading
-      DB_USERNAME: postgres
-      DB_PASSWORD: postgres
-      JWT_SECRET: your-256-bit-secret-key-for-hmac-sha256-token-signing
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      DB_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+      FAUXNANCE_BASE_URL: ${FAUXNANCE_BASE_URL}
+      FAUXNANCE_API_KEY: ${FAUXNANCE_API_KEY}
+      FAUXNANCE_RETRY_MAX_ATTEMPTS: ${FAUXNANCE_RETRY_MAX_ATTEMPTS}
+      FAUXNANCE_RETRY_DELAY_MS: ${FAUXNANCE_RETRY_DELAY_MS}
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS}
+      KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP}
     depends_on:
       postgres:
         condition: service_healthy
@@ -99,12 +103,12 @@ services:
     volumes:
       - ./scripts/create-topics.sh:/workspace/create-topics.sh:ro
     environment:
-      KAFKA_BOOTSTRAP_SERVER: kafka:9092
+      KAFKA_BOOTSTRAP_SERVER: ${KAFKA_BOOTSTRAP_SERVERS}
     entrypoint: /bin/bash
     command:
       - -c
       - |
-        until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do sleep 2; done
+        until /opt/kafka/bin/kafka-topics.sh --bootstrap-server ${KAFKA_BOOTSTRAP_SERVERS} --list >/dev/null 2>&1; do sleep 2; done
         /bin/bash /workspace/create-topics.sh
     networks:
       - trading-net
