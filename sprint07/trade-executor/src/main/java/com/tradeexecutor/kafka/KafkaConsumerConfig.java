@@ -26,7 +26,7 @@ public class KafkaConsumerConfig {
      */
     @Bean
     public ConsumerFactory<String, Object> consumerFactory(KafkaProperties kafkaProperties, SslBundles sslBundles) {
-        var properties = kafkaProperties.getConsumer().buildProperties(sslBundles);
+        var properties = kafkaProperties.buildConsumerProperties(sslBundles);
 
         // Configure JSON deserializer to ignore unknown properties
         properties.put(JsonDeserializer.VALUE_DEFAULT_TYPE, KafkaMessageEnvelope.class.getName());

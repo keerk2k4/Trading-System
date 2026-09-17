@@ -4,7 +4,7 @@ spring:
 
   # Kafka Configuration
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    bootstrap-servers: kafka:9092
     consumer:
       group-id: ${KAFKA_CONSUMER_GROUP:trade-executor-group}
       auto-offset-reset: earliest
