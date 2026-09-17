@@ -9,7 +9,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
-import com.tradeexecutor.kafka.EventEnvelope;
+import com.tradeexecutor.kafka.KafkaMessageEnvelope;
 
 /**
  * Kafka consumer for ORDER_PLACED events.
@@ -46,10 +46,11 @@ public class OrderPlacedConsumer {
      * Kafka configuration:
      * - Topic: "orders"
      * - Consumer group: "trade-executor"
-     * - Message: OrderPlacedEvent (JSON)
+     * - Message: KafkaMessageEnvelope<OrderPlacedEvent> (JSON)
      * - Acknowledgment mode: MANUAL (acknowledge only after successful processing)
+     * - Message Key: accountId (for per-account ordering)
      * 
-     * @param envelope The ORDER_PLACED event envelope
+     * @param envelope The ORDER_PLACED event envelope containing the order details
      * @param ack The Kafka acknowledgment (manual)
      */
     @KafkaListener(
@@ -57,10 +58,17 @@ public class OrderPlacedConsumer {
         groupId = CONSUMER_GROUP,
         containerFactory = "kafkaListenerContainerFactory"
     )
-    public void onOrderPlaced(@Payload EventEnvelope<OrderPlacedEvent> envelope,
+    public void onOrderPlaced(@Payload KafkaMessageEnvelope<OrderPlacedEvent> envelope,
                              Acknowledgment ack) {
-        OrderPlacedEvent event = envelope.getPayload();
-        logger.info("Received ORDER_PLACED event: {}", event);
+        if (envelope == null || envelope.payload() == null) {
+            logger.error("Received null envelope or payload");
+            if (ack != null) ack.acknowledge();
+            return;
+        }
+        
+        OrderPlacedEvent event = envelope.payload();
+        logger.info("Received ORDER_PLACED event: orderId={}, accountId={}, symbol={}, quantity={}", 
+                   event.getOrderId(), event.getAccountId(), event.getSymbol(), event.getQuantity());
 
         try {
             // Step 1: Execute the order (determine FILLED or REJECTED)

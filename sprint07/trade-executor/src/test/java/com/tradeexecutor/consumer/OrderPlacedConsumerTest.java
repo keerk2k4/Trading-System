@@ -1,7 +1,7 @@
 package com.tradeexecutor.consumer;
 
 import com.tradeexecutor.model.OrderPlacedEvent;
-import com.tradeexecutor.kafka.EventEnvelope;
+import com.tradeexecutor.kafka.KafkaMessageEnvelope;
 import com.tradeexecutor.service.ExecutionService;
 import com.tradeexecutor.service.SettlementService;
 import org.junit.jupiter.api.BeforeEach;
