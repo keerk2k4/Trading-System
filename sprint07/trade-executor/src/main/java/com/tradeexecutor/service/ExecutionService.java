@@ -4,13 +4,10 @@ import com.tradingsystem.domain.entities.Instrument;
 import com.tradingsystem.domain.entities.Order;
 import com.tradeexecutor.execution.ExecutionDecision;
 import com.tradeexecutor.execution.OrderExecutor;
-<<<<<<< HEAD
 import com.tradeexecutor.exception.PermanentProcessingException;
 import com.tradeexecutor.exception.TransientProcessingException;
-=======
 import com.tradeexecutor.mapper.InstrumentMapper;
 import com.tradeexecutor.mapper.OrderMapper;
->>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
 import com.tradeexecutor.model.OrderPlacedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,8 +96,7 @@ public class ExecutionService {
                 "ORDER_PLACED event missing required field: orderId"
             );
         }
-        
-<<<<<<< HEAD
+
         // TODO: Load Order from database
         // Order order = orderRepository.findById(event.getOrderId())
         //     .orElseThrow(() -> new PermanentProcessingException(
@@ -112,7 +108,6 @@ public class ExecutionService {
         //     .orElseThrow(() -> new PermanentProcessingException(
         //         "Instrument not found: " + event.getSymbol()
         //     ));
-=======
         // Parse orderId from string to Long
         Long orderId;
         try {
@@ -125,7 +120,6 @@ public class ExecutionService {
         if (accountId == null) {
             throw new IllegalArgumentException("Account ID is missing from order placed event");
         }
->>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
         
         // Step 1: Load Order from database
         Order order = orderMapper.findOrderById(orderId)
