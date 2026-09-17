@@ -3,12 +3,14 @@ package com.tradeexecutor.consumer;
 import com.tradeexecutor.model.OrderPlacedEvent;
 import com.tradeexecutor.kafka.EventEnvelope;
 import com.tradeexecutor.service.ExecutionService;
+import com.tradeexecutor.service.SettlementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.kafka.support.Acknowledgment;
 
 import java.math.BigDecimal;
 
@@ -27,11 +29,17 @@ class OrderPlacedConsumerTest {
     @Mock
     private ExecutionService executionService;
     
+    @Mock
+    private SettlementService settlementService;
+    
+    @Mock
+    private Acknowledgment acknowledgment;
+    
     private OrderPlacedConsumer consumer;
     
     @BeforeEach
     void setUp() {
-        consumer = new OrderPlacedConsumer(executionService);
+        consumer = new OrderPlacedConsumer(executionService, settlementService);
     }
     
     @Test
@@ -57,10 +65,13 @@ class OrderPlacedConsumerTest {
         envelope.setPayload(event);
         
         // When: Consumer receives the event
-        consumer.onOrderPlaced(envelope);
+        consumer.onOrderPlaced(envelope, acknowledgment);
         
         // Then: ExecutionService.processOrderPlaced is called with the event
         verify(executionService, times(1)).processOrderPlaced(event);
+        
+        // And: Kafka message is acknowledged
+        verify(acknowledgment, times(1)).acknowledge();
     }
     
     @Test

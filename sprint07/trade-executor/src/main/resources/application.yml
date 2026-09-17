@@ -4,7 +4,7 @@ spring:
 
   # Kafka Configuration
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:10.8.66.137:9092}
     consumer:
       group-id: ${KAFKA_CONSUMER_GROUP:trade-executor-group}
       auto-offset-reset: earliest
@@ -13,33 +13,39 @@ spring:
         spring.json.trusted.packages: "*"
     producer:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      enable-idempotence: true
+      retries: 2147483647
+      properties:
+        max.in.flight.requests.per.connection: 5
 
   # PostgreSQL Configuration
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/trade_executor}
+    url: ${DB_URL:jdbc:postgresql://postgres:5432/trading_system}
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
-  # JPA/Hibernate Configuration
-  jpa:
-    hibernate:
-      ddl-auto: ${JPA_DDL_AUTO:validate}
-    show-sql: false
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
+  # MyBatis Configuration
+  mybatis:
+    configuration:
+      map-underscore-to-camel-case: true
+    type-aliases-package: com.tradeexecutor.entity
 
 # Application-specific Configuration
 app:
   # Fauxnance Configuration
   fauxnance:
-    base-url: ${FAUXNANCE_BASE_URL:http://localhost:8080}
-    api-key: ${FAUXNANCE_API_KEY:}
+    base-url: ${FAUXNANCE_BASE_URL:url}
+    api-key: ${FAUXNANCE_API_KEY:key}
     retry:
-      max-attempts: ${FAUXNANCE_RETRY_MAX_ATTEMPTS:3}
+      max-attempts: ${FAUXNANCE_RETRY_MAX_ATTEMPTS:1}
       delay-ms: ${FAUXNANCE_RETRY_DELAY_MS:100}
+
+  # Market Data Poller Configuration
+  poller:
+    poll-interval-ms: ${POLL_INTERVAL_SECONDS:30000}
+    min-interval-ms: 30000
 
 # Logging Configuration
 logging:

@@ -66,6 +66,7 @@ services:
         condition: service_started
     networks:
       - trading-net
+
   kafka:
     image: apache/kafka:4.0.0
     container_name: kafka
@@ -93,17 +94,18 @@ services:
     profiles:
       - platform
     depends_on:
-      - kafka
+      kafka:
+        condition: service_started
     volumes:
-      - ./scripts/create-topics.sh:/workspace/create-topics.sh
-    entrypoint: ["/bin/bash", "-c"]
-    command: |
-      chmod +x /workspace/create-topics.sh
-      until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do
-        echo "Waiting for Kafka..."
-        sleep 2
-      done
-      /workspace/create-topics.sh
+      - ./scripts/create-topics.sh:/workspace/create-topics.sh:ro
+    environment:
+      KAFKA_BOOTSTRAP_SERVER: kafka:9092
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do sleep 2; done
+        /bin/bash /workspace/create-topics.sh
     networks:
       - trading-net
 

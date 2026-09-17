@@ -1,5 +1,6 @@
 package com.tradeexecutor.kafka;
 
+import com.tradeexecutor.model.TradeEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -69,6 +70,61 @@ public class KafkaProducer {
             
         } catch (Exception e) {
             logger.error("Failed to publish quote for {}: {}", symbol, e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Publish a trade event to the trade-events topic.
+     * 
+     * Called after successful order settlement (filled or rejected).
+     * Message is keyed by account ID to ensure per-account ordering.
+     * 
+     * @param accountId The account ID as string (for keying)
+     * @param tradeEvent The TradeEvent containing order settlement information
+     */
+    public void publishTradeEvent(String accountId, TradeEvent tradeEvent) {
+        if (accountId == null || accountId.trim().isEmpty()) {
+            logger.error("Cannot publish trade event: accountId is null or empty");
+            return;
+        }
+        
+        if (tradeEvent == null) {
+            logger.error("Cannot publish trade event: payload is null");
+            return;
+        }
+        
+        try {
+            String eventId = UUID.randomUUID().toString();
+            String nowIso = DateTimeFormatter.ISO_INSTANT.format(Instant.now());
+            
+            // Determine event type based on status
+            String eventType;
+            if ("FILLED".equals(tradeEvent.getStatus())) {
+                eventType = "ORDER_FILLED";
+            } else if ("REJECTED".equals(tradeEvent.getStatus())) {
+                eventType = "ORDER_REJECTED";
+            } else {
+                eventType = "ORDER_" + tradeEvent.getStatus();
+            }
+            
+            KafkaMessageEnvelope<TradeEvent> event = new KafkaMessageEnvelope<>(
+                    eventId,
+                    eventType,
+                    nowIso,
+                    "trade-executor",
+                    1,
+                    tradeEvent
+            );
+            
+            // Publish keyed by account ID for per-account ordering
+            kafkaTemplate.send("trade-events", accountId, event);
+            logger.info("Published {} event for order {} to trade-events topic", 
+                eventType, tradeEvent.getOrderId());
+            
+        } catch (Exception e) {
+            logger.error("Failed to publish trade event for order {}: {}", 
+                tradeEvent.getOrderId(), e.getMessage(), e);
+            throw new RuntimeException("Failed to publish trade event", e);
         }
     }
 }
