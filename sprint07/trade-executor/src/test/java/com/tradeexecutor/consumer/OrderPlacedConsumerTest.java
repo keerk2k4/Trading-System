@@ -1,66 +1,127 @@
 package com.tradeexecutor.consumer;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tradeexecutor.kafka.DeadLetterPublisher;
+import com.tradeexecutor.kafka.RetryHandler;
 import com.tradeexecutor.model.OrderPlacedEvent;
-import com.tradeexecutor.kafka.EventEnvelope;
 import com.tradeexecutor.service.ExecutionService;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.times;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Unit tests for OrderPlacedConsumer.
+ * Unit tests for OrderPlacedConsumer happy path.
  * 
- * Tests Kafka consumer behavior for ORDER_PLACED events.
+ * Tests basic Kafka consumer behavior for successful ORDER_PLACED event processing.
+ * Error handling tests are in OrderPlacedConsumerErrorHandlingTest.
  */
-@ExtendWith(MockitoExtension.class)
-@DisplayName("OrderPlacedConsumer Tests")
+@DisplayName("OrderPlacedConsumer Happy Path Tests")
 class OrderPlacedConsumerTest {
     
-    @Mock
-    private ExecutionService executionService;
-    
+    private TestExecutionService executionService;
+    private TestDeadLetterPublisher deadLetterPublisher;
+    private RetryHandler retryHandler;
+    private ObjectMapper objectMapper;
     private OrderPlacedConsumer consumer;
     
     @BeforeEach
     void setUp() {
-        consumer = new OrderPlacedConsumer(executionService);
+        executionService = new TestExecutionService();
+        deadLetterPublisher = new TestDeadLetterPublisher();
+        retryHandler = new RetryHandler();
+        objectMapper = new ObjectMapper();
+        consumer = new OrderPlacedConsumer(
+            executionService,
+            deadLetterPublisher,
+            retryHandler,
+            objectMapper
+        );
+    }
+    
+    // ========== Test Implementation Classes ==========
+    
+    /**
+     * Test implementation of ExecutionService that allows configuring behavior.
+     */
+    private static class TestExecutionService extends ExecutionService {
+        private int callCount = 0;
+        
+        public TestExecutionService() {
+            super(null);  // OrderExecutor not needed for testing
+        }
+        
+        public int getCallCount() {
+            return callCount;
+        }
+        
+        @Override
+        public void processOrderPlaced(OrderPlacedEvent event) {
+            callCount++;
+            // Success - do nothing
+        }
+    }
+    
+    /**
+     * Test implementation of DeadLetterPublisher that tracks calls.
+     */
+    private static class TestDeadLetterPublisher extends DeadLetterPublisher {
+        private int publishCount = 0;
+        
+        public TestDeadLetterPublisher() {
+            super(null);  // KafkaTemplate not needed for testing
+        }
+        
+        public int getPublishCount() {
+            return publishCount;
+        }
+        
+        @Override
+        public void publishToDeadLetter(
+                String originalTopic,
+                String messageKey,
+                byte[] messageValue,
+                String failureReason,
+                org.apache.kafka.common.header.Headers originalHeaders) {
+            publishCount++;
+        }
     }
     
     @Test
-    @DisplayName("OnOrderPlaced: Event is passed to ExecutionService")
-    void testOnOrderPlacedPassesToExecutionService() {
-        // Given: An ORDER_PLACED event
+    @DisplayName("OnOrderPlaced: Valid event is passed to ExecutionService")
+    void testOnOrderPlacedPassesToExecutionService() throws Exception {
+        // Given: A valid ORDER_PLACED event
         OrderPlacedEvent event = new OrderPlacedEvent();
-        event.setOrderId("1");
+        event.setOrderId("order-123");
         event.setAccountId(1L);
         event.setSymbol("AAPL");
         event.setSide("BUY");
         event.setQuantity(100);
         event.setPrice(new BigDecimal("150.00"));
-        event.setIdempotencyKey("1");
+        event.setIdempotencyKey("idempotency-1");
         event.setCreatedOn(String.valueOf(System.currentTimeMillis()));
 
-        EventEnvelope<OrderPlacedEvent> envelope = new EventEnvelope<>();
-        envelope.setEventId("event-1");
-        envelope.setEventType("ORDER_PLACED");
-        envelope.setEventTime(String.valueOf(System.currentTimeMillis()));
-        envelope.setSource("spring-boot-app");
-        envelope.setSchemaVersion(1);
-        envelope.setPayload(event);
+        byte[] messageBytes = objectMapper.writeValueAsBytes(event);
+        ConsumerRecord<String, byte[]> record = new ConsumerRecord<>(
+            "orders",           // topic
+            0,                  // partition
+            0L,                 // offset
+            "account-1",        // key
+            messageBytes        // value
+        );
         
         // When: Consumer receives the event
-        consumer.onOrderPlaced(envelope);
+        consumer.onOrderPlaced(record);
         
-        // Then: ExecutionService.processOrderPlaced is called with the event
-        verify(executionService, times(1)).processOrderPlaced(event);
+        // Then: ExecutionService.processOrderPlaced was called once
+        assertEquals(1, executionService.getCallCount());
+        
+        // And: Dead-letter publisher was not called (success case)
+        assertEquals(0, deadLetterPublisher.getPublishCount());
     }
     
     @Test
@@ -71,4 +132,5 @@ class OrderPlacedConsumerTest {
         // Consumer group should be "trade-executor"
     }
 }
+
 
