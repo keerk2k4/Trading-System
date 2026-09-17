@@ -17,16 +17,6 @@ ALTER TABLE orders ADD COLUMN filled_price NUMERIC(18,4);
 ALTER TABLE orders ADD COLUMN filled_at TIMESTAMP;
 ALTER TABLE orders ADD COLUMN executor_version BIGINT NOT NULL DEFAULT 0;
 
--- Add constraint to ensure filled_price is only set when order is FILLED
-ALTER TABLE orders ADD CONSTRAINT chk_order_filled_price
-    CHECK ((status = 'FILLED' AND filled_price IS NOT NULL) OR
-           (status != 'FILLED' AND filled_price IS NULL));
-
--- Add constraint to ensure filled_at is set for FILLED/REJECTED orders
-ALTER TABLE orders ADD CONSTRAINT chk_order_filled_at
-    CHECK ((status IN ('FILLED', 'REJECTED') AND filled_at IS NOT NULL) OR
-           (status NOT IN ('FILLED', 'REJECTED')));
-
 -- ============================================================
 -- POSITIONS
 -- ============================================================
