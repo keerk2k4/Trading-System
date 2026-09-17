@@ -5,13 +5,13 @@ services:
     profiles:
       - platform
     environment:
-      POSTGRES_DB: trading
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: trading_system
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
       - 5432:5432
     healthcheck:
-      test: [CMD-SHELL, pg_isready -U postgres -d trading]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d trading"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -31,7 +31,7 @@ services:
       POSTGRES_PORT: 5432
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: trading
+      POSTGRES_DB: trading_system
     volumes:
       - ./migrations:/workspace/migrations
       - ./seed:/workspace/seed
@@ -54,13 +54,44 @@ services:
       DB_URL: ${DB_URL}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
       KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+      KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP}
       FAUXNANCE_BASE_URL: ${FAUXNANCE_BASE_URL}
       FAUXNANCE_API_KEY: ${FAUXNANCE_API_KEY}
       FAUXNANCE_RETRY_MAX_ATTEMPTS: ${FAUXNANCE_RETRY_MAX_ATTEMPTS}
       FAUXNANCE_RETRY_DELAY_MS: ${FAUXNANCE_RETRY_DELAY_MS}
       POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_started
+    networks:
+      - trading-net
+
+  trade-executor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: trade-executor
+    profiles:
+      - platform
+    ports:
+      - 8081:8080
+    environment:
+      DB_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
       KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP}
+      FAUXNANCE_BASE_URL: ${FAUXNANCE_BASE_URL}
+      FAUXNANCE_API_KEY: ${FAUXNANCE_API_KEY}
+      FAUXNANCE_RETRY_MAX_ATTEMPTS: ${FAUXNANCE_RETRY_MAX_ATTEMPTS}
+      FAUXNANCE_RETRY_DELAY_MS: ${FAUXNANCE_RETRY_DELAY_MS}
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS}
     depends_on:
       postgres:
         condition: service_healthy
