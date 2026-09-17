@@ -33,6 +33,11 @@ public class KafkaConsumerConfig {
             SslBundles sslBundles) {
         var properties = kafkaProperties.buildConsumerProperties(sslBundles);
 
+        // Avoid mixing property-based JsonDeserializer config with programmatic setters.
+        properties.remove(JsonDeserializer.TRUSTED_PACKAGES);
+        properties.remove(JsonDeserializer.VALUE_DEFAULT_TYPE);
+        properties.remove(JsonDeserializer.USE_TYPE_INFO_HEADERS);
+
         JsonDeserializer<KafkaMessageEnvelope<OrderPlacedEvent>> valueDeserializer =
             new JsonDeserializer<>(new TypeReference<KafkaMessageEnvelope<OrderPlacedEvent>>() {});
         valueDeserializer.addTrustedPackages("*");

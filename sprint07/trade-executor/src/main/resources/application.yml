@@ -8,9 +8,6 @@ spring:
     consumer:
       group-id: ${KAFKA_CONSUMER_GROUP:trade-executor-group}
       auto-offset-reset: earliest
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "*"
     producer:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       acks: all
