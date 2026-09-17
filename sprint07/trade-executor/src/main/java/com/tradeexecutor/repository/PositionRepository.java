@@ -1,18 +1,29 @@
 package com.tradeexecutor.repository;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
 
 /**
- * Repository for Position entities.
+ * MyBatis Mapper for Position queries.
  * 
- * Provides database access for position data.
- * 
- * TODO: Implement query methods for position retrieval and updates
+ * Used by the market-data poller to discover which symbols are held in positions.
+ * Joins positions with instruments table to get ticker symbols.
  */
-@Repository
-public interface PositionRepository extends JpaRepository<Object, Long> {
+@Mapper
+public interface PositionRepository {
 
-    // TODO: Implement PositionRepository methods
+    /**
+     * Find all distinct symbols that have open positions (quantity > 0).
+     * 
+     * Note: After migration 004_align_schema_with_domain_engine.sql:
+     * - instruments.ticker_symbol → instruments.symbol
+     * - positions.total_quantity → positions.quantity
+     * 
+     * @return List of distinct symbol strings
+     */
+    @Select("SELECT DISTINCT i.symbol FROM positions p INNER JOIN instruments i ON p.instrument_id = i.instrument_id WHERE p.quantity > 0")
+    List<String> findAllDistinctSymbols();
 }
 

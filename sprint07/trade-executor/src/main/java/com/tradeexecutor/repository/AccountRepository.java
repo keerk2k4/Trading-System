@@ -1,18 +1,16 @@
 package com.tradeexecutor.repository;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
+import org.apache.ibatis.annotations.Mapper;
 
 /**
- * Repository for Account entities.
- * 
- * Provides database access for account data.
+ * MyBatis Mapper for Account queries.
  * 
  * TODO: Implement query methods for account retrieval and updates
  */
-@Repository
-public interface AccountRepository extends JpaRepository<Object, Long> {
+@Mapper
+public interface AccountRepository {
 
     // TODO: Implement AccountRepository methods
 }
+
 

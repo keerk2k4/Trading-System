@@ -1,18 +1,16 @@
 package com.tradeexecutor.repository;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
+import org.apache.ibatis.annotations.Mapper;
 
 /**
- * Repository for Order entities.
- * 
- * Provides database access for order data.
+ * MyBatis Mapper for Order queries.
  * 
  * TODO: Implement query methods for order retrieval and updates
  */
-@Repository
-public interface OrderRepository extends JpaRepository<Object, Long> {
+@Mapper
+public interface OrderRepository {
 
     // TODO: Implement OrderRepository methods
 }
+
 
