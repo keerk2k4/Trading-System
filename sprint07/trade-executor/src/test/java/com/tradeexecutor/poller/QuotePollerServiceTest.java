@@ -40,13 +40,16 @@ class QuotePollerServiceTest {
     
     @Mock
     private KafkaProducer kafkaProducer;
-    
-    @InjectMocks
+
     private QuotePollerService quotePollerService;
-    
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        // Explicit construction: @InjectMocks cannot satisfy the long
+        // pollIntervalMs constructor parameter, so wire it directly.
+        quotePollerService = new QuotePollerService(
+            positionMapper, fauxnanceClient, kafkaProducer, 30000L);
     }
     
     /**
@@ -88,11 +91,13 @@ class QuotePollerServiceTest {
     }
     
     /**
-     * Acceptance Criteria #1: Batch fetching handles > 25 symbols correctly
-     * 
-     * Given: 50 symbols discovered (requires 2 batches)
+     * Acceptance Criteria #1: Batch fetching delegates chunking to FauxnanceClient
+     *
+     * Given: 50 symbols discovered
      * When: poller calls FauxnanceClient
-     * Then: batches them in multiple calls (25 + 25)
+     * Then: the poller makes ONE getQuotesBatch call with all symbols
+     * (chunking into 25-symbol HTTP batches happens inside FauxnanceClient,
+     * covered by FauxnanceClientTest).
      */
     @Test
     void testBatchFetching_Handles_MoreThan25Symbols() {
@@ -102,19 +107,22 @@ class QuotePollerServiceTest {
             symbols.add("SYM" + String.format("%02d", i));
         }
         when(positionMapper.findAllDistinctSymbols()).thenReturn(symbols);
-        
+
         // Setup: FauxnanceClient returns quotes for all 50
         List<QuoteResponse> quotes = new ArrayList<>();
         for (String symbol : symbols) {
             quotes.add(new QuoteResponse(symbol, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, System.currentTimeMillis()));
         }
         when(fauxnanceClient.getQuotesBatch(anyList())).thenReturn(quotes);
-        
+
         // Execute
         quotePollerService.pollAndPublishQuotes();
-        
-        // Verify: batch fetch called 2 times (25 symbols each)
-        verify(fauxnanceClient, times(2)).getQuotesBatch(anyList());
+
+        // Verify: poller delegates with a single call carrying all 50 symbols
+        ArgumentCaptor<List<String>> batchCaptor = ArgumentCaptor.forClass(List.class);
+        verify(fauxnanceClient, times(1)).getQuotesBatch(batchCaptor.capture());
+        assertEquals(50, batchCaptor.getValue().size());
+        assertTrue(batchCaptor.getValue().containsAll(symbols));
     }
     
     /**
@@ -130,12 +138,13 @@ class QuotePollerServiceTest {
         List<String> symbols = Arrays.asList("AAPL", "GOOG", "MSFT");
         when(positionMapper.findAllDistinctSymbols()).thenReturn(symbols);
         
-        // Setup: quotes returned
+        // Setup: quotes returned (stub by matcher: the poller passes a copy
+        // built from a HashSet, so element order is not deterministic)
         List<QuoteResponse> quotes = new ArrayList<>();
         for (String symbol : symbols) {
             quotes.add(new QuoteResponse(symbol, BigDecimal.TEN, new BigDecimal("9.50"), new BigDecimal("10.50"), System.currentTimeMillis()));
         }
-        when(fauxnanceClient.getQuotesBatch(symbols)).thenReturn(quotes);
+        when(fauxnanceClient.getQuotesBatch(anyList())).thenReturn(quotes);
         
         // Execute
         quotePollerService.pollAndPublishQuotes();

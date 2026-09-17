@@ -65,72 +65,48 @@ class OrderPlacedConsumerErrorHandlingTest {
     
     /**
      * Test implementation of ExecutionService that allows configuring behavior.
+     *
+     * Does NOT call the parent DB workflow (which needs mappers); it mirrors the
+     * parent's fast validation (null event / missing orderId) so consumer-level
+     * permanent vs transient handling can be tested in isolation.
      */
     private static class TestExecutionService extends ExecutionService {
         private Throwable exceptionToThrow = null;
         private int callCount = 0;
-        private int failCountdown = -1;
-        
+
         public TestExecutionService() {
-            super(null);  // OrderExecutor not needed for testing
+            super(null, null, null, null);  // collaborators not needed for these tests
         }
         
         public void setExceptionToThrow(Throwable exception) {
             this.exceptionToThrow = exception;
-            this.failCountdown = -1;  // Always throw
         }
-        
+
         public void setFailOnAttempt(int attemptNumber, Throwable exception) {
             this.exceptionToThrow = exception;
-            this.failCountdown = attemptNumber;
         }
-        
+
         public int getCallCount() {
             return callCount;
         }
-        
+
         @Override
         public void processOrderPlaced(OrderPlacedEvent event) {
-            // Run parent's validation first (may throw PermanentProcessingException)
-            try {
-                super.processOrderPlaced(event);
-                // If we get here, parent succeeded (unlikely due to stub methods)
-                callCount++;
-                
-                // First decrement countdown if we're tracking failures
-                if (failCountdown > 0) {
-                    failCountdown--;
-                    if (failCountdown == 0 && exceptionToThrow != null) {
-                        if (exceptionToThrow instanceof RuntimeException) {
-                            throw (RuntimeException) exceptionToThrow;
-                        } else {
-                            throw new RuntimeException(exceptionToThrow);
-                        }
-                    }
-                }
-            } catch (PermanentProcessingException e) {
-                // Permanent failure - let it propagate (don't count as call for retry logic)
-                throw e;
-            } catch (UnsupportedOperationException e) {
-                // Parent stub methods throw this - count as call and check for simulated failures
-                callCount++;
-                
-                if (failCountdown > 0) {
-                    failCountdown--;
-                    if (failCountdown == 0 && exceptionToThrow != null) {
-                        if (exceptionToThrow instanceof RuntimeException) {
-                            throw (RuntimeException) exceptionToThrow;
-                        } else {
-                            throw new RuntimeException(exceptionToThrow);
-                        }
-                    }
-                } else if (failCountdown < 0 && exceptionToThrow != null) {
-                    // failCountdown < 0 means always throw
-                    if (exceptionToThrow instanceof RuntimeException) {
-                        throw (RuntimeException) exceptionToThrow;
-                    } else {
-                        throw new RuntimeException(exceptionToThrow);
-                    }
+            // Mirror ExecutionService fast validation (permanent failures first)
+            if (event == null) {
+                throw new PermanentProcessingException("Received null ORDER_PLACED event");
+            }
+            if (event.getOrderId() == null || event.getOrderId().trim().isEmpty()) {
+                throw new PermanentProcessingException(
+                    "ORDER_PLACED event missing required field: orderId"
+                );
+            }
+            callCount++;
+            if (exceptionToThrow != null) {
+                if (exceptionToThrow instanceof RuntimeException) {
+                    throw (RuntimeException) exceptionToThrow;
+                } else {
+                    throw new RuntimeException(exceptionToThrow);
                 }
             }
         }

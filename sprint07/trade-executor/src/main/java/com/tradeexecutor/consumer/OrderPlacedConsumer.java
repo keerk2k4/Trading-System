@@ -1,39 +1,33 @@
 package com.tradeexecutor.consumer;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tradeexecutor.exception.PermanentProcessingException;
 import com.tradeexecutor.exception.TransientProcessingException;
 import com.tradeexecutor.kafka.DeadLetterPublisher;
+import com.tradeexecutor.kafka.EventEnvelope;
 import com.tradeexecutor.kafka.RetryHandler;
 import com.tradeexecutor.model.OrderPlacedEvent;
 import com.tradeexecutor.service.ExecutionService;
-<<<<<<< HEAD
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-=======
-import com.tradeexecutor.service.SettlementService;
->>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
-import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
-<<<<<<< HEAD
-=======
-import com.tradeexecutor.kafka.EventEnvelope;
->>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
+
+import java.nio.charset.StandardCharsets;
 
 /**
  * Kafka consumer for ORDER_PLACED events from the 'orders' topic.
- * 
-<<<<<<< HEAD
+ *
  * Implements complete error handling including:
  * - Permanent failures: dead-letter immediately on first attempt
  * - Transient failures: retry with exponential backoff, then dead-letter after budget exhausted
  * - Poison message handling: no indefinite retries
- * 
+ *
  * Behavior:
- * 1. Deserialize the message
+ * 1. Deserialize the message (envelope per contracts/kafka-topics.md, with raw fallback)
  *    - Malformed JSON → PermanentProcessingException → dead-letter immediately
  * 2. Validate the message
  *    - Missing orderId → PermanentProcessingException → dead-letter immediately
@@ -43,44 +37,31 @@ import com.tradeexecutor.kafka.EventEnvelope;
  *    - Broker unreachable → TransientProcessingException → retry with backoff
  *    - DB connection lost → TransientProcessingException → retry with backoff
  *    - Optimistic lock exhausted → TransientProcessingException → retry with backoff
- * 4. Commit offset
- *    - Permanent failure → dead-letter, then commit (message won't be redelivered)
- *    - Transient failure (budgeted) → don't commit, message redelivered for next attempt
- *    - Transient failure (budget exhausted) → dead-letter, then commit
- *    - Success → commit (normal path)
- * 
+ * 4. Commit offset (MANUAL ack mode)
+ *    - Permanent failure → dead-letter, then acknowledge (message won't be redelivered)
+ *    - Transient failure (budgeted) → don't acknowledge, message redelivered for next attempt
+ *    - Transient failure (budget exhausted) → dead-letter, then acknowledge
+ *    - Success → acknowledge (normal path)
+ *
  * Dead-lettering:
  * - Topic: orders.DLT
  * - Message value: original Kafka message (as bytes)
  * - Failure reason: in x-failure-reason header
  * - Message key: preserved from original message
  * - Attempt count: tracked in x-retry-count header
-=======
- * Consumes ORDER_PLACED events from the 'orders' topic.
- * - Consumer group: "trade-executor"
- * - For each event, passes to ExecutionService for processing
- * - After successful settlement and event publishing, acknowledges the Kafka message
- * 
- * Message flow:
- * 1. Receive ORDER_PLACED event from Kafka
- * 2. Execute the order (get execution result)
- * 3. Settle the order (update DB and publish event)
- * 4. Acknowledge Kafka message (only after event is published)
->>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
  */
 @Component
 public class OrderPlacedConsumer {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(OrderPlacedConsumer.class);
     private static final String TOPIC = "orders";
     private static final String CONSUMER_GROUP = "trade-executor";
-    
+
     private final ExecutionService executionService;
-<<<<<<< HEAD
     private final DeadLetterPublisher deadLetterPublisher;
     private final RetryHandler retryHandler;
     private final ObjectMapper objectMapper;
-    
+
     public OrderPlacedConsumer(
             ExecutionService executionService,
             DeadLetterPublisher deadLetterPublisher,
@@ -90,74 +71,84 @@ public class OrderPlacedConsumer {
         this.deadLetterPublisher = deadLetterPublisher;
         this.retryHandler = retryHandler;
         this.objectMapper = objectMapper;
-=======
-    private final SettlementService settlementService;
-    
-    public OrderPlacedConsumer(ExecutionService executionService, SettlementService settlementService) {
-        this.executionService = executionService;
-        this.settlementService = settlementService;
->>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
     }
-    
+
     /**
      * Consume ORDER_PLACED events from Kafka.
-     * 
+     *
      * Kafka configuration:
      * - Topic: "orders"
      * - Consumer group: "trade-executor"
-<<<<<<< HEAD
-     * - Message: OrderPlacedEvent (JSON wrapped in EventEnvelope)
-     * - Manual offset commit: required for proper error handling
-     * 
+     * - Message: OrderPlacedEvent JSON, wrapped in EventEnvelope per contracts/kafka-topics.md
+     *   (raw OrderPlacedEvent JSON is also accepted for backward compatibility / tests)
+     * - Manual offset commit: acknowledge only after the DLT decision is made
+     *
      * @param record The ConsumerRecord containing the ORDER_PLACED event
-=======
-     * - Message: OrderPlacedEvent (JSON)
-     * - Acknowledgment mode: MANUAL (acknowledge only after successful processing)
-     * 
-     * @param envelope The ORDER_PLACED event envelope
-     * @param ack The Kafka acknowledgment (manual)
->>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
+     * @param ack Manual acknowledgment (may be null in tests)
      */
     @KafkaListener(
         topics = TOPIC,
         groupId = CONSUMER_GROUP,
         containerFactory = "kafkaListenerContainerFactory"
     )
-<<<<<<< HEAD
-    public void onOrderPlaced(ConsumerRecord<String, byte[]> record) {
+    public void onOrderPlaced(ConsumerRecord<String, byte[]> record, Acknowledgment ack) {
         String messageKey = record.key();
         byte[] messageValue = record.value();
         org.apache.kafka.common.header.Headers headers = record.headers();
-        
+
         logger.debug("Received message from topic '{}' with key '{}' and offset {}",
             TOPIC, messageKey, record.offset());
-        
+
         try {
-            // Step 1: Deserialize the message
+            // Step 1: Deserialize the message (envelope-aware, raw fallback)
             OrderPlacedEvent event = deserializeMessage(messageValue);
-            
+
             // Step 2: Process the event (may throw Permanent or Transient exception)
             executionService.processOrderPlaced(event);
-            
-            // Step 3: Success - message will be acknowledged by Spring Kafka
+
+            // Step 3: Success - acknowledge so the offset is committed
             logger.info("Successfully processed ORDER_PLACED for order {}", event.getOrderId());
-            
+            if (ack != null) {
+                ack.acknowledge();
+            }
+
         } catch (PermanentProcessingException e) {
-            // Permanent failure: dead-letter immediately
+            // Permanent failure: dead-letter immediately, then acknowledge
             handlePermanentFailure(TOPIC, messageKey, messageValue, headers, e);
-            
+            if (ack != null) {
+                ack.acknowledge();
+            }
+
         } catch (TransientProcessingException e) {
-            // Transient failure: retry with backoff or dead-letter if budget exhausted
-            handleTransientFailure(TOPIC, messageKey, messageValue, headers, e);
+            // Transient failure: retry with backoff or dead-letter if budget exhausted.
+            // handleTransientFailure rethrows when a retry is due (no ack → redelivery).
+            // When budget is exhausted it dead-letters and returns (ack below).
+            boolean retried = handleTransientFailure(TOPIC, messageKey, messageValue, headers, e);
+            if (!retried && ack != null) {
+                ack.acknowledge();
+            }
         }
     }
-    
+
+    /**
+     * Backward-compatible overload without manual acknowledgment (used in unit tests).
+     *
+     * @param record The ConsumerRecord containing the ORDER_PLACED event
+     */
+    public void onOrderPlaced(ConsumerRecord<String, byte[]> record) {
+        onOrderPlaced(record, null);
+    }
+
     /**
      * Deserialize a message from bytes.
-     * 
+     *
+     * Accepts the contract envelope {@code EventEnvelope<OrderPlacedEvent>} and,
+     * for backward compatibility, a raw {@code OrderPlacedEvent} body.
+     *
      * @param messageBytes The raw message bytes
-     * @return The deserialized OrderPlacedEvent
+     * @return The deserialized OrderPlacedEvent payload
      * @throws PermanentProcessingException if deserialization fails (malformed JSON)
+     *         or the envelope carries an unexpected eventType
      */
     private OrderPlacedEvent deserializeMessage(byte[] messageBytes) {
         if (messageBytes == null || messageBytes.length == 0) {
@@ -165,26 +156,43 @@ public class OrderPlacedConsumer {
                 "Received null or empty message body"
             );
         }
-        
+
+        String json = new String(messageBytes, StandardCharsets.UTF_8);
+
+        // Try contract envelope first: {"eventType":"ORDER_PLACED", ..., "payload":{...}}
         try {
-            String json = new String(messageBytes);
-            // Try to parse as generic object first to validate JSON
-            Object obj = objectMapper.readValue(json, Object.class);
-            if (obj == null) {
-                throw new PermanentProcessingException("Deserialized message is null");
+            EventEnvelope<OrderPlacedEvent> envelope = objectMapper.readValue(
+                json,
+                new TypeReference<EventEnvelope<OrderPlacedEvent>>() {
+                });
+            if (envelope != null && envelope.getPayload() != null) {
+                String eventType = envelope.getEventType();
+                if (eventType != null && !eventType.isEmpty()
+                        && !"ORDER_PLACED".equals(eventType)) {
+                    throw new PermanentProcessingException(
+                        "Unexpected eventType: " + eventType + ", expected ORDER_PLACED"
+                    );
+                }
+                return envelope.getPayload();
             }
-            
-            // Now parse as OrderPlacedEvent
+        } catch (PermanentProcessingException e) {
+            throw e;
+        } catch (Exception ignored) {
+            // Not an envelope (or malformed) — fall through to raw parsing below,
+            // which produces the canonical "Malformed JSON" error when appropriate.
+        }
+
+        try {
             OrderPlacedEvent event = objectMapper.readValue(json, OrderPlacedEvent.class);
-            
+
             if (event == null) {
                 throw new PermanentProcessingException(
                     "Failed to deserialize OrderPlacedEvent: result is null"
                 );
             }
-            
+
             return event;
-            
+
         } catch (PermanentProcessingException e) {
             throw e;
         } catch (Exception e) {
@@ -195,15 +203,15 @@ public class OrderPlacedConsumer {
             );
         }
     }
-    
+
     /**
      * Handle a permanent failure.
-     * 
+     *
      * A message that fails permanently will never succeed, so:
      * 1. Publish to dead-letter topic with failure reason
      * 2. Log the error
-     * 3. Allow the message to be acknowledged (commit offset) so it's not redelivered
-     * 
+     * 3. Caller acknowledges (commit offset) so it's not redelivered
+     *
      * @param topic The original topic
      * @param messageKey The message key
      * @param messageValue The raw message bytes
@@ -216,11 +224,11 @@ public class OrderPlacedConsumer {
             byte[] messageValue,
             org.apache.kafka.common.header.Headers headers,
             PermanentProcessingException exception) {
-        
+
         String failureReason = exception.getFailureReason();
         logger.error("Permanent processing failure for message with key '{}': {}",
             messageKey, failureReason);
-        
+
         // Publish to dead-letter topic
         deadLetterPublisher.publishToDeadLetter(
             topic,
@@ -229,67 +237,53 @@ public class OrderPlacedConsumer {
             failureReason,
             headers
         );
-        
-        // After dead-lettering, the message will be acknowledged by Spring Kafka
-        // (the listener method completes successfully, which triggers offset commit)
+
+        // Caller acknowledges after dead-lettering.
     }
-    
+
     /**
      * Handle a transient failure.
-     * 
+     *
      * A message that fails transiently may succeed later, so:
-     * 1. Check if we should retry (retry count < max and time has elapsed)
-     *    - If yes: do nothing, Spring Kafka won't commit offset, message redelivered
-     *    - If no: publish to dead-letter topic and acknowledge
-     * 2. If budget exhausted: log, dead-letter, and acknowledge
-     * 
-     * Note: The retry is implemented by NOT acknowledging the message. Spring Kafka
-     * will continue to redeliver the message from this partition until the listener
-     * completes without throwing an exception or until the retry budget is exhausted.
-     * 
+     * 1. Check if we should retry (retry count &lt; max and backoff elapsed)
+     *    - If yes: rethrow so Spring Kafka redelivers (do NOT acknowledge)
+     *    - If no: publish to dead-letter topic and let caller acknowledge
+     *
      * @param topic The original topic
      * @param messageKey The message key
      * @param messageValue The raw message bytes
      * @param headers The original message headers
      * @param exception The exception that was thrown
+     * @return true if the message will be retried (exception rethrown), false if dead-lettered
      */
-    private void handleTransientFailure(
+    private boolean handleTransientFailure(
             String topic,
             String messageKey,
             byte[] messageValue,
             org.apache.kafka.common.header.Headers headers,
             TransientProcessingException exception) {
-        
+
         String failureReason = exception.getFailureReason();
         int currentRetryCount = retryHandler.getRetryCount(headers);
-        
+
         logger.warn("Transient processing failure for message with key '{}' (attempt {}): {}",
             messageKey, currentRetryCount + 1, failureReason);
-        
+
         // Check if we should retry
         if (retryHandler.shouldRetry(headers)) {
-            // Retry is needed: don't acknowledge, message will be redelivered
-            // The backoff is handled by Spring Kafka's retry mechanism
-            // For now, we just throw the exception to trigger a retry
-            
-            // Note: In a real implementation with @RetryableTopic or custom retry container,
-            // we would add backoff headers here. For this basic implementation,
-            // the retry happens on redelivery and we rely on the message staying
-            // in the partition until processed.
-            
             logger.debug("Will retry message with key '{}'. Current retry count: {}",
                 messageKey, currentRetryCount);
-            
-            // Don't acknowledge - message will be redelivered
-            // This is handled implicitly by throwing from the listener
+
+            // Don't acknowledge - message will be redelivered.
+            // Rethrowing signals Spring Kafka not to commit the offset.
             throw exception;
-            
+
         } else {
-            // Retry budget exhausted: dead-letter and acknowledge
+            // Retry budget exhausted: dead-letter and let caller acknowledge
             String exhaustedReason = retryHandler.formatRetryExhaustedFailureReason(failureReason);
             logger.error("Transient failure retry budget exhausted for message with key '{}': {}",
                 messageKey, exhaustedReason);
-            
+
             // Publish to dead-letter topic
             deadLetterPublisher.publishToDeadLetter(
                 topic,
@@ -298,34 +292,8 @@ public class OrderPlacedConsumer {
                 exhaustedReason,
                 headers
             );
-            
-            // After dead-lettering, allow the message to be acknowledged
+
+            return false;
         }
     }
 }
-
-=======
-    public void onOrderPlaced(@Payload EventEnvelope<OrderPlacedEvent> envelope,
-                             Acknowledgment ack) {
-        OrderPlacedEvent event = envelope.getPayload();
-        logger.info("Received ORDER_PLACED event: {}", event);
-
-        try {
-            // Step 1: Execute the order (determine FILLED or REJECTED)
-            executionService.processOrderPlaced(event);
-            logger.info("Successfully processed ORDER_PLACED for order {}", event.getOrderId());
-
-            if (ack != null) {
-                ack.acknowledge();
-                logger.debug("Acknowledged ORDER_PLACED event for order {}", event.getOrderId());
-            }
-        } catch (Exception e) {
-            logger.error("Error processing ORDER_PLACED event for order {}: {}",
-                event.getOrderId(), e.getMessage(), e);
-            // Do not acknowledge - message will be retried
-            // Could optionally send to dead-letter queue depending on exception type
-        }
-    }
-}
->>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
-
