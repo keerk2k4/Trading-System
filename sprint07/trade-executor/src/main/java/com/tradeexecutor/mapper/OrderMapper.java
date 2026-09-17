@@ -29,8 +29,8 @@ public interface OrderMapper {
         """)
     @ConstructorArgs({
         @Arg(column = "order_id", javaType = Long.class),
-        @Arg(column = "trading_account_id", javaType = com.tradingsystem.domain.entities.Account.class, select = "findAccountById"),
-        @Arg(column = "instrument_id", javaType = com.tradingsystem.domain.entities.Instrument.class, select = "findInstrumentById"),
+        @Arg(column = "trading_account_id", javaType = com.tradingsystem.domain.entities.Account.class, select = "com.tradeexecutor.mapper.AccountMapper.findAccountById"),
+        @Arg(column = "instrument_id", javaType = com.tradingsystem.domain.entities.Instrument.class, select = "com.tradeexecutor.mapper.InstrumentMapper.findInstrumentById"),
         @Arg(column = "order_type", javaType = com.tradingsystem.domain.enums.OrderType.class),
         @Arg(column = "side", javaType = com.tradingsystem.domain.enums.OrderSide.class),
         @Arg(column = "product_type", javaType = com.tradingsystem.domain.enums.ProductType.class),
@@ -58,8 +58,8 @@ public interface OrderMapper {
         """)
     @ConstructorArgs({
         @Arg(column = "order_id", javaType = Long.class),
-        @Arg(column = "trading_account_id", javaType = com.tradingsystem.domain.entities.Account.class, select = "findAccountById"),
-        @Arg(column = "instrument_id", javaType = com.tradingsystem.domain.entities.Instrument.class, select = "findInstrumentById"),
+        @Arg(column = "trading_account_id", javaType = com.tradingsystem.domain.entities.Account.class, select = "com.tradeexecutor.mapper.AccountMapper.findAccountById"),
+        @Arg(column = "instrument_id", javaType = com.tradingsystem.domain.entities.Instrument.class, select = "com.tradeexecutor.mapper.InstrumentMapper.findInstrumentById"),
         @Arg(column = "order_type", javaType = com.tradingsystem.domain.enums.OrderType.class),
         @Arg(column = "side", javaType = com.tradingsystem.domain.enums.OrderSide.class),
         @Arg(column = "product_type", javaType = com.tradingsystem.domain.enums.ProductType.class),

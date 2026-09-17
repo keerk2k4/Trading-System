@@ -30,8 +30,15 @@ public interface AccountMapper {
         @Result(property = "accountReference", column = "account_number"),
         @Result(property = "cashBalance", column = "available_balance"),
         @Result(property = "tradingStatus", column = "account_status"),
-        @Result(property = "version", column = "version"),
-        @Result(property = "holder", column = "user_id", one = @One(select = "findUserById"))
+        @Result(property = "holder", column = "user_id", one = @One(select = "com.tradeexecutor.mapper.UserMapper.findUserById"))
+    })
+    @ConstructorArgs({
+        @Arg(column = "trading_account_id", javaType = Long.class),
+        @Arg(column = "account_number", javaType = String.class),
+        @Arg(column = "user_id", javaType = com.tradingsystem.domain.entities.User.class, select = "com.tradeexecutor.mapper.UserMapper.findUserById"),
+        @Arg(column = "available_balance", javaType = java.math.BigDecimal.class),
+        @Arg(column = "account_status", javaType = com.tradingsystem.domain.enums.TradingStatus.class),
+        @Arg(column = "version", javaType = Long.class)
     })
     Optional<Account> findAccountById(@Param("accountId") Long accountId);
     
@@ -63,7 +70,7 @@ public interface AccountMapper {
         @Result(property = "accountReference", column = "account_number"),
         @Result(property = "cashBalance", column = "available_balance"),
         @Result(property = "tradingStatus", column = "account_status"),
-        @Result(property = "holder", column = "user_id", one = @One(select = "findUserById"))
+        @Result(property = "holder", column = "user_id", one = @One(select = "com.tradeexecutor.mapper.UserMapper.findUserById"))
     })
     Optional<Account> findAccountByNumber(@Param("accountNumber") String accountNumber);
     
@@ -83,7 +90,7 @@ public interface AccountMapper {
         @Result(property = "accountReference", column = "account_number"),
         @Result(property = "cashBalance", column = "available_balance"),
         @Result(property = "tradingStatus", column = "account_status"),
-        @Result(property = "holder", column = "user_id", one = @One(select = "findUserById"))
+        @Result(property = "holder", column = "user_id", one = @One(select = "com.tradeexecutor.mapper.UserMapper.findUserById"))
     })
     List<Account> findAccountsByStatus(@Param("status") String status);
     
