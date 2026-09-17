@@ -24,6 +24,7 @@ import com.tradingsystem.spring_boot_app.mapper.InstrumentMapper;
 import com.tradingsystem.spring_boot_app.mapper.HoldingMapper;
 import com.tradingsystem.spring_boot_app.mapper.OrderMapper;
 import com.tradingsystem.spring_boot_app.mapper.PositionMapper;
+import com.tradingsystem.spring_boot_app.warehouse.WarehouseService;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,16 +46,19 @@ public class OrderService {
     private final PositionMapper positions;
     private final HoldingMapper holdingMapper;
     private final KafkaTemplate<String, KafkaMessageEnvelope<OrderPlacedPayload>> kafkaTemplate;
+    private final WarehouseService warehouseService;
 
     public OrderService(AccountMapper accounts, InstrumentMapper instruments,
                         OrderMapper orders, PositionMapper positions, HoldingMapper holdingMapper,
-                        KafkaTemplate<String, KafkaMessageEnvelope<OrderPlacedPayload>> kafkaTemplate) {
+                        KafkaTemplate<String, KafkaMessageEnvelope<OrderPlacedPayload>> kafkaTemplate,
+                        WarehouseService warehouseService) {
         this.accounts = accounts;
         this.instruments = instruments;
         this.orders = orders;
         this.positions = positions;
         this.holdingMapper = holdingMapper;
         this.kafkaTemplate = kafkaTemplate;
+        this.warehouseService = warehouseService;
     }
 
     @Transactional
@@ -85,6 +89,19 @@ public class OrderService {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
+                // Write to warehouse
+                warehouseService.writeOrderCreated(
+                        order.getOrderId(),
+                        account.getAccountId(),
+                        instrument.getInstrumentId(),
+                        order.getSide().name(),
+                        order.getOrderType().name(),
+                        order.getLimitPrice(),
+                        order.getQuantity(),
+                        order.getIdempotencyKey()
+                );
+
+                // Publish to Kafka
                 kafkaTemplate.send("orders", key, event);
             }
         });
