@@ -10,6 +10,9 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -237,6 +240,132 @@ class FauxnanceClientTest {
             "http://localhost:8080/quotes/GOOG?key=test-key",
             QuoteResponse.class
         );
+    }
+    
+    // ===== BATCH FETCH TESTS (Acceptance Criteria #1) =====
+    
+    @Test
+    @DisplayName("Batch fetch up to 25 symbols in one request")
+    void testBatchFetchUpTo25Symbols() {
+        // Given: 8 symbols to fetch
+        List<String> symbols = Arrays.asList("AAPL", "GOOG", "MSFT", "AMZN", "NVDA", "TSLA", "META", "NFLX");
+        
+        QuoteResponse[] responses = new QuoteResponse[8];
+        for (int i = 0; i < symbols.size(); i++) {
+            responses[i] = new QuoteResponse(
+                symbols.get(i),
+                new BigDecimal("100.00"),
+                new BigDecimal("99.50"),
+                new BigDecimal("100.50"),
+                System.currentTimeMillis()
+            );
+        }
+        
+        when(restTemplate.getForObject(anyString(), eq(QuoteResponse[].class)))
+            .thenReturn(responses);
+        
+        // When: Fetch batch
+        List<QuoteResponse> result = fauxnanceClient.getQuotesBatch(symbols);
+        
+        // Then: All quotes returned in one batch
+        assertEquals(8, result.size());
+        verify(restTemplate, times(1)).getForObject(anyString(), eq(QuoteResponse[].class));
+        
+        // Verify all symbols present
+        for (String symbol : symbols) {
+            assertTrue(result.stream().anyMatch(q -> q.getSymbol().equals(symbol)),
+                "Symbol " + symbol + " should be in results");
+        }
+    }
+    
+    @Test
+    @DisplayName("Batch fetch 26 symbols (requires 2 batches: 25 + 1)")
+    void testBatchFetch26SymbolsMultipleBatches() {
+        // Given: 26 symbols (exceeds batch size of 25)
+        List<String> symbols = new ArrayList<>();
+        for (int i = 0; i < 26; i++) {
+            symbols.add("SYM" + String.format("%02d", i));
+        }
+        
+        QuoteResponse[] firstBatch = new QuoteResponse[25];
+        for (int i = 0; i < 25; i++) {
+            firstBatch[i] = new QuoteResponse(symbols.get(i), BigDecimal.TEN, new BigDecimal("9.50"), new BigDecimal("10.50"), System.currentTimeMillis());
+        }
+        
+        QuoteResponse[] secondBatch = new QuoteResponse[1];
+        secondBatch[0] = new QuoteResponse(symbols.get(25), BigDecimal.TEN, new BigDecimal("9.50"), new BigDecimal("10.50"), System.currentTimeMillis());
+        
+        when(restTemplate.getForObject(anyString(), eq(QuoteResponse[].class)))
+            .thenReturn(firstBatch)
+            .thenReturn(secondBatch);
+        
+        // When: Fetch batch
+        List<QuoteResponse> result = fauxnanceClient.getQuotesBatch(symbols);
+        
+        // Then: All 26 quotes returned in 2 HTTP calls
+        assertEquals(26, result.size());
+        verify(restTemplate, times(2)).getForObject(anyString(), eq(QuoteResponse[].class));
+    }
+    
+    @Test
+    @DisplayName("Batch fetch with retry on transient failure")
+    void testBatchFetchWithRetry() {
+        // Given: API fails once then succeeds
+        List<String> symbols = Arrays.asList("AAPL", "GOOG");
+        
+        QuoteResponse[] responses = new QuoteResponse[2];
+        responses[0] = new QuoteResponse("AAPL", BigDecimal.TEN, new BigDecimal("9.50"), new BigDecimal("10.50"), System.currentTimeMillis());
+        responses[1] = new QuoteResponse("GOOG", BigDecimal.TEN, new BigDecimal("9.50"), new BigDecimal("10.50"), System.currentTimeMillis());
+        
+        when(restTemplate.getForObject(anyString(), eq(QuoteResponse[].class)))
+            .thenThrow(new RestClientException("Connection timeout"))
+            .thenReturn(responses);
+        
+        // When: Fetch batch
+        List<QuoteResponse> result = fauxnanceClient.getQuotesBatch(symbols);
+        
+        // Then: Retried and succeeded
+        assertEquals(2, result.size());
+        verify(restTemplate, times(2)).getForObject(anyString(), eq(QuoteResponse[].class));
+    }
+    
+    @Test
+    @DisplayName("Batch fetch fails after max retries")
+    void testBatchFetchMaxRetriesExceeded() {
+        // Given: API always fails
+        List<String> symbols = Arrays.asList("AAPL");
+        
+        when(restTemplate.getForObject(anyString(), eq(QuoteResponse[].class)))
+            .thenThrow(new RestClientException("Connection lost"));
+        
+        // When: Fetch batch
+        List<QuoteResponse> result = fauxnanceClient.getQuotesBatch(symbols);
+        
+        // Then: Returns empty after max retries
+        assertEquals(0, result.size());
+        verify(restTemplate, times(MAX_RETRIES)).getForObject(anyString(), eq(QuoteResponse[].class));
+    }
+    
+    @Test
+    @DisplayName("Batch fetch with empty symbol list")
+    void testBatchFetchEmptySymbolList() {
+        // When: Fetch batch with empty list
+        List<QuoteResponse> result = fauxnanceClient.getQuotesBatch(new ArrayList<>());
+        
+        // Then: Returns empty, no HTTP call made
+        assertEquals(0, result.size());
+        verify(restTemplate, never()).getForObject(anyString(), eq(QuoteResponse[].class));
+    }
+    
+    @Test
+    @DisplayName("Batch fetch with null symbol list")
+    void testBatchFetchNullSymbolList() {
+        // When: Fetch batch with null list
+        List<QuoteResponse> result = fauxnanceClient.getQuotesBatch(null);
+        
+        // Then: Returns empty, no HTTP call made
+        assertEquals(0, result.size());
+        verify(restTemplate, never()).getForObject(anyString(), eq(QuoteResponse[].class));
     }
 }
 
