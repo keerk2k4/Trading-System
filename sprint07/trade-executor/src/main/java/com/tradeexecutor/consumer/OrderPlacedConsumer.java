@@ -7,26 +7,15 @@ import com.tradeexecutor.kafka.DeadLetterPublisher;
 import com.tradeexecutor.kafka.RetryHandler;
 import com.tradeexecutor.model.OrderPlacedEvent;
 import com.tradeexecutor.service.ExecutionService;
-<<<<<<< HEAD
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-=======
-import com.tradeexecutor.service.SettlementService;
->>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.support.Acknowledgment;
-import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
-<<<<<<< HEAD
-=======
-import com.tradeexecutor.kafka.EventEnvelope;
->>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
 
 /**
  * Kafka consumer for ORDER_PLACED events from the 'orders' topic.
  * 
-<<<<<<< HEAD
  * Implements complete error handling including:
  * - Permanent failures: dead-letter immediately on first attempt
  * - Transient failures: retry with exponential backoff, then dead-letter after budget exhausted
@@ -55,18 +44,6 @@ import com.tradeexecutor.kafka.EventEnvelope;
  * - Failure reason: in x-failure-reason header
  * - Message key: preserved from original message
  * - Attempt count: tracked in x-retry-count header
-=======
- * Consumes ORDER_PLACED events from the 'orders' topic.
- * - Consumer group: "trade-executor"
- * - For each event, passes to ExecutionService for processing
- * - After successful settlement and event publishing, acknowledges the Kafka message
- * 
- * Message flow:
- * 1. Receive ORDER_PLACED event from Kafka
- * 2. Execute the order (get execution result)
- * 3. Settle the order (update DB and publish event)
- * 4. Acknowledge Kafka message (only after event is published)
->>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
  */
 @Component
 public class OrderPlacedConsumer {
@@ -76,7 +53,6 @@ public class OrderPlacedConsumer {
     private static final String CONSUMER_GROUP = "trade-executor";
     
     private final ExecutionService executionService;
-<<<<<<< HEAD
     private final DeadLetterPublisher deadLetterPublisher;
     private final RetryHandler retryHandler;
     private final ObjectMapper objectMapper;
@@ -90,13 +66,6 @@ public class OrderPlacedConsumer {
         this.deadLetterPublisher = deadLetterPublisher;
         this.retryHandler = retryHandler;
         this.objectMapper = objectMapper;
-=======
-    private final SettlementService settlementService;
-    
-    public OrderPlacedConsumer(ExecutionService executionService, SettlementService settlementService) {
-        this.executionService = executionService;
-        this.settlementService = settlementService;
->>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
     }
     
     /**
@@ -105,25 +74,16 @@ public class OrderPlacedConsumer {
      * Kafka configuration:
      * - Topic: "orders"
      * - Consumer group: "trade-executor"
-<<<<<<< HEAD
      * - Message: OrderPlacedEvent (JSON wrapped in EventEnvelope)
      * - Manual offset commit: required for proper error handling
      * 
      * @param record The ConsumerRecord containing the ORDER_PLACED event
-=======
-     * - Message: OrderPlacedEvent (JSON)
-     * - Acknowledgment mode: MANUAL (acknowledge only after successful processing)
-     * 
-     * @param envelope The ORDER_PLACED event envelope
-     * @param ack The Kafka acknowledgment (manual)
->>>>>>> a7686d5fc4827dd98e49875c495c1fb3edce0e68
      */
     @KafkaListener(
         topics = TOPIC,
         groupId = CONSUMER_GROUP,
         containerFactory = "kafkaListenerContainerFactory"
     )
-<<<<<<< HEAD
     public void onOrderPlaced(ConsumerRecord<String, byte[]> record) {
         String messageKey = record.key();
         byte[] messageValue = record.value();
