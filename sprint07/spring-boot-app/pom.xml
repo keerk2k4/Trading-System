@@ -48,6 +48,12 @@
 			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+		<!-- DuckDB for analytics warehouse -->
+		<dependency>
+			<groupId>org.duckdb</groupId>
+			<artifactId>duckdb_jdbc</artifactId>
+			<version>1.0.0</version>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
