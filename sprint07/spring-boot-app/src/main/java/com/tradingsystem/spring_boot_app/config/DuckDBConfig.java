@@ -1,6 +1,7 @@
 package com.tradingsystem.spring_boot_app.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -17,6 +18,7 @@ import javax.sql.DataSource;
  * - DuckDB (warehouse): For analytics warehouse writes
  */
 @Configuration
+@EnableConfigurationProperties(DuckDBConfig.DuckDBProperties.class)
 public class DuckDBConfig {
     
     public static final String WAREHOUSE_DATASOURCE_BEAN = "warehouseDataSource";
@@ -63,15 +65,19 @@ public class DuckDBConfig {
         DriverManagerDataSource dataSource = new DriverManagerDataSource();
         dataSource.setDriverClassName(dataSourceProperties.getDriverClassName());
         dataSource.setUrl(dataSourceProperties.getUrl());
-        dataSource.setUsername(dataSourceProperties.getUsername());
-        dataSource.setPassword(dataSourceProperties.getPassword());
+        if (dataSourceProperties.getUsername() != null) {
+            dataSource.setUsername(dataSourceProperties.getUsername());
+        }
+        if (dataSourceProperties.getPassword() != null) {
+            dataSource.setPassword(dataSourceProperties.getPassword());
+        }
         return new JdbcTemplate(dataSource);
     }
     
     /**
      * Configuration properties for DuckDB datasource.
      */
-    @org.springframework.boot.context.properties.ConfigurationProperties(prefix = "warehouse.datasource")
+    @ConfigurationProperties(prefix = "warehouse.datasource")
     public static class DuckDBProperties {
         private String url;
         private String driverClassName;
@@ -109,13 +115,5 @@ public class DuckDBConfig {
         public void setPassword(String password) {
             this.password = password;
         }
-    }
-    
-    /**
-     * Enable binding of DuckDBProperties from configuration.
-     */
-    @Bean
-    public DuckDBProperties duckDBProperties() {
-        return new DuckDBProperties();
     }
 }
