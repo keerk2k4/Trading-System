@@ -14,6 +14,22 @@ import java.util.Optional;
  */
 @Mapper
 public interface PositionMapper {
+
+    @Select("SELECT COALESCE(MAX(position_id), 0) + 1 FROM positions")
+    Long nextPositionId();
+
+    /**
+     * Insert a new position.
+     */
+    @Insert("""
+        INSERT INTO positions (position_id, trading_account_id, instrument_id, product_type, quantity,
+                               average_price, realized_pnl, position_status, opened_at, updated_at,
+                               as_of_date, trade_type)
+        VALUES (#{position.positionId}, #{position.account.accountId}, #{position.instrument.instrumentId},
+                #{position.productType}, #{position.quantity}, #{position.averagePrice}, #{position.realizedPnl},
+                #{position.positionStatus}, #{position.openedAt}, #{position.updatedAt}, CURRENT_DATE, 'LONG')
+        """)
+    int insertPosition(@Param("position") Position position);
     
     /**
      * Find a position by ID.
@@ -21,10 +37,24 @@ public interface PositionMapper {
      * @return the position, or empty if not found
      */
     @Select("""
-        SELECT position_id, trading_account_id, instrument_id, quantity, average_cost
+        SELECT position_id, trading_account_id, instrument_id, product_type, quantity,
+               average_price, realized_pnl, position_status, opened_at, closed_at, updated_at
         FROM positions
         WHERE position_id = #{positionId}
         """)
+    @ConstructorArgs({
+        @Arg(column = "position_id", javaType = Long.class),
+        @Arg(column = "trading_account_id", javaType = com.tradingsystem.domain.entities.Account.class, select = "com.tradeexecutor.mapper.AccountMapper.findAccountById"),
+        @Arg(column = "instrument_id", javaType = com.tradingsystem.domain.entities.Instrument.class, select = "com.tradeexecutor.mapper.InstrumentMapper.findInstrumentById"),
+        @Arg(column = "product_type", javaType = com.tradingsystem.domain.enums.ProductType.class),
+        @Arg(column = "quantity", javaType = int.class),
+        @Arg(column = "average_price", javaType = BigDecimal.class),
+        @Arg(column = "realized_pnl", javaType = BigDecimal.class),
+        @Arg(column = "position_status", javaType = String.class),
+        @Arg(column = "opened_at", javaType = java.time.LocalDateTime.class),
+        @Arg(column = "closed_at", javaType = java.time.LocalDateTime.class),
+        @Arg(column = "updated_at", javaType = java.time.LocalDateTime.class)
+    })
     Optional<Position> findPositionById(@Param("positionId") Long positionId);
     
     /**
@@ -33,11 +63,25 @@ public interface PositionMapper {
      * @return list of positions for the account
      */
     @Select("""
-        SELECT position_id, trading_account_id, instrument_id, quantity, average_cost
+        SELECT position_id, trading_account_id, instrument_id, product_type, quantity,
+               average_price, realized_pnl, position_status, opened_at, closed_at, updated_at
         FROM positions
         WHERE trading_account_id = #{accountId}
         ORDER BY instrument_id
         """)
+    @ConstructorArgs({
+        @Arg(column = "position_id", javaType = Long.class),
+        @Arg(column = "trading_account_id", javaType = com.tradingsystem.domain.entities.Account.class, select = "com.tradeexecutor.mapper.AccountMapper.findAccountById"),
+        @Arg(column = "instrument_id", javaType = com.tradingsystem.domain.entities.Instrument.class, select = "com.tradeexecutor.mapper.InstrumentMapper.findInstrumentById"),
+        @Arg(column = "product_type", javaType = com.tradingsystem.domain.enums.ProductType.class),
+        @Arg(column = "quantity", javaType = int.class),
+        @Arg(column = "average_price", javaType = BigDecimal.class),
+        @Arg(column = "realized_pnl", javaType = BigDecimal.class),
+        @Arg(column = "position_status", javaType = String.class),
+        @Arg(column = "opened_at", javaType = java.time.LocalDateTime.class),
+        @Arg(column = "closed_at", javaType = java.time.LocalDateTime.class),
+        @Arg(column = "updated_at", javaType = java.time.LocalDateTime.class)
+    })
     List<Position> findPositionsByAccountId(@Param("accountId") Long accountId);
     
     /**
@@ -47,42 +91,40 @@ public interface PositionMapper {
      * @return the position, or empty if not found
      */
     @Select("""
-        SELECT position_id, trading_account_id, instrument_id, quantity, average_cost
+        SELECT position_id, trading_account_id, instrument_id, product_type, quantity,
+               average_price, realized_pnl, position_status, opened_at, closed_at, updated_at
         FROM positions
         WHERE trading_account_id = #{accountId} AND instrument_id = #{instrumentId}
         """)
+    @ConstructorArgs({
+        @Arg(column = "position_id", javaType = Long.class),
+        @Arg(column = "trading_account_id", javaType = com.tradingsystem.domain.entities.Account.class, select = "com.tradeexecutor.mapper.AccountMapper.findAccountById"),
+        @Arg(column = "instrument_id", javaType = com.tradingsystem.domain.entities.Instrument.class, select = "com.tradeexecutor.mapper.InstrumentMapper.findInstrumentById"),
+        @Arg(column = "product_type", javaType = com.tradingsystem.domain.enums.ProductType.class),
+        @Arg(column = "quantity", javaType = int.class),
+        @Arg(column = "average_price", javaType = BigDecimal.class),
+        @Arg(column = "realized_pnl", javaType = BigDecimal.class),
+        @Arg(column = "position_status", javaType = String.class),
+        @Arg(column = "opened_at", javaType = java.time.LocalDateTime.class),
+        @Arg(column = "closed_at", javaType = java.time.LocalDateTime.class),
+        @Arg(column = "updated_at", javaType = java.time.LocalDateTime.class)
+    })
     Optional<Position> findPositionByAccountAndInstrument(
         @Param("accountId") Long accountId,
         @Param("instrumentId") Long instrumentId
     );
     
     /**
-     * Update position quantity.
-     * @param positionId the position ID (bound parameter)
-     * @param quantity the new quantity (bound parameter)
-     * @return number of rows affected
+     * Update position quantity and average price in one statement.
      */
     @Update("""
         UPDATE positions
-        SET quantity = #{quantity}, updated_at = CURRENT_TIMESTAMP
+        SET quantity = #{quantity}, average_price = #{averagePrice}, updated_at = CURRENT_TIMESTAMP
         WHERE position_id = #{positionId}
         """)
-    int updatePositionQuantity(@Param("positionId") Long positionId,
-                               @Param("quantity") Long quantity);
-    
-    /**
-     * Update position average cost.
-     * @param positionId the position ID (bound parameter)
-     * @param averageCost the new average cost (bound parameter)
-     * @return number of rows affected
-     */
-    @Update("""
-        UPDATE positions
-        SET average_cost = #{averageCost}, updated_at = CURRENT_TIMESTAMP
-        WHERE position_id = #{positionId}
-        """)
-    int updatePositionAverageCost(@Param("positionId") Long positionId,
-                                  @Param("averageCost") BigDecimal averageCost);
+    int updatePosition(@Param("positionId") Long positionId,
+                       @Param("quantity") int quantity,
+                       @Param("averagePrice") BigDecimal averagePrice);
     
     /**
      * Find all distinct symbols that have open positions (quantity > 0).

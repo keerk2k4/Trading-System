@@ -1,6 +1,7 @@
 package com.tradeexecutor.service;
 
 import com.tradingsystem.domain.entities.Account;
+import com.tradingsystem.domain.entities.Order;
 import com.tradingsystem.domain.entities.Position;
 import com.tradingsystem.domain.enums.OrderSide;
 import com.tradeexecutor.execution.ExecutionResult;
@@ -16,6 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 /**
@@ -232,10 +235,77 @@ public class SettlementService {
      */
     private void updatePosition(Long accountId, Long orderId, BigDecimal executionPrice,
                                int quantity, OrderSide side) {
-        // For now, this is a placeholder. The position update logic will depend on
-        // how positions are managed (find existing, update quantity/cost, or create new).
-        // This will be implemented based on the domain requirements.
-        logger.debug("Position update for order {} would happen here", orderId);
+        Order order = orderMapper.findOrderById(orderId)
+            .orElseThrow(() -> new IllegalArgumentException("Order " + orderId + " not found for position update"));
+
+        Long instrumentId = order.getInstrument().getInstrumentId();
+        Optional<Position> existingPosition = positionMapper.findPositionByAccountAndInstrument(accountId, instrumentId);
+
+        if (existingPosition.isPresent()) {
+            Position current = existingPosition.get();
+            int updatedQuantity;
+            BigDecimal updatedAveragePrice;
+
+            if (side == OrderSide.BUY) {
+                updatedQuantity = current.getQuantity() + quantity;
+                if (updatedQuantity <= 0) {
+                    throw new IllegalStateException("Invalid position quantity after BUY for order " + orderId);
+                }
+
+                BigDecimal existingNotional = current.getAveragePrice()
+                    .multiply(BigDecimal.valueOf(current.getQuantity()));
+                BigDecimal incomingNotional = executionPrice
+                    .multiply(BigDecimal.valueOf(quantity));
+
+                updatedAveragePrice = existingNotional.add(incomingNotional)
+                    .divide(BigDecimal.valueOf(updatedQuantity), 2, RoundingMode.HALF_UP);
+            } else {
+                updatedQuantity = current.getQuantity() - quantity;
+                if (updatedQuantity < 0) {
+                    throw new IllegalStateException("Insufficient position quantity for SELL on order " + orderId);
+                }
+                // SELL preserves weighted average cost basis; only quantity changes.
+                updatedAveragePrice = current.getAveragePrice().setScale(2, RoundingMode.HALF_UP);
+            }
+
+            int updated = positionMapper.updatePosition(current.getPositionId(), updatedQuantity, updatedAveragePrice);
+            if (updated == 0) {
+                throw new IllegalStateException("Failed to update position for account " + accountId + " and instrument " + instrumentId);
+            }
+
+            logger.info("    ✓ Existing position updated (positionId={}, quantity={}, avgPrice={})",
+                current.getPositionId(), updatedQuantity, updatedAveragePrice);
+            return;
+        }
+
+        if (side == OrderSide.SELL) {
+            throw new IllegalStateException("No existing position to SELL for account " + accountId + " and instrument " + instrumentId);
+        }
+
+        Account account = accountMapper.findAccountById(accountId)
+            .orElseThrow(() -> new IllegalArgumentException("Account " + accountId + " not found for position insert"));
+
+        Position newPosition = new Position(
+            positionMapper.nextPositionId(),
+            account,
+            order.getInstrument(),
+            order.getProductType(),
+            quantity,
+            executionPrice.setScale(2, RoundingMode.HALF_UP),
+            BigDecimal.ZERO,
+            "OPEN",
+            LocalDateTime.now(),
+            null,
+            LocalDateTime.now()
+        );
+
+        int inserted = positionMapper.insertPosition(newPosition);
+        if (inserted == 0) {
+            throw new IllegalStateException("Failed to create position for account " + accountId + " and instrument " + instrumentId);
+        }
+
+        logger.info("    ✓ New position created (positionId={}, quantity={}, avgPrice={})",
+            newPosition.getPositionId(), quantity, newPosition.getAveragePrice());
     }
     
     /**
