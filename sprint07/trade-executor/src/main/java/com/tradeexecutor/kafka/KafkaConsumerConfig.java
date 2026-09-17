@@ -1,5 +1,8 @@
 package com.tradeexecutor.kafka;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.tradeexecutor.model.OrderPlacedEvent;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.boot.ssl.SslBundles;
 import org.springframework.context.annotation.Bean;
@@ -25,15 +28,17 @@ public class KafkaConsumerConfig {
      * Ignores unknown properties for forward compatibility.
      */
     @Bean
-    public ConsumerFactory<String, Object> consumerFactory(KafkaProperties kafkaProperties, SslBundles sslBundles) {
+    public ConsumerFactory<String, KafkaMessageEnvelope<OrderPlacedEvent>> consumerFactory(
+            KafkaProperties kafkaProperties,
+            SslBundles sslBundles) {
         var properties = kafkaProperties.buildConsumerProperties(sslBundles);
 
-        // Configure JSON deserializer to ignore unknown properties
-        properties.put(JsonDeserializer.VALUE_DEFAULT_TYPE, KafkaMessageEnvelope.class.getName());
-        properties.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
-        properties.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
+        JsonDeserializer<KafkaMessageEnvelope<OrderPlacedEvent>> valueDeserializer =
+            new JsonDeserializer<>(new TypeReference<KafkaMessageEnvelope<OrderPlacedEvent>>() {});
+        valueDeserializer.addTrustedPackages("*");
+        valueDeserializer.ignoreTypeHeaders();
 
-        return new DefaultKafkaConsumerFactory<>(properties);
+        return new DefaultKafkaConsumerFactory<>(properties, new StringDeserializer(), valueDeserializer);
     }
 
     /**
@@ -41,9 +46,9 @@ public class KafkaConsumerConfig {
      * Ensures messages are only acknowledged after successful processing.
      */
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory(
-            ConsumerFactory<String, Object> consumerFactory) {
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
+    public ConcurrentKafkaListenerContainerFactory<String, KafkaMessageEnvelope<OrderPlacedEvent>> kafkaListenerContainerFactory(
+            ConsumerFactory<String, KafkaMessageEnvelope<OrderPlacedEvent>> consumerFactory) {
+        ConcurrentKafkaListenerContainerFactory<String, KafkaMessageEnvelope<OrderPlacedEvent>> factory =
             new ConcurrentKafkaListenerContainerFactory<>();
 
         factory.setCommonErrorHandler(new org.springframework.kafka.listener.DefaultErrorHandler());
