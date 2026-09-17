@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS dim_account (
     
     CONSTRAINT fk_dim_account_source
         FOREIGN KEY (account_id)
-        REFERENCES trading_accounts(account_id),
+        REFERENCES trading_accounts(trading_account_id),
     
     CONSTRAINT chk_dim_account_status
         CHECK (account_status IN ('ACTIVE', 'SUSPENDED', 'CLOSED'))
