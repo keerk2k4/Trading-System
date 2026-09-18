@@ -11,6 +11,7 @@ import com.tradingsystem.spring_boot_app.mapper.OrderMapper;
 import com.tradingsystem.spring_boot_app.mapper.PositionMapper;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -49,9 +50,9 @@ public class AccountService {
                                               java.time.OffsetDateTime from,
                                               java.time.OffsetDateTime to) {
         account(id);
-        return orders.findOrdersByAccountId(id).stream()
-                .filter(order -> status == null || order.getStatus() == status)
-                .map(this::order).toList();
+        return orders.findOrderHistoryByAccountId(id).stream()
+            .filter(order -> status == null || order.status() == status)
+            .map(this::orderEntry).toList();
     }
 
     private Account account(long id) {
@@ -68,6 +69,25 @@ public class AccountService {
         return new OrderHistoryEntry("ORD-" + order.getOrderId(), order.getAccount().getAccountId(),
                 order.getInstrument().getSymbol(), order.getSide(), order.getQuantity(), order.getLimitPrice(),
                 order.getLimitPrice(), order.getStatus(), order.getIdempotencyKey(), now());
+    }
+
+    private OrderHistoryEntry orderEntry(OrderHistoryRow row) {
+        return new OrderHistoryEntry(
+                row.orderId(),
+                row.accountId(),
+                row.symbol(),
+                row.side(),
+                row.quantity(),
+                row.price(),
+                row.executedPrice(),
+                row.status(),
+                row.idempotencyKey(),
+                toOffsetUtc(row.createdOn())
+        );
+    }
+
+    private OffsetDateTime toOffsetUtc(LocalDateTime value) {
+        return value == null ? now() : value.atOffset(ZoneOffset.UTC);
     }
 
     private AccountStatus status(TradingStatus status) {

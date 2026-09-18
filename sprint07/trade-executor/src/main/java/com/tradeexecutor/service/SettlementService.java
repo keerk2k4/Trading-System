@@ -116,9 +116,7 @@ public class SettlementService {
                              int quantity, OrderSide side) {
         logger.info("  Updating order status to FILLED in database...");
         // Step 1: Update order status atomically (detect duplicate delivery)
-        int rowsUpdated = orderMapper.updateOrderStatusWithCurrentStatus(
-            orderId, "NEW", "FILLED"
-        );
+        int rowsUpdated = orderMapper.markOrderFilled(orderId, executionPrice);
         
         if (rowsUpdated == 0) {
             // Duplicate delivery - order already settled
@@ -148,9 +146,7 @@ public class SettlementService {
      */
     private void settleRejected(Long orderId) {
         logger.info("  Updating order status to REJECTED in database...");
-        int rowsUpdated = orderMapper.updateOrderStatusWithCurrentStatus(
-            orderId, "NEW", "REJECTED"
-        );
+        int rowsUpdated = orderMapper.markOrderRejected(orderId);
         
         if (rowsUpdated == 0) {
             // Duplicate delivery
