@@ -3,6 +3,7 @@ package com.tradeexecutor.mapper;
 import com.tradingsystem.domain.entities.Order;
 import org.apache.ibatis.annotations.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -101,5 +102,34 @@ public interface OrderMapper {
     int updateOrderStatusWithCurrentStatus(@Param("orderId") Long orderId,
                                           @Param("currentStatus") String currentStatus,
                                           @Param("newStatus") String newStatus);
+
+    /**
+     * Mark order as FILLED and persist execution details.
+     */
+    @Update("""
+        UPDATE orders
+        SET status = 'FILLED',
+            filled_price = #{executionPrice},
+            filled_at = CURRENT_TIMESTAMP,
+            executor_version = executor_version + 1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE order_id = #{orderId} AND status = 'NEW'
+        """)
+    int markOrderFilled(@Param("orderId") Long orderId,
+                        @Param("executionPrice") BigDecimal executionPrice);
+
+    /**
+     * Mark order as REJECTED and persist decision timestamp.
+     */
+    @Update("""
+        UPDATE orders
+        SET status = 'REJECTED',
+            filled_price = NULL,
+            filled_at = CURRENT_TIMESTAMP,
+            executor_version = executor_version + 1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE order_id = #{orderId} AND status = 'NEW'
+        """)
+    int markOrderRejected(@Param("orderId") Long orderId);
 }
 

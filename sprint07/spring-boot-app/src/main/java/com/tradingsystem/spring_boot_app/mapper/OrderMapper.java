@@ -2,6 +2,7 @@ package com.tradingsystem.spring_boot_app.mapper;
 
 import com.tradingsystem.domain.entities.Order;
 import com.tradingsystem.domain.enums.OrderStatus;
+import com.tradingsystem.spring_boot_app.dto.OrderHistoryRow;
 import org.apache.ibatis.annotations.*;
 
 import java.util.List;
@@ -117,6 +118,40 @@ public interface OrderMapper {
     })
     @Result(property = "status", column = "status")
     List<Order> findOrdersByAccountId(@Param("accountId") Long accountId);
+
+    /**
+     * Order history projection with persisted execution price from executor.
+     */
+    @Select("""
+        SELECT
+            'ORD-' || o.order_id AS order_id,
+            o.trading_account_id AS account_id,
+            i.symbol AS symbol,
+            o.side AS side,
+            o.quantity AS quantity,
+            CAST(o.limit_price AS numeric(18,2)) AS price,
+            CAST(o.filled_price AS numeric(18,2)) AS executed_price,
+            o.status AS status,
+            o.idempotency_key AS idempotency_key,
+            o.created_at AS created_on
+        FROM orders o
+        JOIN instruments i ON i.instrument_id = o.instrument_id
+        WHERE o.trading_account_id = #{accountId}
+        ORDER BY o.created_at DESC
+        """)
+    @ConstructorArgs({
+        @Arg(column = "order_id", javaType = String.class),
+        @Arg(column = "account_id", javaType = Long.class),
+        @Arg(column = "symbol", javaType = String.class),
+        @Arg(column = "side", javaType = com.tradingsystem.domain.enums.OrderSide.class),
+        @Arg(column = "quantity", javaType = int.class),
+        @Arg(column = "price", javaType = java.math.BigDecimal.class),
+        @Arg(column = "executed_price", javaType = java.math.BigDecimal.class),
+        @Arg(column = "status", javaType = com.tradingsystem.domain.enums.OrderStatus.class),
+        @Arg(column = "idempotency_key", javaType = String.class),
+        @Arg(column = "created_on", javaType = java.time.LocalDateTime.class)
+    })
+    List<OrderHistoryRow> findOrderHistoryByAccountId(@Param("accountId") Long accountId);
     
     /**
      * Selects orders by status filter.
