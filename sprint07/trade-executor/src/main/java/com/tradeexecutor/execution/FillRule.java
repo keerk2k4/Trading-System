@@ -20,13 +20,17 @@ import java.math.BigDecimal;
 public interface FillRule {
     
     /**
-     * Evaluate whether to fill the order at the given quote price.
+     * Evaluate whether to fill the order using side-aware bid/ask prices.
+     * 
+     * BUY compares against ask and fills at ask.
+     * SELL compares against bid and fills at bid.
      * 
      * @param order The order to evaluate (contains limit price, side, quantity)
-     * @param quotedPrice The current market price from Fauxnance
+     * @param bid The current best bid from Fauxnance
+     * @param ask The current best ask from Fauxnance
      * @return An ExecutionResult indicating FILLED, REJECTED, or other status
      */
-    ExecutionResult evaluate(Order order, BigDecimal quotedPrice);
+    ExecutionResult evaluate(Order order, BigDecimal bid, BigDecimal ask);
     
     /**
      * Get the name of this fill rule (e.g., "DEFAULT", "IOC", "FOK")

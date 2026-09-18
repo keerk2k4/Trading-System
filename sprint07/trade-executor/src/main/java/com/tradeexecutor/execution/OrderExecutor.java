@@ -75,18 +75,28 @@ public class OrderExecutor {
         }
         
         QuoteResponse quote = quoteOpt.get();
-        BigDecimal quotedPrice = quote.getPrice();
-        
-        if (quotedPrice == null) {
-            logger.warn("Quote for {} has null price", instrument.getSymbol());
+        BigDecimal bid = quote.getBid();
+        BigDecimal ask = quote.getAsk();
+
+        if (bid == null || ask == null) {
+            logger.warn("Quote for {} missing bid/ask. bid={}, ask={}", instrument.getSymbol(), bid, ask);
+            BigDecimal fallbackPrice = quote.getPrice();
+            if (fallbackPrice != null) {
+                logger.info("Falling back to mid/last price for {} because bid/ask is missing", instrument.getSymbol());
+                bid = fallbackPrice;
+                ask = fallbackPrice;
+            }
+        }
+
+        if (bid == null || ask == null) {
             ExecutionResult result = ExecutionResult.pricingUnavailable(
-                "Quote for " + instrument.getSymbol() + " has no price data"
+                "Quote for " + instrument.getSymbol() + " has no bid/ask data"
             );
             return new ExecutionDecision(result, fillRule.getName());
         }
         
         // Step 3: Apply fill rule (pure function - no side effects)
-        ExecutionResult result = fillRule.evaluate(order, quotedPrice);
+        ExecutionResult result = fillRule.evaluate(order, bid, ask);
         
         logger.info("Execution result for order {}: {}", order.getOrderId(), result);
         
