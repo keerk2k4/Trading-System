@@ -1,9 +1,13 @@
 package com.tradeexecutor.consumer;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tradeexecutor.model.OrderPlacedEvent;
+import com.tradeexecutor.kafka.DeadLetterPublisher;
 import com.tradeexecutor.kafka.KafkaMessageEnvelope;
+import com.tradeexecutor.kafka.RetryHandler;
 import com.tradeexecutor.service.ExecutionService;
 import com.tradeexecutor.service.SettlementService;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,13 +18,16 @@ import org.springframework.kafka.support.Acknowledgment;
 
 import java.math.BigDecimal;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for OrderPlacedConsumer.
  * 
- * Tests Kafka consumer behavior for ORDER_PLACED events.
+ * Tests Kafka consumer behavior for ORDER_PLACED events with DLT support.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("OrderPlacedConsumer Tests")
@@ -33,18 +40,27 @@ class OrderPlacedConsumerTest {
     private SettlementService settlementService;
     
     @Mock
+    private DeadLetterPublisher deadLetterPublisher;
+    
+    @Mock
+    private RetryHandler retryHandler;
+    
+    @Mock
+    private ObjectMapper objectMapper;
+    
+    @Mock
     private Acknowledgment acknowledgment;
     
     private OrderPlacedConsumer consumer;
     
     @BeforeEach
-    void setUp() {
-        consumer = new OrderPlacedConsumer(executionService, settlementService);
+    void setUp() throws Exception {
+        consumer = new OrderPlacedConsumer(executionService, settlementService, deadLetterPublisher, retryHandler, objectMapper);
     }
     
     @Test
-    @DisplayName("OnOrderPlaced: Event is passed to ExecutionService")
-    void testOnOrderPlacedPassesToExecutionService() {
+    @DisplayName("OnOrderPlaced: Successful event processing - message acknowledged")
+    void testOnOrderPlacedSuccessfulProcessing() throws Exception {
         // Given: An ORDER_PLACED event
         OrderPlacedEvent event = new OrderPlacedEvent();
         event.setOrderId("1");
@@ -56,30 +72,32 @@ class OrderPlacedConsumerTest {
         event.setIdempotencyKey("1");
         event.setCreatedOn(String.valueOf(System.currentTimeMillis()));
 
-        EventEnvelope<OrderPlacedEvent> envelope = new EventEnvelope<>();
-        envelope.setEventId("event-1");
-        envelope.setEventType("ORDER_PLACED");
-        envelope.setEventTime(String.valueOf(System.currentTimeMillis()));
-        envelope.setSource("spring-boot-app");
-        envelope.setSchemaVersion(1);
-        envelope.setPayload(event);
+        KafkaMessageEnvelope<OrderPlacedEvent> envelope = new KafkaMessageEnvelope<>(
+            "event-1",
+            "ORDER_PLACED",
+            "spring-boot-app",
+            String.valueOf(System.currentTimeMillis()),
+            1,
+            event
+        );
+        
+        ConsumerRecord<String, KafkaMessageEnvelope<OrderPlacedEvent>> record = new ConsumerRecord<>(
+            "orders",
+            0,
+            100L,
+            "account-1",
+            envelope
+        );
         
         // When: Consumer receives the event
-        consumer.onOrderPlaced(envelope, acknowledgment);
+        doNothing().when(executionService).processOrderPlaced(event);
+        
+        consumer.onOrderPlaced(record, envelope, acknowledgment);
         
         // Then: ExecutionService.processOrderPlaced is called with the event
         verify(executionService, times(1)).processOrderPlaced(event);
-        
-        // And: Kafka message is acknowledged
         verify(acknowledgment, times(1)).acknowledge();
     }
-    
-    @Test
-    @DisplayName("Consumer group is 'trade-executor'")
-    void testConsumerGroupIsCorrect() {
-        // This is a compile-time check verified by the annotation
-        // @KafkaListener(topics = TOPIC, groupId = CONSUMER_GROUP)
-        // Consumer group should be "trade-executor"
-    }
 }
+
 

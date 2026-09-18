@@ -75,7 +75,7 @@ services:
   trade-executor:
     build:
       context: .
-      dockerfile: trade-executor/Dockerfile
+      dockerfile: Dockerfile
     container_name: trade-executor
     profiles:
       - platform

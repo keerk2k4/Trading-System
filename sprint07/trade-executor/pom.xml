@@ -90,6 +90,31 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Mockito (test scope only) - inline mocking is built into mockito-core since 5.x.
+             Version 5.20.0 ships ByteBuddy 1.17.x with support for the Java 25 runtime used here
+             (mockito-inline 5.2.0 / ByteBuddy 1.14.x cannot mock classes on Java 25). -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>5.20.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- ByteBuddy pinned for the Java 25 runtime (Spring Boot 3.3 manages 1.14.x,
+             which cannot detect/mock on Java 25). Test scope only. -->
+        <dependency>
+            <groupId>net.bytebuddy</groupId>
+            <artifactId>byte-buddy</artifactId>
+            <version>1.17.6</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>net.bytebuddy</groupId>
+            <artifactId>byte-buddy-agent</artifactId>
+            <version>1.17.6</version>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>org.mybatis.spring.boot</groupId>
             <artifactId>mybatis-spring-boot-starter</artifactId>

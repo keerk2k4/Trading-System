@@ -2,6 +2,7 @@ package com.tradeexecutor.service;
 
 import com.tradingsystem.domain.entities.Instrument;
 import com.tradingsystem.domain.entities.Order;
+import com.tradeexecutor.exception.PermanentProcessingException;
 import com.tradeexecutor.execution.ExecutionDecision;
 import com.tradeexecutor.execution.OrderExecutor;
 import com.tradeexecutor.mapper.InstrumentMapper;
@@ -60,7 +61,7 @@ public class ExecutionService {
         
         if (event == null || event.getOrderId() == null) {
             logger.error("Invalid ORDER_PLACED event: event is null or orderId is missing");
-            throw new IllegalArgumentException("Invalid ORDER_PLACED event");
+            throw new PermanentProcessingException("Invalid ORDER_PLACED event: event is null or orderId is missing");
         }
         
         // Parse orderId from string to Long
@@ -70,13 +71,13 @@ public class ExecutionService {
             logger.debug("Order ID parsed successfully: {}", orderId);
         } catch (NumberFormatException e) {
             logger.error("Failed to parse order ID: {}. Error: {}", event.getOrderId(), e.getMessage());
-            throw new IllegalArgumentException("Invalid order ID format: " + event.getOrderId(), e);
+            throw new PermanentProcessingException("Invalid order ID format: " + event.getOrderId(), e);
         }
         
         Long accountId = event.getAccountId();
         if (accountId == null) {
             logger.error("Account ID is missing from order placed event for order {}", orderId);
-            throw new IllegalArgumentException("Account ID is missing from order placed event");
+            throw new PermanentProcessingException("Account ID is missing from order placed event");
         }
         logger.info("Account ID: {}", accountId);
         
@@ -85,7 +86,7 @@ public class ExecutionService {
         Order order = orderMapper.findOrderById(orderId)
             .orElseThrow(() -> {
                 logger.error("Order not found in database: {}", orderId);
-                return new IllegalArgumentException("Order not found: " + orderId);
+                return new PermanentProcessingException("Order not found: " + orderId);
             });
         logger.info("✓ Order loaded: quantity={}, side={}", 
                    order.getQuantity(), order.getSide());
@@ -95,7 +96,7 @@ public class ExecutionService {
         Instrument instrument = instrumentMapper.findInstrumentBySymbol(event.getSymbol())
             .orElseThrow(() -> {
                 logger.error("Instrument not found: {}", event.getSymbol());
-                return new IllegalArgumentException("Instrument not found: " + event.getSymbol());
+                return new PermanentProcessingException("Instrument not found: " + event.getSymbol());
             });
         logger.info("✓ Instrument loaded for symbol {}", event.getSymbol());
         

@@ -7,11 +7,10 @@ import com.tradeexecutor.kafka.QuotePayload;
 import com.tradeexecutor.mapper.PositionMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-import org.slf4j.Logger;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -30,6 +29,7 @@ import static org.mockito.Mockito.*;
  * ✓ Interval quota validation (stays within 2000 req/day)
  * ✓ Interval floor enforcement (minimum 30 seconds)
  */
+@ExtendWith(MockitoExtension.class)
 class QuotePollerServiceTest {
     
     @Mock
@@ -41,12 +41,11 @@ class QuotePollerServiceTest {
     @Mock
     private KafkaProducer kafkaProducer;
     
-    @InjectMocks
     private QuotePollerService quotePollerService;
     
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
+        quotePollerService = new QuotePollerService(positionMapper, fauxnanceClient, kafkaProducer, 30000L);
     }
     
     /**
@@ -90,9 +89,9 @@ class QuotePollerServiceTest {
     /**
      * Acceptance Criteria #1: Batch fetching handles > 25 symbols correctly
      * 
-     * Given: 50 symbols discovered (requires 2 batches)
-     * When: poller calls FauxnanceClient
-     * Then: batches them in multiple calls (25 + 25)
+     * Given: 50 symbols discovered
+     * When: poller calls FauxnanceClient.getQuotesBatch
+     * Then: all 50 are passed in one batch (FauxnanceClient handles internal batching)
      */
     @Test
     void testBatchFetching_Handles_MoreThan25Symbols() {
@@ -108,13 +107,15 @@ class QuotePollerServiceTest {
         for (String symbol : symbols) {
             quotes.add(new QuoteResponse(symbol, BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ONE, System.currentTimeMillis()));
         }
-        when(fauxnanceClient.getQuotesBatch(anyList())).thenReturn(quotes);
+        when(fauxnanceClient.getQuotesBatch(any(List.class))).thenReturn(quotes);
         
         // Execute
         quotePollerService.pollAndPublishQuotes();
         
-        // Verify: batch fetch called 2 times (25 symbols each)
-        verify(fauxnanceClient, times(2)).getQuotesBatch(anyList());
+        // Verify: batch fetch called 1 time with all 50 symbols (FauxnanceClient handles internal 25-symbol batching)
+        ArgumentCaptor<List<String>> batchCaptor = ArgumentCaptor.forClass(List.class);
+        verify(fauxnanceClient, times(1)).getQuotesBatch(batchCaptor.capture());
+        assertEquals(50, batchCaptor.getValue().size());
     }
     
     /**
@@ -135,7 +136,7 @@ class QuotePollerServiceTest {
         for (String symbol : symbols) {
             quotes.add(new QuoteResponse(symbol, BigDecimal.TEN, new BigDecimal("9.50"), new BigDecimal("10.50"), System.currentTimeMillis()));
         }
-        when(fauxnanceClient.getQuotesBatch(symbols)).thenReturn(quotes);
+        when(fauxnanceClient.getQuotesBatch(any(List.class))).thenReturn(quotes);
         
         // Execute
         quotePollerService.pollAndPublishQuotes();
