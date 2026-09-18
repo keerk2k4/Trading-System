@@ -103,6 +103,7 @@ public class ExecutionService {
         // Step 3: Execute the order
         logger.info("Step 3: Executing order with OrderExecutor...");
         ExecutionDecision decision = orderExecutor.execute(order, instrument);
+        
         logger.info("✓ Execution decision made: {}", decision);
         logger.info("  Fill status: {}", decision.isFilled());
         logger.info("  Result status: {}", decision.getResult().getStatus());

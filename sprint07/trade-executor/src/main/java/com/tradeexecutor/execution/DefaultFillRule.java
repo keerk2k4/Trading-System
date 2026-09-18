@@ -19,9 +19,9 @@ public class DefaultFillRule implements FillRule {
     public static final DefaultFillRule INSTANCE = new DefaultFillRule();
     
     @Override
-    public ExecutionResult evaluate(Order order, BigDecimal quotedPrice) {
-        if (quotedPrice == null) {
-            return ExecutionResult.rejected("Quote price is null");
+    public ExecutionResult evaluate(Order order, BigDecimal bid, BigDecimal ask) {
+        if (bid == null || ask == null) {
+            return ExecutionResult.rejected("Quote bid/ask is missing");
         }
         
         BigDecimal limitPrice = order.getLimitPrice();
@@ -32,23 +32,23 @@ public class DefaultFillRule implements FillRule {
         OrderSide side = order.getSide();
         
         if (side == OrderSide.BUY) {
-            // For BUY orders: fill if limit price >= quoted price
-            if (limitPrice.compareTo(quotedPrice) >= 0) {
-                return ExecutionResult.filled(quotedPrice);
+            // BUY fills against ask.
+            if (limitPrice.compareTo(ask) >= 0) {
+                return ExecutionResult.filled(ask);
             } else {
                 return ExecutionResult.rejected(
                     "BUY order limit price " + limitPrice + 
-                    " is below quoted price " + quotedPrice
+                    " is below ask " + ask
                 );
             }
         } else if (side == OrderSide.SELL) {
-            // For SELL orders: fill if limit price <= quoted price
-            if (limitPrice.compareTo(quotedPrice) <= 0) {
-                return ExecutionResult.filled(quotedPrice);
+            // SELL fills against bid.
+            if (limitPrice.compareTo(bid) <= 0) {
+                return ExecutionResult.filled(bid);
             } else {
                 return ExecutionResult.rejected(
                     "SELL order limit price " + limitPrice + 
-                    " is above quoted price " + quotedPrice
+                    " is above bid " + bid
                 );
             }
         } else {
