@@ -15,16 +15,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * HTTP client for Fauxnance API.
- * 
- * Fetches live market quotes from the Fauxnance service with configurable retry logic.
- * 
- * Features:
- * - Retry on transient failures
- * - Configurable retry budget (max attempts, delay between retries)
- * - Return Optional.empty() after retry budget exhausted
- */
 @Component
 public class FauxnanceClient {
     
@@ -49,16 +39,6 @@ public class FauxnanceClient {
         this.retryDelayMs = retryDelayMs;
     }
     
-
-    /**
-     * Fetch quotes for a batch of symbols from Fauxnance.
-     * 
-     * Batches up to 25 symbols per HTTP request for quota efficiency.
-     * Implements the same retry logic as getQuote.
-     * 
-     * @param symbols List of stock symbols to fetch (will batch in chunks of 25)
-     * @return List of QuoteResponse objects; empty list if request fails after retries
-     */
     public List<QuoteResponse> getQuotesBatch(List<String> symbols) {
         if (symbols == null || symbols.isEmpty()) {
             logger.warn("No symbols provided for batch quote fetch");
@@ -128,17 +108,6 @@ public class FauxnanceClient {
         return headers;
     }
 
-    /**
-     * Fetch a quote for a single symbol from Fauxnance.
-     * 
-     * Implements retry logic with exponential backoff:
-     * - Attempts up to maxRetryAttempts times
-     * - Waits retryDelayMs between attempts
-     * - Returns Optional.empty() if all attempts fail
-     * 
-     * @param symbol The stock symbol (e.g., "AAPL")
-     * @return Optional containing the quote if successful, Optional.empty() if all retries failed
-     */
     public Optional<QuoteResponse> getQuote(String symbol) {
         if (symbol == null || symbol.trim().isEmpty()) {
             logger.error("Symbol cannot be null or empty");
