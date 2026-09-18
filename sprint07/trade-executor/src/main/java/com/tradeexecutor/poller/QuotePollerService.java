@@ -97,7 +97,7 @@ public class QuotePollerService {
      * Runs at intervals specified by POLL_INTERVAL_SECONDS (default 30 seconds, min 30 seconds).
      * Note: fixedRateString requires milliseconds, so we use poll-interval-ms in config.
      */
-    @Scheduled(fixedRateString = "${app.poller.poll-interval-ms:30000}")
+    @Scheduled(fixedRateString = "${app.poller.poll-interval-ms:120000}")
     public void pollAndPublishQuotes() {
         logger.info("=== Market Data Poll Started ===");
         long pollStartTime = System.currentTimeMillis();
