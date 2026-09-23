@@ -102,6 +102,26 @@ services:
     networks:
       - trading-net
 
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    profiles:
+      - platform
+    ports:
+      - 3000:3000
+    environment:      
+      JWT_SECRET: ${JWT_SECRET}
+      DB_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - trading-net
+
   kafka:
     image: apache/kafka:4.0.0
     container_name: kafka
