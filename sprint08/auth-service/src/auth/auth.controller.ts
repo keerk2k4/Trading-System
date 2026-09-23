@@ -5,7 +5,6 @@ import {
   Body,
   HttpCode,
   HttpStatus,
-  BadRequestException,
   UseGuards,
   Request,
   Res,
@@ -21,6 +20,7 @@ import { BearerGuard } from "../guards/BearerGuard";
 import { TokenService } from "../services/TokenService";
 import { PasswordService } from "../services/PasswordService";
 import { RefreshTokenService } from "../services/RefreshTokenService";
+import { TradeApiClient } from "../services/TradeApiClient";
 import { UserRepository } from "../repositories/UserRepository";
 
 @Controller("auth")
@@ -29,28 +29,58 @@ export class AuthController {
     private tokenService: TokenService,
     private passwordService: PasswordService,
     private refreshTokenService: RefreshTokenService,
+    private tradeApiClient: TradeApiClient,
     private userRepository: UserRepository,
   ) {}
 
   /**
    * POST /auth/register
-   * Boilerplate route - no implementation yet
+   *
+   * 1. Reject if the username is already taken (AUTH-409).
+   * 2. Hash the password.
+   * 3. Create the user row in auth.users.
+   * 4. Ask Trade REST API to create a brand new trading account for
+   *    this user (balance 0, status ACTIVE), linked by the user's UUID.
+   * 5. Return confirmation only -- no token, matching the contract.
    */
   @Post("register")
+  @HttpCode(HttpStatus.CREATED)
   async register(@Body() registerRequest: RegisterRequest, @Res() res: Response): Promise<void> {
     try {
-      // TODO: Implement registration logic
-      // 1. Validate accountId exists in Trade API
-      // 2. Hash password
-      // 3. Generate UUID
-      // 4. Create user in users table
-      // 5. Return UserResponse (no tokens)
+      const alreadyTaken = await this.userRepository.isUsernameTaken(registerRequest.username);
+      if (alreadyTaken) {
+        const error: ErrorResponse = {
+          errorCode: "AUTH-409",
+          message: "Username already registered",
+        };
+        res.status(409).json(error);
+        return;
+      }
 
-      const error: ErrorResponse = {
-        errorCode: "AUTH-401",
-        message: "Registration not yet implemented",
+      const passwordHash = await this.passwordService.hashPassword(registerRequest.password);
+
+      const user = await this.userRepository.create({
+        userName: registerRequest.username,
+        passwordHash,
+        email: `${registerRequest.username}@placeholder.local`,
+        phone: null,
+        firstName: "",
+        lastName: "",
+        status: "ACTIVE",
+      });
+
+      // Auto-create the trading account, per the team's chosen design --
+      // this is a deliberate, documented tradeoff (see security review).
+      await this.tradeApiClient.createAccount(user.userId);
+
+      const response: UserResponse = {
+        id: user.userId,
+        username: user.userName,
+        accountId: 0, // not returned by the contract's UserResponse shape at register time
+        roles: registerRequest.roles ?? ["CUSTOMER"],
       };
-      res.status(501).json(error);
+
+      res.status(201).json(response);
     } catch (error) {
       console.error("Register error:", error);
       const response: ErrorResponse = {
@@ -63,28 +93,21 @@ export class AuthController {
 
   /**
    * POST /auth/login
-   * Authenticate user with username and password
-   * Returns access token (15 minutes expiry)
-   * No refresh token on login endpoint
    */
   @Post("login")
   @HttpCode(HttpStatus.OK)
   async login(@Body() loginRequest: LoginRequest, @Res() res: Response): Promise<void> {
     try {
-      // Find user by username
       const user = await this.userRepository.findByUsername(loginRequest.username);
 
-      // For security: use dummy hash if user not found to prevent timing attacks
       let passwordValid = false;
       if (user) {
         passwordValid = await this.passwordService.verifyPassword(loginRequest.password, user.passwordHash);
       } else {
-        // Consume same time as real password verification by hashing against dummy hash
         const dummyHash = await this.passwordService.getDummyHash();
         await this.passwordService.verifyPassword(loginRequest.password, dummyHash);
       }
 
-      // Return same error for both unknown user and wrong password
       if (!user || !passwordValid) {
         const response: ErrorResponse = {
           errorCode: "AUTH-401",
@@ -94,16 +117,26 @@ export class AuthController {
         return;
       }
 
-      // TODO: Call Trade API to get accountId for this user
-      // For now, assume userId maps to accountId (e.g., user 1 -> account 1)
-      // This will be replaced with actual API call
-      const accountId = 1; // Placeholder
+      // Fetch the real, current account for this user from Trade API.
+      const account = await this.tradeApiClient.getAccountByUserId(user.userId);
+      if (!account) {
+        const response: ErrorResponse = {
+          errorCode: "AUTH-401",
+          message: "Unauthorised",
+        };
+        res.status(401).json(response);
+        return;
+      }
 
-      // Create access token
-      const accessToken = this.tokenService.createAccessToken(user.userId, accountId, ["CUSTOMER"]);
+      const accessToken = this.tokenService.createAccessToken(user.userId, account.accountId, ["CUSTOMER"]);
+
+      const refreshToken = this.refreshTokenService.generateRefreshToken();
+      const tokenHash = await this.refreshTokenService.hashRefreshToken(refreshToken);
+      await this.refreshTokenService.storeRefreshToken(user.userId, tokenHash);
 
       const response: TokenResponse = {
         accessToken,
+        refreshToken,
         tokenType: "Bearer",
         expiresIn: this.tokenService.getAccessTokenExpiry(),
       };
@@ -121,15 +154,11 @@ export class AuthController {
 
   /**
    * POST /auth/refresh
-   * Exchange refresh token for new token pair
-   * Creates new access token and new refresh token
-   * Revokes the old refresh token
    */
   @Post("refresh")
   @HttpCode(HttpStatus.OK)
   async refresh(@Body() refreshRequest: RefreshRequest, @Res() res: Response): Promise<void> {
     try {
-      // Validate refresh token
       const validation = await this.refreshTokenService.validateRefreshToken(refreshRequest.refreshToken);
 
       if (!validation.valid) {
@@ -143,13 +172,10 @@ export class AuthController {
 
       const userId = validation.userId!;
 
-      // Revoke the presented refresh token
       const tokenHash = await this.refreshTokenService.hashRefreshToken(refreshRequest.refreshToken);
       await this.refreshTokenService.revokeRefreshToken(tokenHash);
 
-      // Get user to extract data for new token
       const user = await this.userRepository.findByUserId(userId);
-
       if (!user) {
         const response: ErrorResponse = {
           errorCode: "AUTH-401",
@@ -159,13 +185,18 @@ export class AuthController {
         return;
       }
 
-      // TODO: Call Trade API to get accountId for this user
-      const accountId = 1; // Placeholder
+      const account = await this.tradeApiClient.getAccountByUserId(user.userId);
+      if (!account) {
+        const response: ErrorResponse = {
+          errorCode: "AUTH-401",
+          message: "Unauthorised",
+        };
+        res.status(401).json(response);
+        return;
+      }
 
-      // Create new access token
-      const newAccessToken = this.tokenService.createAccessToken(user.userId, accountId, ["CUSTOMER"]);
+      const newAccessToken = this.tokenService.createAccessToken(user.userId, account.accountId, ["CUSTOMER"]);
 
-      // Create new refresh token
       const newRefreshToken = this.refreshTokenService.generateRefreshToken();
       const newTokenHash = await this.refreshTokenService.hashRefreshToken(newRefreshToken);
       await this.refreshTokenService.storeRefreshToken(user.userId, newTokenHash);
@@ -190,17 +221,15 @@ export class AuthController {
 
   /**
    * GET /auth/me
-   * Protected route - requires bearer token
-   * Returns current authenticated user
    */
   @Get("me")
   @UseGuards(BearerGuard)
   @HttpCode(HttpStatus.OK)
   async getMe(@Request() req: any, @Res() res: Response): Promise<void> {
     try {
-      const user = req.user;
+      const claims = req.user;
 
-      if (!user) {
+      if (!claims) {
         const response: ErrorResponse = {
           errorCode: "AUTH-401",
           message: "Unauthorised",
@@ -209,11 +238,13 @@ export class AuthController {
         return;
       }
 
+      const user = await this.userRepository.findByUserId(claims.sub);
+
       const userResponse: UserResponse = {
-        id: user.sub,
-        username: "", // TODO: Extract from JWT or lookup by userId
-        accountId: user.accountId,
-        roles: user.roles,
+        id: claims.sub,
+        username: user?.userName ?? "",
+        accountId: claims.accountId,
+        roles: claims.roles,
       };
 
       res.status(200).json(userResponse);

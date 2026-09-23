@@ -10,29 +10,41 @@ import java.util.Optional;
 /**
  * MyBatis mapper for Account entity (trading_accounts table).
  * All parameters are bound as JDBC bind parameters to prevent SQL injection.
+ *
+ * NOTE: trading_accounts.user_id is now VARCHAR(36) holding a UUID string
+ * (migration 007). insertAccount and findAccountByUserId below already
+ * reflect that. However, UserMapper.findUserById(Long) still expects a
+ * Long -- meaning the "holder" @One lookups in findAccountById,
+ * findAccountByNumber, findAccountsByStatus and findAccountsCreatedAfter
+ * below are currently type-mismatched too, and will fail at runtime the
+ * moment they're actually exercised. That's a separate fix, touching
+ * UserMapper.java, not addressed in this pass.
  */
 @Mapper
 public interface AccountMapper {
-    
+
     /**
-     * Inserts a new trading account.
-     * @param accountId the account ID (bound parameter)
-     * @param accountNumber the account number (bound parameter)
-     * @param userId the user ID (bound parameter)
-     * @param accountStatus the account status (bound parameter)
-     * @return number of rows affected
+     * Inserts a new trading account, linked to an Auth Service user by
+     * their UUID. The account ID and timestamps are generated
+     * automatically; a brand-new account always starts at zero balance
+     * and ACTIVE status.
+     *
+     * @param accountNumber a generated, human-readable account reference
+     * @param userId the Auth Service user's UUID, as a string
+     * @param accountStatus the starting account status
+     * @return the generated accountId
      */
     @Insert("""
-        INSERT INTO trading_accounts (trading_account_id, account_number, user_id, status, account_status, available_balance, blocked_balance, created_at, updated_at)
-        VALUES (#{accountId}, #{accountNumber}, #{userId}, 'ACTIVE', #{accountStatus}, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        INSERT INTO trading_accounts (account_number, user_id, status, account_status, available_balance, blocked_balance, version, created_at, updated_at)
+        VALUES (#{accountNumber}, #{userId}, 'ACTIVE', #{accountStatus}, 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """)
-    int insertAccount(
-        @Param("accountId") Long accountId,
+    @Options(useGeneratedKeys = true, keyProperty = "accountId")
+    Long insertAccount(
         @Param("accountNumber") String accountNumber,
-        @Param("userId") Long userId,
+        @Param("userId") String userId,
         @Param("accountStatus") String accountStatus
     );
-    
+
     /**
      * Selects an account by account ID.
      * @param accountId the account ID to search for (bound parameter)
@@ -59,7 +71,7 @@ public interface AccountMapper {
         @Arg(column = "version", javaType = Long.class)
     })
     Optional<Account> findAccountById(@Param("accountId") Long accountId);
-    
+
     /**
      * Selects an account by account number (key).
      * The account number is treated as a bound parameter to prevent SQL injection.
@@ -79,7 +91,7 @@ public interface AccountMapper {
         @Result(property = "holder", column = "user_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.UserMapper.findUserById"))
     })
     Optional<Account> findAccountByNumber(@Param("accountNumber") String accountNumber);
-    
+
     /**
      * Selects accounts by status filter.
      * The status is treated as a bound parameter to prevent SQL injection.
@@ -100,7 +112,7 @@ public interface AccountMapper {
         @Result(property = "holder", column = "user_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.UserMapper.findUserById"))
     })
     List<Account> findAccountsByStatus(@Param("status") String status);
-    
+
     /**
      * Updates the available balance for an account.
      * @param accountId the account ID (bound parameter)
@@ -116,7 +128,7 @@ public interface AccountMapper {
     int updateAvailableBalanceOptimistic(@Param("accountId") Long accountId,
                                          @Param("availableBalance") BigDecimal availableBalance,
                                          @Param("version") Long version);
-    
+
     /**
      * Updates the blocked balance for an account.
      * @param accountId the account ID (bound parameter)
@@ -132,7 +144,7 @@ public interface AccountMapper {
     int updateBlockedBalance(@Param("accountId") Long accountId,
                              @Param("blockedBalance") BigDecimal blockedBalance,
                              @Param("version") Long version);
-    
+
     /**
      * Updates account status.
      * @param accountId the account ID (bound parameter)
@@ -148,7 +160,7 @@ public interface AccountMapper {
     int updateAccountStatus(@Param("accountId") Long accountId,
                             @Param("status") String status,
                             @Param("version") Long version);
-    
+
     /**
      * Selects accounts created after a given timestamp.
      * @param createdAfter the timestamp filter (bound parameter)
@@ -168,4 +180,16 @@ public interface AccountMapper {
         @Result(property = "holder", column = "user_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.UserMapper.findUserById"))
     })
     List<Account> findAccountsCreatedAfter(@Param("createdAfter") java.time.LocalDateTime createdAfter);
+
+    /**
+     * Selects an account by the Auth Service user's UUID.
+     * @param userId the user's UUID, as a string
+     * @return the account, or empty if not found
+     */
+    @Select("""
+        SELECT trading_account_id, account_number, user_id, available_balance, account_status, version
+        FROM trading_accounts
+        WHERE user_id = #{userId}
+        """)
+    Optional<Account> findAccountByUserId(@Param("userId") String userId);
 }

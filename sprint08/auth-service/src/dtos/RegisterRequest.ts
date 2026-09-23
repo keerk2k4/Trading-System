@@ -1,4 +1,4 @@
-import { IsString, MinLength, MaxLength, IsInt, Matches, IsOptional, IsArray, IsEnum, Min } from "class-validator";
+import { IsString, MinLength, MaxLength, Matches, IsOptional, IsArray, IsEnum } from "class-validator";
 
 export enum Role {
   CUSTOMER = "CUSTOMER",
@@ -19,9 +19,10 @@ export class RegisterRequest {
   @MaxLength(128)
   password!: string;
 
-  @IsInt()
-  @Min(1)
-  accountId!: number;
+  // NOTE: accountId removed deliberately. The team decided registration
+  // auto-creates a new trading account via Trade REST API, rather than
+  // requiring the client to already own one -- see the security review
+  // for the reasoning and the accepted tradeoff.
 
   @IsOptional()
   @IsArray()

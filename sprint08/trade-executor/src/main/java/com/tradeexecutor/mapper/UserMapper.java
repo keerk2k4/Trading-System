@@ -20,10 +20,10 @@ public interface UserMapper {
     @Select("""
         SELECT user_id, first_name, last_name, email, phone, password_hash, status
         FROM users
-        WHERE user_id = #{userId}
+        WHERE user_id = #{userId}::uuid
         """)
     @ConstructorArgs({
-        @Arg(column = "user_id", javaType = Long.class),
+        @Arg(column = "user_id", javaType = String.class),
         @Arg(column = "first_name", javaType = String.class),
         @Arg(column = "last_name", javaType = String.class),
         @Arg(column = "email", javaType = String.class),
@@ -31,5 +31,5 @@ public interface UserMapper {
         @Arg(column = "password_hash", javaType = String.class),
         @Arg(column = "status", javaType = UserStatus.class)
     })
-    Optional<User> findUserById(@Param("userId") Long userId);
+    Optional<User> findUserById(@Param("userId") String userId);
 }

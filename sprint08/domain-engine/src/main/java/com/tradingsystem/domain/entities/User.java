@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 
 public class User {
 
-    private final Long userId;
+    private final String userId;
 
     @NotBlank
     @Size(max = 100)
@@ -36,7 +36,7 @@ public class User {
     private UserStatus status;
 
     public User(
-            Long userId,
+            String userId,
             String firstName,
             String lastName,
             String email,
@@ -52,7 +52,7 @@ public class User {
         this.status = status;
     }
 
-    public Long getUserId() {
+    public String getUserId() {
         return userId;
     }
     public String getFirstName() {
