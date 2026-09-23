@@ -111,7 +111,8 @@ services:
       - platform
     ports:
       - 3000:3000
-    environment:      
+    environment:     
+      PORT: 3000 
       JWT_SECRET: ${JWT_SECRET}
       DB_URL: ${DB_URL}
       DB_USERNAME: ${DB_USERNAME}
