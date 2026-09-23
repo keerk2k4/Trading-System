@@ -1,10 +1,11 @@
 -- seed/001_auth_test_users.sql
 -- Seed test users for auth service testing
 -- These UUIDs are fixed for reproducible testing
+-- Users are inserted into trading.users (primary), then copied to auth.users
 
 BEGIN;
 
-INSERT INTO auth.users (user_id, user_name, password_hash, email, phone, first_name, last_name, status)
+INSERT INTO trading.users (user_id, user_name, password_hash, email, phone, first_name, last_name, status)
 VALUES
   (
     '550e8400-e29b-41d4-a716-446655440001'::uuid,
@@ -56,5 +57,9 @@ VALUES
     'Trader',
     'ACTIVE'
   );
+
+-- Copy users from trading schema to auth schema
+INSERT INTO auth.users 
+SELECT * FROM trading.users;
 
 COMMIT;

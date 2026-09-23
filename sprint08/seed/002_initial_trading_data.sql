@@ -1,67 +1,8 @@
 -- seed/001_initial_trading_data.sql
 -- Initial seed data for the Trading System.
+-- NOTE: Users are populated by 001_auth_test_users.sql
 
 BEGIN;
-
--- ============================================================
--- USERS
--- ============================================================
-
-INSERT INTO users (
-    user_id,
-    user_name,
-    password_hash,
-    email,
-    phone,
-    first_name,
-    last_name
-) VALUES
-(
-    1,
-    'alice_trader',
-    '$2b$12$LQv3c1yqBW1sQf8n3h9pUeQ8mK0W7Y4V1X2Z3A4B5C6D7E8F9G0H1',
-    'alice@example.com',
-    '+353871000001',
-    'Alice',
-    'Trader'
-),
-(
-    2,
-    'bob_investor',
-    '$2b$12$LQv3c1yqBW1sQf8n3h9pUeQ8mK0W7Y4V1X2Z3A4B5C6D7E8F9G0H2',
-    'bob@example.com',
-    '+353871000002',
-    'Bob',
-    'Investor'
-),
-(
-    3,
-    'charlie_trader',
-    '$2b$12$LQv3c1yqBW1sQf8n3h9pUeQ8mK0W7Y4V1X2Z3A4B5C6D7E8F9G0H3',
-    'charlie@example.com',
-    '+353871000003',
-    'Charlie',
-    'Trader'
-),
-(
-    4,
-    'diana_investor',
-    '$2b$12$LQv3c1yqBW1sQf8n3h9pUeQ8mK0W7Y4V1X2Z3A4B5C6D7E8F9G0H4',
-    'diana@example.com',
-    '+353871000004',
-    'Diana',
-    'Investor'
-),
-(
-    5,
-    'ethan_trader',
-    '$2b$12$LQv3c1yqBW1sQf8n3h9pUeQ8mK0W7Y4V1X2Z3A4B5C6D7E8F9G0H5',
-    'ethan@example.com',
-    '+353871000005',
-    'Ethan',
-    'Trader'
-);
-
 
 -- ============================================================
 -- ACCOUNTS
@@ -79,7 +20,7 @@ INSERT INTO trading.trading_accounts (
 (
     1,
     'ACC-100001',
-    1,
+    '550e8400-e29b-41d4-a716-446655440001',
     25000.00,
     'ACTIVE',
     0,
@@ -88,7 +29,7 @@ INSERT INTO trading.trading_accounts (
 (
     2,
     'ACC-100002',
-    2,
+    '550e8400-e29b-41d4-a716-446655440002',
     50000.00,
     'ACTIVE',
     0,
@@ -97,7 +38,7 @@ INSERT INTO trading.trading_accounts (
 (
     3,
     'ACC-100003',
-    3,
+    '550e8400-e29b-41d4-a716-446655440003',
     15000.00,
     'ACTIVE',
     0,
@@ -106,7 +47,7 @@ INSERT INTO trading.trading_accounts (
 (
     4,
     'ACC-100004',
-    4,
+    '550e8400-e29b-41d4-a716-446655440004',
     75000.00,
     'ACTIVE',
     0,
@@ -115,7 +56,7 @@ INSERT INTO trading.trading_accounts (
 (
     5,
     'ACC-100005',
-    5,
+    '550e8400-e29b-41d4-a716-446655440005',
     30000.00,
     'ACTIVE',
     0,
@@ -628,7 +569,7 @@ INSERT INTO trading.watchlist (
 ) VALUES
 (
     1,
-    1,
+    '550e8400-e29b-41d4-a716-446655440001'::uuid,
     'Tech Giants',
     'Large technology companies',
     '2026-08-01 09:15:00',
@@ -636,7 +577,7 @@ INSERT INTO trading.watchlist (
 ),
 (
     2,
-    1,
+    '550e8400-e29b-41d4-a716-446655440001'::uuid,
     'Growth Stocks',
     'High-growth stocks to monitor',
     '2026-08-05 10:00:00',
@@ -644,7 +585,7 @@ INSERT INTO trading.watchlist (
 ),
 (
     3,
-    2,
+    '550e8400-e29b-41d4-a716-446655440002'::uuid,
     'US Tech',
     'US technology stocks',
     '2026-08-02 10:00:00',
@@ -652,7 +593,7 @@ INSERT INTO trading.watchlist (
 ),
 (
     4,
-    3,
+    '550e8400-e29b-41d4-a716-446655440003'::uuid,
     'AI Stocks',
     'Artificial intelligence related stocks',
     '2026-08-03 11:00:00',
@@ -660,7 +601,7 @@ INSERT INTO trading.watchlist (
 ),
 (
     5,
-    4,
+    '550e8400-e29b-41d4-a716-446655440004'::uuid,
     'Long Term',
     'Long-term investment candidates',
     '2026-08-04 11:30:00',
@@ -668,7 +609,7 @@ INSERT INTO trading.watchlist (
 ),
 (
     6,
-    5,
+    '550e8400-e29b-41d4-a716-446655440005'::uuid,
     'Market Watch',
     'General market watchlist',
     '2026-08-05 12:00:00',
