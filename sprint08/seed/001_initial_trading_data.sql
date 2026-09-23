@@ -67,7 +67,7 @@ INSERT INTO users (
 -- ACCOUNTS
 -- ============================================================
 
-INSERT INTO trading_accounts (
+INSERT INTO trading.trading_accounts (
     trading_account_id,
     account_number,
     user_id,
@@ -127,7 +127,7 @@ INSERT INTO trading_accounts (
 -- INSTRUMENTS
 -- ============================================================
 
-INSERT INTO instruments (
+INSERT INTO trading.instruments (
     instrument_id,
     symbol,
     display_name,
@@ -219,7 +219,7 @@ INSERT INTO instruments (
 -- the new schema deliberately does not support partial fills.
 -- ============================================================
 
-INSERT INTO orders (
+INSERT INTO trading.orders (
     order_id,
     idempotency_key,
     trading_account_id,
@@ -361,7 +361,7 @@ INSERT INTO orders (
 -- No PARTIALLY_FILLED status is used.
 -- ============================================================
 
-INSERT INTO order_history (
+INSERT INTO trading.order_history (
     order_id,
     status,
     timestamp
@@ -462,7 +462,7 @@ INSERT INTO order_history (
 -- POSITIONS
 -- ============================================================
 
-INSERT INTO positions (
+INSERT INTO trading.positions (
     position_id,
     trading_account_id,
     instrument_id,
@@ -548,7 +548,7 @@ INSERT INTO positions (
 -- HOLDINGS
 -- ============================================================
 
-INSERT INTO holdings (
+INSERT INTO trading.holdings (
     holding_id,
     demat_account_id,
     instrument_id,
@@ -618,7 +618,7 @@ INSERT INTO holdings (
 -- WATCHLISTS
 -- ============================================================
 
-INSERT INTO watchlist (
+INSERT INTO trading.watchlist (
     watchlist_id,
     user_id,
     watchlist_name,
@@ -680,7 +680,7 @@ INSERT INTO watchlist (
 -- WATCHLIST INSTRUMENTS
 -- ============================================================
 
-INSERT INTO watchlist_inst (
+INSERT INTO trading.watchlist_inst (
     wlist_id,
     inst_id
 ) VALUES
