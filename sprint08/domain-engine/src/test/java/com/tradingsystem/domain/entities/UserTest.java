@@ -15,7 +15,7 @@ class UserTest {
     @BeforeEach
     void setUp() {
         user = new User(
-                1L,
+                "1",
                 "John",
                 "Doe",
                 "john.doe@example.com",
@@ -26,7 +26,7 @@ class UserTest {
 
     @Test
     void shouldStoreUserId() {
-        assertEquals(1L, user.getUserId());
+        assertEquals("1", user.getUserId());
     }
 
     @Test

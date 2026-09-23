@@ -237,7 +237,7 @@ class OrderValidatorTest {
                         () -> validator.validate(order)
                 );
 
-        assertEquals(1L, exception.getUserId());
+        assertEquals("1", exception.getUserId());
     }
 
     @Test
@@ -693,7 +693,7 @@ class OrderValidatorTest {
             TradingStatus tradingStatus
     ) {
         User user = new User(
-                accountId,
+                String.valueOf(accountId),
                 "John",
                 "Doe",
                 "john" + accountId + "@example.com",

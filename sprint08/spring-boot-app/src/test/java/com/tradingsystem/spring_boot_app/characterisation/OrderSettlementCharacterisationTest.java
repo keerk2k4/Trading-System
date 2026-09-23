@@ -67,7 +67,7 @@ class OrderSettlementCharacterisationTest {
     private OrderService service;
 
     private Account activeAccount(BigDecimal cash) {
-        User user = new User(9L, "Test", "User", "test@example.com", "123", "hash", UserStatus.ACTIVE);
+        User user = new User("9", "Test", "User", "test@example.com", "123", "hash", UserStatus.ACTIVE);
         return new Account(1L, "ACC-001", user, cash, TradingStatus.ACTIVE, 0L);
     }
 
@@ -171,7 +171,7 @@ class OrderSettlementCharacterisationTest {
     @Test
     @DisplayName("account that is not ACTIVE throws AccountNotActiveException")
     void inactiveAccountThrows() {
-        User user = new User(9L, "Test", "User", "test@example.com", "123", "hash", UserStatus.ACTIVE);
+        User user = new User("9", "Test", "User", "test@example.com", "123", "hash", UserStatus.ACTIVE);
         Account suspended = new Account(1L, "ACC-001", user, new BigDecimal("10000.00"), TradingStatus.SUSPENDED, 0L);
         when(accounts.findAccountById(1L)).thenReturn(Optional.of(suspended));
         when(instruments.findInstrumentBySymbol("ACME")).thenReturn(Optional.of(acme()));

@@ -254,7 +254,7 @@ class SettlementProcessorTest {
     private Account createAccount(Long accountId) {
 
         User user = new User(
-                accountId,
+                String.valueOf(accountId),
                 "John",
                 "Doe",
                 "john" + accountId + "@example.com",

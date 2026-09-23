@@ -158,7 +158,7 @@ class PositionTest {
     private Position createPosition() {
 
         User user = new User(
-                1L,
+                "1",
                 "John",
                 "Doe",
                 "john@example.com",

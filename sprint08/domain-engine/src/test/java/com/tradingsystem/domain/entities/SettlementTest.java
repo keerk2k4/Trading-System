@@ -17,7 +17,7 @@ class SettlementTest {
     private Account createAccount() {
 
         User user = new User(
-                1L,
+                "1",
                 "John",
                 "Doe",
                 "john@example.com",

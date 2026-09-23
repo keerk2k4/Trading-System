@@ -20,7 +20,7 @@ class AccountTest {
     void createAccount() {
 
         user = new User(
-                1L,
+                "1",
                 "John",
                 "Doe",
                 "john@example.com",

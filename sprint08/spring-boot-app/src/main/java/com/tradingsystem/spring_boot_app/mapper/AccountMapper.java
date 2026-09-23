@@ -35,15 +35,15 @@ public interface AccountMapper {
      * @return the generated accountId
      */
     @Insert("""
-        INSERT INTO trading_accounts (account_number, user_id, status, account_status, available_balance, blocked_balance, version, created_at, updated_at)
-        VALUES (#{accountNumber}, #{userId}, 'ACTIVE', #{accountStatus}, 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        """)
-    @Options(useGeneratedKeys = true, keyProperty = "accountId")
-    Long insertAccount(
-        @Param("accountNumber") String accountNumber,
-        @Param("userId") String userId,
-        @Param("accountStatus") String accountStatus
-    );
+    INSERT INTO trading_accounts (account_number, user_id, account_status, available_balance, blocked_balance, version, created_at, updated_at)
+    VALUES (#{accountNumber}, #{userId}, #{accountStatus}, 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    RETURNING trading_account_id
+    """)
+Long insertAccount(
+    @Param("accountNumber") String accountNumber,
+    @Param("userId") String userId,
+    @Param("accountStatus") String accountStatus
+);
 
     /**
      * Selects an account by account ID.
@@ -187,9 +187,17 @@ public interface AccountMapper {
      * @return the account, or empty if not found
      */
     @Select("""
-        SELECT trading_account_id, account_number, user_id, available_balance, account_status, version
-        FROM trading_accounts
-        WHERE user_id = #{userId}
-        """)
-    Optional<Account> findAccountByUserId(@Param("userId") String userId);
+    SELECT trading_account_id, account_number, user_id, available_balance, account_status, version
+    FROM trading_accounts
+    WHERE user_id = #{userId}
+    """)
+@ConstructorArgs({
+    @Arg(column = "trading_account_id", javaType = Long.class),
+    @Arg(column = "account_number", javaType = String.class),
+    @Arg(column = "user_id", javaType = com.tradingsystem.domain.entities.User.class, select = "com.tradingsystem.spring_boot_app.mapper.UserMapper.findUserById"),
+    @Arg(column = "available_balance", javaType = BigDecimal.class),
+    @Arg(column = "account_status", javaType = com.tradingsystem.domain.enums.TradingStatus.class),
+    @Arg(column = "version", javaType = Long.class)
+})
+Optional<Account> findAccountByUserId(@Param("userId") String userId);
 }
