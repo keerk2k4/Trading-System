@@ -34,7 +34,7 @@ public interface AccountMapper {
      * @param accountStatus the starting account status
      * @return the generated accountId
      */
-    @Insert("""
+    @Select("""
     INSERT INTO trading_accounts (account_number, user_id, account_status, available_balance, blocked_balance, version, created_at, updated_at)
     VALUES (#{accountNumber}, #{userId}, #{accountStatus}, 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     RETURNING trading_account_id

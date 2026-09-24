@@ -34,7 +34,7 @@ export class AuthController {
     private tradeApiClient: TradeApiClient,
     private userRepository: UserRepository,
     private throttleService: ThrottleService,
-  ) {}
+  ) { }
 
   /**
    * POST /auth/register
@@ -74,8 +74,10 @@ export class AuthController {
 
       // Auto-create the trading account, per the team's chosen design --
       // this is a deliberate, documented tradeoff (see security review).
+      let accountId = 0;
       try {
-        await this.tradeApiClient.createAccount(user.userId);
+        const account = await this.tradeApiClient.createAccount(user.userId);
+        accountId = account.accountId;
       } catch (accountError) {
         // Account creation failed -- clean up the user we just saved, so we
         // never leave a "ghost" user with no matching account behind.
@@ -86,7 +88,7 @@ export class AuthController {
       const response: UserResponse = {
         id: user.userId,
         username: user.userName,
-        accountId: 0, // not returned by the contract's UserResponse shape at register time
+        accountId: accountId,
         roles: registerRequest.roles ?? ["CUSTOMER"],
       };
 
