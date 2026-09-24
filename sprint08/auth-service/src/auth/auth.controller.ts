@@ -10,6 +10,7 @@ import {
   Res,
 } from "@nestjs/common";
 import { Response } from "express";
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import { RegisterRequest } from "../dtos/RegisterRequest";
 import { LoginRequest } from "../dtos/LoginRequest";
 import { RefreshRequest } from "../dtos/RefreshRequest";
@@ -47,7 +48,12 @@ export class AuthController {
    * 5. Return confirmation only -- no token, matching the contract.
    */
   @Post("register")
+  @ApiTags("Auth")
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: "Register a user" })
+  @ApiResponse({ status: 201, description: "User created.", type: UserResponse })
+  @ApiResponse({ status: 409, description: "The username is already taken.", type: ErrorResponse })
+  @ApiResponse({ status: 422, description: "Invalid input", type: ErrorResponse })
   async register(@Body() registerRequest: RegisterRequest, @Res() res: Response): Promise<void> {
     try {
       const alreadyTaken = await this.userRepository.isUsernameTaken(registerRequest.username);
@@ -111,7 +117,12 @@ export class AuthController {
    * Implements uniform failure response and login throttle for security.
    */
   @Post("login")
+  @ApiTags("Auth")
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Log in and receive tokens" })
+  @ApiResponse({ status: 200, description: "Authenticated.", type: TokenResponse })
+  @ApiResponse({ status: 401, description: "Unauthorised", type: ErrorResponse })
+  @ApiResponse({ status: 422, description: "Invalid input", type: ErrorResponse })
   async login(@Body() loginRequest: LoginRequest, @Request() req: any, @Res() res: Response): Promise<void> {
     try {
       // Check if this user is throttled after failed login attempts
@@ -191,7 +202,12 @@ export class AuthController {
    * POST /auth/refresh
    */
   @Post("refresh")
+  @ApiTags("Auth")
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Exchange a refresh token for a new token pair" })
+  @ApiResponse({ status: 200, description: "A new token pair.", type: TokenResponse })
+  @ApiResponse({ status: 401, description: "Unauthorised", type: ErrorResponse })
+  @ApiResponse({ status: 422, description: "Invalid input", type: ErrorResponse })
   async refresh(@Body() refreshRequest: RefreshRequest, @Res() res: Response): Promise<void> {
     try {
       const validation = await this.refreshTokenService.validateRefreshToken(refreshRequest.refreshToken);
@@ -261,6 +277,11 @@ export class AuthController {
   @Get("me")
   @UseGuards(BearerGuard)
   @HttpCode(HttpStatus.OK)
+  @ApiTags("Profile")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Get the authenticated user" })
+  @ApiResponse({ status: 200, description: "The authenticated user.", type: UserResponse })
+  @ApiResponse({ status: 401, description: "Unauthorised", type: ErrorResponse })
   async getMe(@CurrentUser() claims: any, @Res() res: Response): Promise<void> {
     try {
       if (!claims) {
