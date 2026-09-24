@@ -19,14 +19,46 @@ export class RefreshTokenService {
     return crypto.randomBytes(32).toString("hex");
   }
 
+  /** bcrypt cost factor for refresh-token hashes. */
+  private readonly BCRYPT_COST = 10;
+
   /**
-   * Hash a refresh token using bcryptjs.
-   * Never store plaintext refresh tokens in the database.
+   * Hash a refresh token using bcrypt (salted, non-deterministic).
+   * Only the hash is ever persisted: read access to the database must not
+   * equal session takeover, so the plaintext token is never stored.
+   *
+   * NOTE: because bcrypt hashes are salted, `hash(token)` returns a different
+   * string every call and MUST NOT be used in a `WHERE token_hash = $1`
+   * lookup. Instead, rows are located with `findRefreshTokenRow`, which loads
+   * candidate rows and uses `bcrypt.compare` against each stored hash.
    * @param token - The plaintext refresh token
-   * @returns The hashed token
+   * @returns The bcrypt hash to store
    */
   async hashRefreshToken(token: string): Promise<string> {
-    return bcrypt.hash(token, 12);
+    return bcrypt.hash(token, this.BCRYPT_COST);
+  }
+
+  /**
+   * Find the stored row matching a presented plaintext refresh token.
+   * Compares the token against each stored bcrypt hash. Revoked and expired
+   * rows are included so callers can distinguish "unknown token" from
+   * "already exchanged (reuse)" and "expired".
+   * @param token - The plaintext refresh token as presented by the client
+   * @returns The matching row, or null if no stored hash matches
+   */
+  private async findRefreshTokenRow(token: string): Promise<any | null> {
+    const result = await this.databaseService.query(
+      `SELECT id, user_id, token_hash, is_revoked, expires_at
+        FROM auth.refresh_tokens`
+    );
+
+    for (const row of result.rows) {
+      if (await bcrypt.compare(token, row.token_hash)) {
+        return row;
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -49,14 +81,23 @@ export class RefreshTokenService {
   }
 
   /**
-   * Revoke a refresh token by marking it as revoked.
-   * @param tokenHash - The hashed refresh token to revoke
-   * @returns Number of rows updated
+   * Revoke the presented refresh token by marking its matched row as revoked.
+   * The row is located via bcrypt.compare (see findRefreshTokenRow) and then
+   * revoked by primary key, since a freshly computed bcrypt hash would never
+   * equal the stored one.
+   * @param token - The plaintext refresh token as presented by the client
+   * @returns Number of rows updated (1 on first exchange, 0 if unknown/already revoked)
    */
-  async revokeRefreshToken(tokenHash: string): Promise<number> {
+  async revokeRefreshToken(token: string): Promise<number> {
+    const row = await this.findRefreshTokenRow(token);
+
+    if (!row || row.is_revoked) {
+      return 0;
+    }
+
     const result = await this.databaseService.query(
-      "UPDATE auth.refresh_tokens SET is_revoked = TRUE WHERE token_hash = $1",
-      [tokenHash]
+      "UPDATE auth.refresh_tokens SET is_revoked = TRUE WHERE id = $1",
+      [row.id]
     );
     return result.rowCount || 0;
   }
@@ -76,31 +117,20 @@ export class RefreshTokenService {
   }
 
   /**
-   * Validate a refresh token by looking it up and checking it exists and isn't revoked.
-   * @param token - The plaintext refresh token
-   * @param tokenHash - The hashed refresh token (pre-computed)
+   * Validate a presented refresh token by matching it against the stored
+   * bcrypt hashes, then checking it isn't revoked or expired.
+   * @param token - The plaintext refresh token as presented by the client
    * @returns Object with valid flag and userId if valid
    */
   async validateRefreshToken(
     token: string,
-    tokenHash?: string,
   ): Promise<{ valid: boolean; userId?: string; error?: string }> {
     try {
-      // If hash not provided, hash the token
-      const hash = tokenHash || (await this.hashRefreshToken(token));
+      const tokenRecord = await this.findRefreshTokenRow(token);
 
-      const result = await this.databaseService.query(
-        `SELECT id, user_id, is_revoked, expires_at 
-         FROM auth.refresh_tokens 
-         WHERE token_hash = $1`,
-        [hash]
-      );
-
-      if (result.rows.length === 0) {
+      if (!tokenRecord) {
         return { valid: false, error: "Refresh token not found" };
       }
-
-      const tokenRecord = result.rows[0];
 
       // Check if token is revoked
       if (tokenRecord.is_revoked) {

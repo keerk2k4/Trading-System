@@ -18,6 +18,15 @@ export class BearerGuard implements CanActivate {
 
     const token = authHeader.substring(7); // Remove "Bearer " prefix
 
+    if (!token) {
+      throw new UnauthorizedException({
+        errorCode: "AUTH-401",
+        message: "Unauthorised",
+      });
+    }
+
+    // verifyAccessToken checks the signature FIRST (HS256 + JWT_SECRET),
+    // then expiry and issuer. No claim is trusted before verification.
     const result = this.tokenService.verifyAccessToken(token);
 
     if (!result.valid) {

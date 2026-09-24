@@ -17,6 +17,7 @@ import { UserResponse } from "../dtos/UserResponse";
 import { TokenResponse } from "../dtos/TokenResponse";
 import { ErrorResponse } from "../dtos/ErrorResponse";
 import { BearerGuard } from "../guards/BearerGuard";
+import { CurrentUser } from "../guards/CurrentUser";
 import { TokenService } from "../services/TokenService";
 import { PasswordService } from "../services/PasswordService";
 import { RefreshTokenService } from "../services/RefreshTokenService";
@@ -204,8 +205,9 @@ export class AuthController {
 
       const userId = validation.userId!;
 
-      const tokenHash = await this.refreshTokenService.hashRefreshToken(refreshRequest.refreshToken);
-      await this.refreshTokenService.revokeRefreshToken(tokenHash);
+      // Revoke the presented token (matched via bcrypt.compare inside the
+      // service, then revoked by id) so it cannot be exchanged twice.
+      await this.refreshTokenService.revokeRefreshToken(refreshRequest.refreshToken);
 
       const user = await this.userRepository.findByUserId(userId);
       if (!user) {
@@ -257,10 +259,8 @@ export class AuthController {
   @Get("me")
   @UseGuards(BearerGuard)
   @HttpCode(HttpStatus.OK)
-  async getMe(@Request() req: any, @Res() res: Response): Promise<void> {
+  async getMe(@CurrentUser() claims: any, @Res() res: Response): Promise<void> {
     try {
-      const claims = req.user;
-
       if (!claims) {
         const response: ErrorResponse = {
           errorCode: "AUTH-401",
