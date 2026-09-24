@@ -73,7 +73,14 @@ export class AuthController {
 
       // Auto-create the trading account, per the team's chosen design --
       // this is a deliberate, documented tradeoff (see security review).
-      await this.tradeApiClient.createAccount(user.userId);
+      try {
+        await this.tradeApiClient.createAccount(user.userId);
+      } catch (accountError) {
+        // Account creation failed -- clean up the user we just saved, so we
+        // never leave a "ghost" user with no matching account behind.
+        await this.userRepository.deleteById(user.userId);
+        throw accountError;
+      }
 
       const response: UserResponse = {
         id: user.userId,

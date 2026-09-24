@@ -79,4 +79,11 @@ export class UserRepository {
       status: row.status,
     };
   }
+
+  async deleteById(userId: string): Promise<void> {
+  await this.databaseService.query(
+    `DELETE FROM auth.users WHERE user_id = $1`,
+    [userId]
+  );
+  }
 }
