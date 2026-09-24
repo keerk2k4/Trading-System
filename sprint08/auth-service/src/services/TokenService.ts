@@ -19,7 +19,7 @@ interface VerifyResult {
 @Injectable()
 export class TokenService {
   private readonly SECRET = process.env.JWT_SECRET!;
-  private readonly ISSUER = process.env.JWT_ISSUER!;
+  private readonly ISSUER = process.env.JWT_ISSUER || "auth-service";
   private readonly ACCESS_TOKEN_EXPIRY = parseInt(process.env.JWT_ACCESS_TOKEN_EXPIRY_SECONDS || "900", 10); // 15 minutes
   private readonly REFRESH_TOKEN_EXPIRY = parseInt(process.env.JWT_REFRESH_TOKEN_EXPIRY_SECONDS || "604800", 10); // 7 days
 

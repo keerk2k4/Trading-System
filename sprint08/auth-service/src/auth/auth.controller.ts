@@ -22,6 +22,7 @@ import { PasswordService } from "../services/PasswordService";
 import { RefreshTokenService } from "../services/RefreshTokenService";
 import { TradeApiClient } from "../services/TradeApiClient";
 import { UserRepository } from "../repositories/UserRepository";
+import { ThrottleService } from "../services/ThrottleService";
 
 @Controller("auth")
 export class AuthController {
@@ -31,6 +32,7 @@ export class AuthController {
     private refreshTokenService: RefreshTokenService,
     private tradeApiClient: TradeApiClient,
     private userRepository: UserRepository,
+    private throttleService: ThrottleService,
   ) {}
 
   /**
@@ -93,11 +95,25 @@ export class AuthController {
 
   /**
    * POST /auth/login
+   *
+   * Authenticates a user with username and password.
+   * Returns an access token and refresh token on success.
+   * Implements uniform failure response and login throttle for security.
    */
   @Post("login")
   @HttpCode(HttpStatus.OK)
-  async login(@Body() loginRequest: LoginRequest, @Res() res: Response): Promise<void> {
+  async login(@Body() loginRequest: LoginRequest, @Request() req: any, @Res() res: Response): Promise<void> {
     try {
+      // Check if this user is throttled after failed login attempts
+      if (this.throttleService.isThrottled(loginRequest.username)) {
+        const response: ErrorResponse = {
+          errorCode: "AUTH-401",
+          message: "Unauthorised",
+        };
+        res.status(401).json(response);
+        return;
+      }
+
       const user = await this.userRepository.findByUsername(loginRequest.username);
 
       let passwordValid = false;
@@ -109,6 +125,9 @@ export class AuthController {
       }
 
       if (!user || !passwordValid) {
+        // Record failed attempt for throttle tracking
+        this.throttleService.recordFailedAttempt(loginRequest.username);
+
         const response: ErrorResponse = {
           errorCode: "AUTH-401",
           message: "Unauthorised",
@@ -120,6 +139,9 @@ export class AuthController {
       // Fetch the real, current account for this user from Trade API.
       const account = await this.tradeApiClient.getAccountByUserId(user.userId);
       if (!account) {
+        // Record failed attempt for throttle tracking
+        this.throttleService.recordFailedAttempt(loginRequest.username);
+
         const response: ErrorResponse = {
           errorCode: "AUTH-401",
           message: "Unauthorised",
@@ -133,6 +155,9 @@ export class AuthController {
       const refreshToken = this.refreshTokenService.generateRefreshToken();
       const tokenHash = await this.refreshTokenService.hashRefreshToken(refreshToken);
       await this.refreshTokenService.storeRefreshToken(user.userId, tokenHash);
+
+      // Reset throttle on successful login
+      this.throttleService.resetThrottle(loginRequest.username);
 
       const response: TokenResponse = {
         accessToken,

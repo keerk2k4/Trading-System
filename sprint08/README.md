@@ -198,7 +198,25 @@ failed logins from one address collides with a login throttle, so build the
 throttle and know its cooldown window, and run the comparison outside it. A
 throttle limits how fast an attacker can use an oracle you left open, and does
 not close it.
+## Login Throttle
 
+A login throttle is implemented to prevent unlimited rapid authentication attempts
+from a single client.
+
+**Configuration:**
+- **Maximum attempts:** 5 failed attempts
+- **Cooldown duration:** 900 seconds (15 minutes)
+- **Reset interval:** 3600 seconds (1 hour) — if no attempts occur within this window, the counter resets
+- **Tracking:** Failed attempts are tracked per client IP address
+- **Failed attempt:** Any login that returns AUTH-401 (unknown user, wrong password, or account lookup failure) counts as one failed attempt
+- **Reset behavior:** A successful login resets the counter for that client immediately
+
+**Behavior:**
+When a client IP reaches 5 failed attempts within the reset interval, further login
+attempts from that IP return `AUTH-401` immediately for the duration of the cooldown
+window. No password verification or database lookup occurs during the cooldown.
+The throttle applies uniformly without revealing whether the username or password was
+the issue, maintaining the uniform failure semantics.
 ## Integrating the auth service
 
 The acceptance statement is that the Trade REST API needs no code change. Not a
