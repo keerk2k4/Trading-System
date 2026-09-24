@@ -7,13 +7,13 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     this.pool = new Pool({
-      connectionString: process.env.DB_URL || "postgresql://postgres:postgres@localhost:5432/trading_system",
+      connectionString: process.env.AUTH_DB_URL
     });
 
     this.pool.on("error", (err) => {
       console.error("Unexpected error on idle client", err);
     });
-
+    console.log(process.env.DB_URL);
     console.log("Database pool initialized successfully");
   }
 
