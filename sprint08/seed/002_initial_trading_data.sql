@@ -651,5 +651,10 @@ INSERT INTO trading.watchlist_inst (
 (6, 5),
 (6, 8);
 
+SELECT setval(
+    'trading.trading_accounts_id_seq',
+    COALESCE((SELECT MAX(trading_account_id) FROM trading.trading_accounts), 0) + 1,
+    false
+);
 
 COMMIT;
