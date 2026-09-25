@@ -148,6 +148,16 @@ export class AuthController {
         return;
       }
 
+      // Do not issue or rotate any credentials for a non-active trading account.
+      if (account.accountStatus?.trim().toUpperCase() == "SUSPENDED") {
+        const response: ErrorResponse = {
+          errorCode: "ACC-403",
+          message: "You are blocked from using this service.",
+        };
+        res.status(403).json(response);
+        return;
+      }
+
       const accessToken = this.tokenService.createAccessToken(user.userId, account.accountId, ["CUSTOMER"]);
 
       
