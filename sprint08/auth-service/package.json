@@ -8,7 +8,8 @@
     "dev": "nest start --watch",
     "build": "nest build",
     "start": "node dist/main",
-    "test": "jest"
+    "test": "jest",
+    "test:coverage": "jest --coverage --runInBand"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",
