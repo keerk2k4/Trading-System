@@ -92,7 +92,7 @@ public class JwtTokenProvider {
                 return null;
             }
             
-        } catch (SecurityException e) {
+        } catch (io.jsonwebtoken.security.SecurityException e) {
             LOGGER.warn("Invalid JWT signature: {}", e.getMessage());
             return null;
         } catch (MalformedJwtException e) {

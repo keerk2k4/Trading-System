@@ -81,7 +81,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } catch (UnauthorisedException ex) {
             // Handle auth failure by writing JSON error response
             // Must catch here because filters don't go through @ControllerAdvice
-            sendErrorResponse(response, 401, "AUTH-401", "Invalid or missing token");
+            sendErrorResponse(response, 401, "AUTH-401", "Unauthorised");
         }
     }
     
@@ -95,7 +95,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         
         Map<String, String> errorMap = new HashMap<>();
-        errorMap.put("code", code);
+        errorMap.put("errorCode", code);
         errorMap.put("message", message);
         
         ObjectMapper objectMapper = new ObjectMapper();
