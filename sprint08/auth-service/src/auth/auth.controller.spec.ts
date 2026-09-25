@@ -322,6 +322,30 @@ describe("AuthController", () => {
       expect(refreshTokenService.storeRefreshToken).not.toHaveBeenCalled();
     });
 
+    it("rejects a suspended account without issuing or rotating tokens", async () => {
+      tradeApiClient.getAccountByUserId.mockResolvedValue({
+        ...account,
+        accountStatus: "SUSPENDED",
+      });
+      const { res, state } = makeResponse();
+
+      await controller.login(loginRequest(), {} as any, res);
+
+      expect(state).toEqual({
+        status: 403,
+        body: {
+          errorCode: "ACC-403",
+          message: "You are blocked from using this service.",
+        },
+      });
+      expect(tokenService.createAccessToken).not.toHaveBeenCalled();
+      expect(refreshTokenService.revokeAllRefreshTokensForUser).not.toHaveBeenCalled();
+      expect(refreshTokenService.generateRefreshToken).not.toHaveBeenCalled();
+      expect(refreshTokenService.hashRefreshToken).not.toHaveBeenCalled();
+      expect(refreshTokenService.storeRefreshToken).not.toHaveBeenCalled();
+      expect(throttleService.resetThrottle).not.toHaveBeenCalled();
+    });
+
     it("maps unexpected dependency errors to the uniform 401 response", async () => {
       const lookupError = new Error("database unavailable");
       userRepository.findByUsername.mockRejectedValue(lookupError);
