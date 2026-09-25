@@ -7,20 +7,13 @@ interface ThrottleEntry {
 }
 
 @Injectable()
-export class ThrottleService {
-  // Configuration
+export class ThrottleService {  
   private readonly MAX_ATTEMPTS = 5; // Maximum failed attempts before throttle
   private readonly COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes cooldown
   private readonly RESET_INTERVAL_MS = 60 * 60 * 1000; // 1 hour - reset counter if no attempts
 
-  // In-memory storage of throttle state per username
   private throttleMap = new Map<string, ThrottleEntry>();
 
-  /**
-   * Check if a user is currently throttled after failed login attempts.
-   * @param username - The username
-   * @returns true if throttled, false if not
-   */
   isThrottled(username: string): boolean {
     const entry = this.throttleMap.get(username);
 

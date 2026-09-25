@@ -11,41 +11,18 @@ export class RefreshTokenService {
     private tokenService: TokenService,
   ) {}
 
-  /**
-   * Generate a new refresh token (opaque random string).
-   * @returns Random token string (64 hex characters)
-   */
   generateRefreshToken(): string {
     return crypto.randomBytes(32).toString("hex");
   }
 
-  /** bcrypt cost factor for refresh-token hashes. */
   private readonly BCRYPT_COST = 10;
 
-  /**
-   * Hash a refresh token using bcrypt (salted, non-deterministic).
-   * Only the hash is ever persisted: read access to the database must not
-   * equal session takeover, so the plaintext token is never stored.
-   *
-   * NOTE: because bcrypt hashes are salted, `hash(token)` returns a different
-   * string every call and MUST NOT be used in a `WHERE token_hash = $1`
-   * lookup. Instead, rows are located with `findRefreshTokenRow`, which loads
-   * candidate rows and uses `bcrypt.compare` against each stored hash.
-   * @param token - The plaintext refresh token
-   * @returns The bcrypt hash to store
-   */
   async hashRefreshToken(token: string): Promise<string> {
     return bcrypt.hash(token, this.BCRYPT_COST);
   }
 
-  /**
-   * Find the stored row matching a presented plaintext refresh token.
-   * Compares the token against each stored bcrypt hash. Revoked and expired
-   * rows are included so callers can distinguish "unknown token" from
-   * "already exchanged (reuse)" and "expired".
-   * @param token - The plaintext refresh token as presented by the client
-   * @returns The matching row, or null if no stored hash matches
-   */
+
+  // Better query?
   private async findRefreshTokenRow(token: string): Promise<any | null> {
     const result = await this.databaseService.query(
       `SELECT id, user_id, token_hash, is_revoked, expires_at
@@ -61,12 +38,6 @@ export class RefreshTokenService {
     return null;
   }
 
-  /**
-   * Store a refresh token in the database.
-   * @param userId - The user UUID
-   * @param tokenHash - The hashed refresh token
-   * @returns The stored token record
-   */
   async storeRefreshToken(userId: string, tokenHash: string): Promise<{ id: number; expiresAt: Date }> {
     const expiresAt = new Date(Date.now() + this.tokenService.getRefreshTokenExpiry() * 1000);
 
@@ -80,14 +51,6 @@ export class RefreshTokenService {
     return result.rows[0];
   }
 
-  /**
-   * Revoke the presented refresh token by marking its matched row as revoked.
-   * The row is located via bcrypt.compare (see findRefreshTokenRow) and then
-   * revoked by primary key, since a freshly computed bcrypt hash would never
-   * equal the stored one.
-   * @param token - The plaintext refresh token as presented by the client
-   * @returns Number of rows updated (1 on first exchange, 0 if unknown/already revoked)
-   */
   async revokeRefreshToken(token: string): Promise<number> {
     const row = await this.findRefreshTokenRow(token);
 
@@ -102,12 +65,6 @@ export class RefreshTokenService {
     return result.rowCount || 0;
   }
 
-  /**
-   * Revoke all refresh tokens for a user.
-   * Used when theft is detected (token presented twice).
-   * @param userId - The user UUID
-   * @returns Number of rows updated
-   */
   async revokeAllRefreshTokensForUser(userId: string): Promise<number> {
     const result = await this.databaseService.query(
       "UPDATE auth.refresh_tokens SET is_revoked = TRUE WHERE user_id = $1",
@@ -116,12 +73,6 @@ export class RefreshTokenService {
     return result.rowCount || 0;
   }
 
-  /**
-   * Validate a presented refresh token by matching it against the stored
-   * bcrypt hashes, then checking it isn't revoked or expired.
-   * @param token - The plaintext refresh token as presented by the client
-   * @returns Object with valid flag and userId if valid
-   */
   async validateRefreshToken(
     token: string,
   ): Promise<{ valid: boolean; userId?: string; error?: string }> {
@@ -150,12 +101,7 @@ export class RefreshTokenService {
     }
   }
 
-  /**
-   * Get the most recent refresh token hash for a user.
-   * Used to identify which token to revoke during rotation.
-   * @param userId - The user UUID
-   * @returns The token hash or null if no active token
-   */
+  // could have multiple refresh tokens 
   async getActiveRefreshTokenForUser(userId: string): Promise<string | null> {
     const result = await this.databaseService.query(
       `SELECT token_hash FROM auth.refresh_tokens 

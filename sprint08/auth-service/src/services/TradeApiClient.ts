@@ -7,19 +7,11 @@ export interface TradeAccountResponse {
   accountStatus: string;
 }
 
-/**
- * The only place in this service that talks to Trade REST API's internal
- * account endpoints. Every other part of the codebase goes through this
- * client, never building the HTTP call itself.
- */
 @Injectable()
 export class TradeApiClient {
-  private readonly baseUrl = process.env.TRADE_API_URL || "http://localhost:8080";
+  private readonly baseUrl = process.env.TRADE_API_URL;
 
-  /**
-   * Called once, during registration. Creates a brand new trading account
-   * for this user, starting at balance 0 and status ACTIVE.
-   */
+  // pass a token for auth service verificiation
   async createAccount(userId: string): Promise<TradeAccountResponse> {
     const response = await fetch(`${this.baseUrl}/internal/accounts`, {
       method: "POST",
@@ -37,10 +29,6 @@ export class TradeApiClient {
     return response.json() as Promise<TradeAccountResponse>;
   }
 
-  /**
-   * Called on every login and refresh. Fetches the real, current account
-   * for this user -- never cached, always read fresh from Trade API.
-   */
   async getAccountByUserId(userId: string): Promise<TradeAccountResponse | null> {
     const response = await fetch(`${this.baseUrl}/internal/accounts/by-user/${userId}`);
 

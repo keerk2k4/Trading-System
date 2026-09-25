@@ -23,13 +23,6 @@ export class TokenService {
   private readonly ACCESS_TOKEN_EXPIRY = parseInt(process.env.JWT_ACCESS_TOKEN_EXPIRY_SECONDS || "900", 10); // 15 minutes
   private readonly REFRESH_TOKEN_EXPIRY = parseInt(process.env.JWT_REFRESH_TOKEN_EXPIRY_SECONDS || "604800", 10); // 7 days
 
-  /**
-   * Create an access token with the specified claims.
-   * @param sub - User UUID identifier
-   * @param accountId - Trading account ID
-   * @param roles - Array of roles (e.g., ["CUSTOMER"])
-   * @returns Signed JWT token
-   */
   createAccessToken(sub: string, accountId: number, roles: string[]): string {
     const now = Math.floor(Date.now() / 1000);
     const payload: TokenPayload = {
@@ -44,12 +37,6 @@ export class TokenService {
     return jwt.sign(payload, this.SECRET, { algorithm: "HS256" });
   }
 
-  /**
-   * Verify an access token and return its payload.
-   * Validates signature, expiry, and issuer.
-   * @param token - The JWT token to verify
-   * @returns Object with valid flag and payload (if valid) or error (if invalid)
-   */
   verifyAccessToken(token: string): VerifyResult {
     try {
       const payload = jwt.verify(token, this.SECRET, {
@@ -64,11 +51,6 @@ export class TokenService {
     }
   }
 
-  /**
-   * Decode a token without verification (unsafe, for inspection only).
-   * @param token - The JWT token to decode
-   * @returns Decoded payload or null if invalid
-   */
   decodeToken(token: string): TokenPayload | null {
     try {
       const decoded = jwt.decode(token) as TokenPayload | null;
@@ -78,18 +60,10 @@ export class TokenService {
     }
   }
 
-  /**
-   * Get the access token expiry time in seconds.
-   * @returns Expiry time in seconds
-   */
   getAccessTokenExpiry(): number {
     return this.ACCESS_TOKEN_EXPIRY;
   }
 
-  /**
-   * Get the refresh token expiry time in seconds.
-   * @returns Expiry time in seconds
-   */
   getRefreshTokenExpiry(): number {
     return this.REFRESH_TOKEN_EXPIRY;
   }
