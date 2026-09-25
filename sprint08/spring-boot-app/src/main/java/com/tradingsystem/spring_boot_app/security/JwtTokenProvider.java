@@ -109,4 +109,69 @@ public class JwtTokenProvider {
             return null;
         }
     }
+    
+    /**
+     * Validates an internal service token.
+     * Internal tokens are used for service-to-service communication (Auth Service → Trade API).
+     * 
+     * Validation order:
+     * 1. Verify signature using the secret key
+     * 2. Verify token has not expired
+     * 3. Verify algorithm is HS256
+     * 4. Verify service claim is "auth-service"
+     * 
+     * @param token The JWT token string (without "Bearer " prefix)
+     * @return true if token is valid, false otherwise
+     */
+    public boolean validateInternalServiceToken(String token) {
+        try {
+            // Parse and verify signature (step 1)
+            Jws<Claims> jws = Jwts.parser()
+                    .verifyWith(secretKey)
+                    .build()
+                    .parseSignedClaims(token);
+            
+            Claims claims = jws.getBody();
+            
+            // Verify expiration (step 2)
+            Date expirationDate = claims.getExpiration();
+            if (expirationDate != null && expirationDate.before(new Date())) {
+                LOGGER.warn("Internal token is expired: {}", expirationDate);
+                return false;
+            }
+            
+            // Verify algorithm (step 3)
+            String algorithm = jws.getHeader().getAlgorithm();
+            if (!ALGORITHM.equals(algorithm)) {
+                LOGGER.warn("Internal token uses wrong algorithm: {} (expected {})", algorithm, ALGORITHM);
+                return false;
+            }
+            
+            // Verify service claim (step 4)
+            String service = claims.get("service", String.class);
+            if (!"auth-service".equals(service)) {
+                LOGGER.warn("Internal token has wrong service: {} (expected 'auth-service')", service);
+                return false;
+            }
+            
+            LOGGER.info("Internal service token validated successfully for service: {}", service);
+            return true;
+            
+        } catch (io.jsonwebtoken.security.SecurityException e) {
+            LOGGER.warn("Invalid internal token signature: {}", e.getMessage());
+            return false;
+        } catch (MalformedJwtException e) {
+            LOGGER.warn("Invalid internal token format: {}", e.getMessage());
+            return false;
+        } catch (ExpiredJwtException e) {
+            LOGGER.warn("Expired internal token");
+            return false;
+        } catch (UnsupportedJwtException e) {
+            LOGGER.warn("Unsupported internal token: {}", e.getMessage());
+            return false;
+        } catch (IllegalArgumentException e) {
+            LOGGER.warn("Internal token claims string is empty: {}", e.getMessage());
+            return false;
+        }
+    }
 }
