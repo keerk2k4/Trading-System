@@ -16,12 +16,21 @@ interface VerifyResult {
   error?: string;
 }
 
+interface InternalServiceTokenPayload {
+  service: string;
+  scope: string;
+  iat: number;
+  exp: number;
+  iss: string;
+}
+
 @Injectable()
 export class TokenService {
   private readonly SECRET = process.env.JWT_SECRET!;
   private readonly ISSUER = process.env.JWT_ISSUER || "auth-service";
   private readonly ACCESS_TOKEN_EXPIRY = parseInt(process.env.JWT_ACCESS_TOKEN_EXPIRY_SECONDS || "900", 10); // 15 minutes
   private readonly REFRESH_TOKEN_EXPIRY = parseInt(process.env.JWT_REFRESH_TOKEN_EXPIRY_SECONDS || "604800", 10); // 7 days
+  private readonly INTERNAL_ACCESS_TOKEN_EXPIRY = parseInt(process.env.JWT_INTERNAL_ACCESS_TOKEN_EXPIRY_SECONDS || "60", 10); // 1 minute
 
   createAccessToken(sub: string, accountId: number, roles: string[]): string {
     const now = Math.floor(Date.now() / 1000);
@@ -33,6 +42,27 @@ export class TokenService {
       exp: now + this.ACCESS_TOKEN_EXPIRY,
       iss: this.ISSUER,
     };
+
+    return jwt.sign(payload, this.SECRET, { algorithm: "HS256" });
+  }
+
+  createInternalAccessToken(): string {
+    const now = Math.floor(Date.now() / 1000);
+    const payload: InternalServiceTokenPayload = {
+      service: "auth-service",
+      scope: "trade-internal",
+      iat: now,
+      exp: now + this.INTERNAL_ACCESS_TOKEN_EXPIRY,
+      iss: this.ISSUER,
+    };
+
+    console.log("[TokenService] Creating internal access token", {
+      service: payload.service,
+      scope: payload.scope,
+      iss: payload.iss,
+      exp: payload.exp,
+      iat: payload.iat,
+    });
 
     return jwt.sign(payload, this.SECRET, { algorithm: "HS256" });
   }

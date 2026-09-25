@@ -1,4 +1,5 @@
 import { Injectable, HttpException, HttpStatus } from "@nestjs/common";
+import { TokenService } from "./TokenService";
 
 export interface TradeAccountResponse {
   accountId: number;
@@ -11,11 +12,26 @@ export interface TradeAccountResponse {
 export class TradeApiClient {
   private readonly baseUrl = process.env.TRADE_API_URL;
 
+  constructor(private tokenService: TokenService) {}
+
   // pass a token for auth service verificiation
   async createAccount(userId: string): Promise<TradeAccountResponse> {
-    const response = await fetch(`${this.baseUrl}/internal/accounts`, {
+    const internalAccessToken = this.tokenService.createInternalAccessToken();
+    const endpoint = `${this.baseUrl}/internal/accounts`;
+
+    console.log("[TradeApiClient] Calling createAccount", {
+      endpoint,
+      userId,
+      authScheme: "Bearer",
+      tokenPrefix: internalAccessToken.slice(0, 16),
+    });
+
+    const response = await fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${internalAccessToken}`,
+      },
       body: JSON.stringify({ userId }),
     });
 
@@ -30,7 +46,21 @@ export class TradeApiClient {
   }
 
   async getAccountByUserId(userId: string): Promise<TradeAccountResponse | null> {
-    const response = await fetch(`${this.baseUrl}/internal/accounts/by-user/${userId}`);
+    const internalAccessToken = this.tokenService.createInternalAccessToken();
+    const endpoint = `${this.baseUrl}/internal/accounts/by-user/${userId}`;
+
+    console.log("[TradeApiClient] Calling getAccountByUserId", {
+      endpoint,
+      userId,
+      authScheme: "Bearer",
+      tokenPrefix: internalAccessToken.slice(0, 16),
+    });
+
+    const response = await fetch(endpoint, {
+      headers: {
+        Authorization: `Bearer ${internalAccessToken}`,
+      },
+    });
 
     if (response.status === 404) {
       return null;
