@@ -1,10 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.service";
 import { User } from "../entities/User";
+import { EmailEncryptionService } from "../services/EmailEncryptionService";
 
 @Injectable()
 export class UserRepository {
-  constructor(private databaseService: DatabaseService) {}
+  constructor(
+    private databaseService: DatabaseService,
+    private emailEncryptionService: EmailEncryptionService,
+  ) {}
 
   async findByUsername(userName: string): Promise<User | null> {
     const result = await this.databaseService.query("SELECT * FROM auth.users WHERE user_name = $1", [userName]);
@@ -27,11 +31,13 @@ export class UserRepository {
   }
 
   async create(user: Omit<User, "userId">): Promise<User> {
+    // Email is PII: store only AES-256-GCM ciphertext, never plaintext.
+    const encryptedEmail = this.emailEncryptionService.encrypt(user.email);
     const result = await this.databaseService.query(
       `INSERT INTO auth.users (user_name, password_hash, email, phone, first_name, last_name, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [user.userName, user.passwordHash, user.email, user.phone, user.firstName, user.lastName, user.status]
+      [user.userName, user.passwordHash, encryptedEmail, user.phone, user.firstName, user.lastName, user.status]
     );
 
     return this.mapRowToUser(result.rows[0]);
@@ -47,7 +53,9 @@ export class UserRepository {
       userId: row.user_id,
       userName: row.user_name,
       passwordHash: row.password_hash,
-      email: row.email,
+      // Decrypt on read so the domain layer always sees plaintext.
+      // Plaintext legacy rows (pre-encryption) pass through unchanged.
+      email: (this.emailEncryptionService.decrypt(row.email) as string) ?? row.email,
       phone: row.phone || null,
       firstName: row.first_name,
       lastName: row.last_name,
