@@ -6,14 +6,15 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   private pool!: Pool;
 
   async onModuleInit() {
-    this.pool = new Pool({
-      connectionString: process.env.AUTH_DB_URL
-    });
+    const connectionString =
+      process.env.AUTH_DB_URL ||
+      process.env.DB_URL;
+
+    this.pool = new Pool({ connectionString });
 
     this.pool.on("error", (err) => {
       console.error("Unexpected error on idle client", err);
     });
-    console.log(process.env.DB_URL);
     console.log("Database pool initialized successfully");
   }
 

@@ -1,0 +1,417 @@
+import { AuthController } from "./auth.controller";
+import { Role } from "../dtos/RegisterRequest";
+import { LoginRequest } from "../dtos/LoginRequest";
+import { RegisterRequest } from "../dtos/RegisterRequest";
+import { TokenService } from "../services/TokenService";
+import { PasswordService } from "../services/PasswordService";
+import { RefreshTokenService } from "../services/RefreshTokenService";
+import { TradeApiClient } from "../services/TradeApiClient";
+import { UserRepository } from "../repositories/UserRepository";
+import { ThrottleService } from "../services/ThrottleService";
+import { User } from "../entities/User";
+
+const USER_ID = "11111111-2222-4333-8444-555555555555";
+const ACCOUNT_ID = 73;
+
+const user: User = {
+  userId: USER_ID,
+  userName: "alice.trader",
+  passwordHash: "stored-password-hash",
+  email: "alice.trader@placeholder.local",
+  phone: null,
+  firstName: "Alice",
+  lastName: "Trader",
+  status: "ACTIVE",
+};
+
+const account = {
+  accountId: ACCOUNT_ID,
+  accountNumber: "ACC-73",
+  availableBalance: "0.00",
+  accountStatus: "ACTIVE",
+};
+
+const errorResponse = {
+  errorCode: "AUTH-401",
+  message: "Unauthorised",
+};
+
+function makeResponse() {
+  const state: { status?: number; body?: any } = {};
+  const res: any = {
+    status: jest.fn((code: number) => {
+      state.status = code;
+      return res;
+    }),
+    json: jest.fn((body: any) => {
+      state.body = body;
+      return res;
+    }),
+  };
+  return { res, state };
+}
+
+function registerRequest(overrides: Partial<RegisterRequest> = {}): RegisterRequest {
+  return {
+    username: "new.trader",
+    password: "correct horse battery staple",
+    ...overrides,
+  };
+}
+
+function loginRequest(overrides: Partial<LoginRequest> = {}): LoginRequest {
+  return {
+    username: user.userName,
+    password: "correct horse battery staple",
+    ...overrides,
+  };
+}
+
+describe("AuthController", () => {
+  let controller: AuthController;
+  let tokenService: any;
+  let passwordService: any;
+  let refreshTokenService: any;
+  let tradeApiClient: any;
+  let userRepository: any;
+  let throttleService: any;
+
+  beforeEach(() => {
+    tokenService = {
+      createAccessToken: jest.fn(),
+      getAccessTokenExpiry: jest.fn().mockReturnValue(900),
+    };
+    passwordService = {
+      hashPassword: jest.fn(),
+      verifyPassword: jest.fn(),
+      getDummyHash: jest.fn(),
+    };
+    refreshTokenService = {
+      generateRefreshToken: jest.fn(),
+      hashRefreshToken: jest.fn(),
+      storeRefreshToken: jest.fn(),
+      revokeAllRefreshTokensForUser: jest.fn(),
+    };
+    tradeApiClient = {
+      createAccount: jest.fn(),
+      getAccountByUserId: jest.fn(),
+    };
+    userRepository = {
+      isUsernameTaken: jest.fn(),
+      create: jest.fn(),
+      deleteById: jest.fn(),
+      findByUsername: jest.fn(),
+      findByUserId: jest.fn(),
+    };
+    throttleService = {
+      isThrottled: jest.fn().mockReturnValue(false),
+      recordFailedAttempt: jest.fn(),
+      resetThrottle: jest.fn(),
+    };
+
+    controller = new AuthController(
+      tokenService,
+      passwordService,
+      refreshTokenService,
+      tradeApiClient,
+      userRepository,
+      throttleService,
+    );
+    jest.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  describe("register", () => {
+    it("creates the auth user and linked trade account, ignoring self-declared roles", async () => {
+      userRepository.isUsernameTaken.mockResolvedValue(false);
+      passwordService.hashPassword.mockResolvedValue("hashed-password");
+      userRepository.create.mockResolvedValue(user);
+      tradeApiClient.createAccount.mockResolvedValue(account);
+      const { res, state } = makeResponse();
+
+      await controller.register(registerRequest({ roles: [Role.ADMIN] }), res);
+
+      expect(state).toEqual({
+        status: 201,
+        body: {
+          id: USER_ID,
+          username: user.userName,
+          accountId: ACCOUNT_ID,
+          roles: [Role.CUSTOMER],
+        },
+      });
+      expect(userRepository.isUsernameTaken).toHaveBeenCalledWith("new.trader");
+      expect(passwordService.hashPassword).toHaveBeenCalledWith("correct horse battery staple");
+      expect(userRepository.create).toHaveBeenCalledWith({
+        userName: "new.trader",
+        passwordHash: "hashed-password",
+        email: "new.trader@placeholder.local",
+        phone: null,
+        firstName: "",
+        lastName: "",
+        status: "ACTIVE",
+      });
+      expect(tradeApiClient.createAccount).toHaveBeenCalledWith(USER_ID);
+    });
+
+    it("defaults omitted roles to CUSTOMER", async () => {
+      userRepository.isUsernameTaken.mockResolvedValue(false);
+      passwordService.hashPassword.mockResolvedValue("hashed-password");
+      userRepository.create.mockResolvedValue(user);
+      tradeApiClient.createAccount.mockResolvedValue(account);
+      const { res, state } = makeResponse();
+
+      await controller.register(registerRequest(), res);
+
+      expect(state.status).toBe(201);
+      expect(state.body.roles).toEqual([Role.CUSTOMER]);
+    });
+
+    it("returns 409 and does not hash or create anything for a taken username", async () => {
+      userRepository.isUsernameTaken.mockResolvedValue(true);
+      const { res, state } = makeResponse();
+
+      await controller.register(registerRequest(), res);
+
+      expect(state).toEqual({
+        status: 409,
+        body: {
+          errorCode: "AUTH-409",
+          message: "Username already registered",
+        },
+      });
+      expect(passwordService.hashPassword).not.toHaveBeenCalled();
+      expect(userRepository.create).not.toHaveBeenCalled();
+      expect(tradeApiClient.createAccount).not.toHaveBeenCalled();
+    });
+
+    it("deletes a newly created user when Trade API account creation fails", async () => {
+      const tradeError = new Error("account service unavailable");
+      userRepository.isUsernameTaken.mockResolvedValue(false);
+      passwordService.hashPassword.mockResolvedValue("hashed-password");
+      userRepository.create.mockResolvedValue(user);
+      tradeApiClient.createAccount.mockRejectedValue(tradeError);
+      const { res, state } = makeResponse();
+
+      await controller.register(registerRequest(), res);
+
+      expect(state).toEqual({
+        status: 422,
+        body: {
+          errorCode: "VAL-422",
+          message: "Invalid input",
+        },
+      });
+      expect(userRepository.deleteById).toHaveBeenCalledWith(USER_ID);
+    });
+
+    it("maps a hashing failure to 422 without attempting database creation", async () => {
+      const hashError = new Error("hash failure");
+      userRepository.isUsernameTaken.mockResolvedValue(false);
+      passwordService.hashPassword.mockRejectedValue(hashError);
+      const { res, state } = makeResponse();
+
+      await controller.register(registerRequest(), res);
+
+      expect(state).toEqual({
+        status: 422,
+        body: {
+          errorCode: "VAL-422",
+          message: "Invalid input",
+        },
+      });
+      expect(userRepository.create).not.toHaveBeenCalled();
+      expect(tradeApiClient.createAccount).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("login", () => {
+    beforeEach(() => {
+      userRepository.findByUsername.mockResolvedValue(user);
+      passwordService.verifyPassword.mockResolvedValue(true);
+      tradeApiClient.getAccountByUserId.mockResolvedValue(account);
+    });
+
+    it("returns an access/refresh token pair for valid credentials", async () => {
+      tokenService.createAccessToken.mockReturnValue("access-token");
+      refreshTokenService.generateRefreshToken.mockReturnValue("refresh-token");
+      refreshTokenService.hashRefreshToken.mockResolvedValue("hashed-refresh-token");
+      refreshTokenService.storeRefreshToken.mockResolvedValue({ id: 1, expiresAt: new Date() });
+      const { res, state } = makeResponse();
+
+      await controller.login(loginRequest(), {} as any, res);
+
+      expect(state).toEqual({
+        status: 200,
+        body: {
+          accessToken: "access-token",
+          refreshToken: "refresh-token",
+          tokenType: "Bearer",
+          expiresIn: 900,
+        },
+      });
+      expect(userRepository.findByUsername).toHaveBeenCalledWith(user.userName);
+      expect(passwordService.verifyPassword).toHaveBeenCalledWith(
+        "correct horse battery staple",
+        user.passwordHash,
+      );
+      expect(tradeApiClient.getAccountByUserId).toHaveBeenCalledWith(USER_ID);
+      expect(tokenService.createAccessToken).toHaveBeenCalledWith(USER_ID, ACCOUNT_ID, [Role.CUSTOMER]);
+      expect(refreshTokenService.hashRefreshToken).toHaveBeenCalledWith("refresh-token");
+      expect(refreshTokenService.storeRefreshToken).toHaveBeenCalledWith(
+        USER_ID,
+        "hashed-refresh-token",
+      );
+      expect(refreshTokenService.revokeAllRefreshTokensForUser).toHaveBeenCalledWith(USER_ID);
+      expect(throttleService.resetThrottle).toHaveBeenCalledWith(user.userName);
+    });
+
+    it("returns 401 immediately for a throttled username", async () => {
+      throttleService.isThrottled.mockReturnValue(true);
+      const { res, state } = makeResponse();
+
+      await controller.login(loginRequest(), {} as any, res);
+
+      expect(state).toEqual({ status: 401, body: errorResponse });
+      expect(userRepository.findByUsername).not.toHaveBeenCalled();
+      expect(passwordService.verifyPassword).not.toHaveBeenCalled();
+    });
+
+    it("uses the dummy hash and records a failure for an unknown user", async () => {
+      userRepository.findByUsername.mockResolvedValue(null);
+      passwordService.getDummyHash.mockResolvedValue("dummy-hash");
+      passwordService.verifyPassword.mockResolvedValue(false);
+      const { res, state } = makeResponse();
+
+      await controller.login(loginRequest(), {} as any, res);
+
+      expect(state).toEqual({ status: 401, body: errorResponse });
+      expect(passwordService.getDummyHash).toHaveBeenCalledTimes(1);
+      expect(passwordService.verifyPassword).toHaveBeenCalledWith(
+        "correct horse battery staple",
+        "dummy-hash",
+      );
+      expect(throttleService.recordFailedAttempt).toHaveBeenCalledWith(user.userName);
+      expect(tradeApiClient.getAccountByUserId).not.toHaveBeenCalled();
+    });
+
+    it("returns 401 and records a failure for a wrong password", async () => {
+      passwordService.verifyPassword.mockResolvedValue(false);
+      const { res, state } = makeResponse();
+
+      await controller.login(loginRequest(), {} as any, res);
+
+      expect(state).toEqual({ status: 401, body: errorResponse });
+      expect(throttleService.recordFailedAttempt).toHaveBeenCalledWith(user.userName);
+      expect(tradeApiClient.getAccountByUserId).not.toHaveBeenCalled();
+      expect(tokenService.createAccessToken).not.toHaveBeenCalled();
+    });
+
+    it("returns 401 and records a failure when the user has no linked account", async () => {
+      tradeApiClient.getAccountByUserId.mockResolvedValue(null);
+      const { res, state } = makeResponse();
+
+      await controller.login(loginRequest(), {} as any, res);
+
+      expect(state).toEqual({ status: 401, body: errorResponse });
+      expect(throttleService.recordFailedAttempt).toHaveBeenCalledWith(user.userName);
+      expect(tokenService.createAccessToken).not.toHaveBeenCalled();
+      expect(refreshTokenService.storeRefreshToken).not.toHaveBeenCalled();
+    });
+
+    it("maps unexpected dependency errors to the uniform 401 response", async () => {
+      const lookupError = new Error("database unavailable");
+      userRepository.findByUsername.mockRejectedValue(lookupError);
+      const { res, state } = makeResponse();
+
+      await controller.login(loginRequest(), {} as any, res);
+
+      expect(state).toEqual({ status: 401, body: errorResponse });
+      expect(throttleService.recordFailedAttempt).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("getMe", () => {
+    it("returns 401 when the guard supplied no claims", async () => {
+      const { res, state } = makeResponse();
+
+      await controller.getMe(undefined, res);
+
+      expect(state).toEqual({ status: 401, body: errorResponse });
+      expect(userRepository.findByUserId).not.toHaveBeenCalled();
+    });
+
+    it("returns the profile from verified claims and the stored username", async () => {
+      userRepository.findByUserId.mockResolvedValue(user);
+      const claims = {
+        sub: USER_ID,
+        accountId: ACCOUNT_ID,
+        roles: [Role.CUSTOMER],
+        iat: 1,
+        exp: 2,
+        iss: "auth-service",
+      };
+      const { res, state } = makeResponse();
+
+      await controller.getMe(claims, res);
+
+      expect(state).toEqual({
+        status: 200,
+        body: {
+          id: USER_ID,
+          username: user.userName,
+          accountId: ACCOUNT_ID,
+          roles: [Role.CUSTOMER],
+        },
+      });
+      expect(userRepository.findByUserId).toHaveBeenCalledWith(USER_ID);
+    });
+
+    it("preserves claims and returns an empty username when the user row is missing", async () => {
+      userRepository.findByUserId.mockResolvedValue(null);
+      const claims = {
+        sub: USER_ID,
+        accountId: ACCOUNT_ID,
+        roles: [Role.CUSTOMER],
+        iat: 1,
+        exp: 2,
+        iss: "auth-service",
+      };
+      const { res, state } = makeResponse();
+
+      await controller.getMe(claims, res);
+
+      // This documents the current fallback behavior for a token whose user
+      // was removed between token issuance and the /me request.
+      expect(state).toEqual({
+        status: 200,
+        body: {
+          id: USER_ID,
+          username: "",
+          accountId: ACCOUNT_ID,
+          roles: [Role.CUSTOMER],
+        },
+      });
+    });
+
+    it("maps a profile lookup failure to 401", async () => {
+      const lookupError = new Error("database unavailable");
+      userRepository.findByUserId.mockRejectedValue(lookupError);
+      const { res, state } = makeResponse();
+
+      await controller.getMe(
+        {
+          sub: USER_ID,
+          accountId: ACCOUNT_ID,
+          roles: [Role.CUSTOMER],
+        },
+        res,
+      );
+
+      expect(state).toEqual({ status: 401, body: errorResponse });
+    });
+  });
+});

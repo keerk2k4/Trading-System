@@ -81,7 +81,9 @@ export class AuthController {
         id: user.userId,
         username: user.userName,
         accountId: accountId,
-        roles: registerRequest.roles ?? ["CUSTOMER"],
+        // Public registration must never accept a caller-declared role.
+        // Administrative role assignment belongs on a separately protected path.
+        roles: ["CUSTOMER"],
       };
 
       res.status(201).json(response);

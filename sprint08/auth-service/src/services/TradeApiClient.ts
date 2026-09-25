@@ -9,9 +9,9 @@ export interface TradeAccountResponse {
 
 @Injectable()
 export class TradeApiClient {
-  private readonly baseUrl = process.env.TRADE_API_URL;
+  private readonly baseUrl = process.env.TRADE_API_URL || "http://localhost:8080";
 
-  // pass a token for auth service verificiation
+  // Internal API calls must use a separate service credential; customer JWTs are not appropriate here.
   async createAccount(userId: string): Promise<TradeAccountResponse> {
     const response = await fetch(`${this.baseUrl}/internal/accounts`, {
       method: "POST",
