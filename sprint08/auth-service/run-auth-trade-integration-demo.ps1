@@ -1,6 +1,6 @@
 param(
   [string]$AuthBaseUrl = "http://localhost:3000",
-  [string]$Username = "real_john_5",
+  [string]$Username = "john",
   [string]$Password = "johnbelongstoswag"
 )
 
@@ -74,9 +74,20 @@ function Invoke-JsonRequest {
 
     if ($_.Exception.Response -ne $null) {
       $httpResponse = [System.Net.HttpWebResponse]$_.Exception.Response
-      $reader = New-Object System.IO.StreamReader($httpResponse.GetResponseStream())
-      $content = $reader.ReadToEnd()
-      $reader.Close()
+      $content = ""
+
+      if ($_.ErrorDetails -and -not [string]::IsNullOrWhiteSpace($_.ErrorDetails.Message)) {
+        $content = $_.ErrorDetails.Message
+      }
+
+      if ([string]::IsNullOrWhiteSpace($content)) {
+        $responseStream = $httpResponse.GetResponseStream()
+        if ($responseStream -ne $null) {
+          $reader = New-Object System.IO.StreamReader($responseStream)
+          $content = $reader.ReadToEnd()
+          $reader.Close()
+        }
+      }
 
       return [pscustomobject]@{
         StatusCode = [int]$httpResponse.StatusCode
@@ -279,6 +290,42 @@ Write-Host "Known user avg (ms): $knownAvg"
 Write-Host "Unknown user avg (ms): $unknownAvg"
 Write-Host "Absolute avg difference (ms): $avgDiff"
 Write-Host "Interpretation: Similar timings reduce username-enumeration signal from password-hash work factor."
+
+Write-Step "Account status behavior demo: suspended vs closed"
+
+$maddyResponse = Invoke-JsonPost -Url "$AuthBaseUrl/auth/login" -Body @{
+  username = "maddy"
+  password = "testpassword123"
+}
+
+Write-Host "maddy login status: $($maddyResponse.StatusCode)"
+Write-Host "maddy login latency: $($maddyResponse.ElapsedMs) ms"
+Write-Host "maddy login body:"
+Write-Host (Format-JsonOutput -Text $maddyResponse.Content)
+
+if ($maddyResponse.StatusCode -eq 403) {
+  Write-Host "Expected: maddy is blocked because trading account is SUSPENDED." -ForegroundColor Green
+}
+else {
+  Write-Host "Unexpected for maddy. Expected 403 with ACC-403 blocked message." -ForegroundColor Yellow
+}
+
+$superMaddyResponse = Invoke-JsonPost -Url "$AuthBaseUrl/auth/login" -Body @{
+  username = "superMaddy"
+  password = "testpassword123"
+}
+
+Write-Host "superMaddy login status: $($superMaddyResponse.StatusCode)"
+Write-Host "superMaddy login latency: $($superMaddyResponse.ElapsedMs) ms"
+Write-Host "superMaddy login body:"
+Write-Host (Format-JsonOutput -Text $superMaddyResponse.Content)
+
+if ($superMaddyResponse.StatusCode -eq 200) {
+  Write-Host "Expected: superMaddy can still log in even when account is CLOSED." -ForegroundColor Green
+}
+else {
+  Write-Host "Unexpected for superMaddy. Expected normal login success response." -ForegroundColor Yellow
+}
 
 Write-Step "Demo completed"
 Write-Host "Observe auth-service console logs for internal JWT, trade API calls, and DB query logs." -ForegroundColor Green

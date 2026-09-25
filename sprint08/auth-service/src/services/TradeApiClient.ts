@@ -53,7 +53,7 @@ export class TradeApiClient {
       endpoint,
       userId,
       authScheme: "Bearer",
-      tokenPrefix: internalAccessToken.slice(0, 16),
+      tokenPrefix: internalAccessToken,
     });
 
     const response = await fetch(endpoint, {
