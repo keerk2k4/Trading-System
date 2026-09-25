@@ -14,6 +14,7 @@ describe('TokenService - JWT Contract', () => {
     process.env.JWT_SECRET = testSecret;
     process.env.JWT_ISSUER = 'auth-service';
     process.env.JWT_ACCESS_TOKEN_EXPIRY_SECONDS = '900';
+    process.env.JWT_INTERNAL_ACCESS_TOKEN_EXPIRY_SECONDS = '60';
   });
 
   beforeEach(async () => {
@@ -22,6 +23,11 @@ describe('TokenService - JWT Contract', () => {
     }).compile();
 
     service = module.get<TokenService>(TokenService);
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('Access token generation', () => {
@@ -156,6 +162,47 @@ describe('TokenService - JWT Contract', () => {
           issuer: 'wrong-issuer',
         });
       }).toThrow();
+    });
+  });
+
+  describe('Internal service token generation', () => {
+    it('creates a short-lived token scoped for Trade API calls', () => {
+      const beforeTime = Math.floor(Date.now() / 1000);
+      const token = service.createInternalAccessToken();
+      const afterTime = Math.floor(Date.now() / 1000);
+      const decoded = jwt.decode(token, { complete: true });
+
+      expect(decoded).not.toBeNull();
+      expect(decoded!.header.alg).toBe('HS256');
+
+      const payload = decoded!.payload as any;
+      expect(Object.keys(payload).sort()).toEqual(['exp', 'iat', 'iss', 'scope', 'service']);
+      expect(payload.service).toBe('auth-service');
+      expect(payload.scope).toBe('trade-internal');
+      expect(payload.iss).toBe('auth-service');
+      expect(payload.iat).toBeGreaterThanOrEqual(beforeTime);
+      expect(payload.iat).toBeLessThanOrEqual(afterTime);
+      expect(payload.exp).toBe(payload.iat + 60);
+    });
+
+    it('does not include customer identity or account claims', () => {
+      const token = service.createInternalAccessToken();
+      const payload = jwt.decode(token) as any;
+
+      expect(payload.sub).toBeUndefined();
+      expect(payload.accountId).toBeUndefined();
+      expect(payload.roles).toBeUndefined();
+    });
+
+    it('verifies with the configured signing secret and issuer', () => {
+      const token = service.createInternalAccessToken();
+      const verified = jwt.verify(token, testSecret, {
+        algorithms: ['HS256'],
+        issuer: 'auth-service',
+      }) as any;
+
+      expect(verified.service).toBe('auth-service');
+      expect(verified.scope).toBe('trade-internal');
     });
   });
 
