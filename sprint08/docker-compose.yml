@@ -117,6 +117,7 @@ services:
       JWT_ISSUER: auth-service
       DB_URL: ${AUTH_DB_URL}
       TRADE_API_URL: ${TRADE_API_URL}
+      EMAIL_ENCRYPTION_KEY: ${EMAIL_ENCRYPTION_KEY}
     depends_on:
       postgres:
         condition: service_healthy

@@ -39,6 +39,13 @@ public interface UserMapper {
     })
     Optional<User> findUserById(@Param("userId") String userId);
 
+    /**
+     * @deprecated Email is stored as randomized AES-256-GCM ciphertext
+     * (see auth-service EmailEncryptionService + migrations/011). A
+     * {@code WHERE email = #{plaintext}} query can never match, so plaintext
+     * email lookup is retired. Load by user ID instead.
+     */
+    @Deprecated
     @Select("""
         SELECT user_id, first_name, last_name, email, phone, password_hash, status
         FROM users
