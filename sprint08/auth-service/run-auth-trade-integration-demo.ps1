@@ -1,6 +1,6 @@
 param(
   [string]$AuthBaseUrl = "http://localhost:3000",
-  [string]$Username = "real_john_4",
+  [string]$Username = "real_john_5",
   [string]$Password = "johnbelongstoswag"
 )
 
