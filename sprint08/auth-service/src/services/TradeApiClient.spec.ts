@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus } from "@nestjs/common";
+import { TokenService } from "./TokenService";
 import { TradeApiClient, TradeAccountResponse } from "./TradeApiClient";
 
 function makeResponse(
@@ -20,13 +21,22 @@ describe("TradeApiClient", () => {
   const originalFetch = global.fetch;
   const originalTradeApiUrl = process.env.TRADE_API_URL;
   let fetchMock: jest.Mock;
+  let tokenService: { createInternalAccessToken: jest.Mock };
   let client: TradeApiClient;
 
   beforeEach(() => {
     process.env.TRADE_API_URL = "https://trade-api.test";
     fetchMock = jest.fn();
+    tokenService = {
+      createInternalAccessToken: jest.fn().mockReturnValue("internal-service-token"),
+    };
     global.fetch = fetchMock as unknown as typeof fetch;
-    client = new TradeApiClient();
+    client = new TradeApiClient(tokenService as unknown as TokenService);
+    jest.spyOn(console, "log").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   afterAll(() => {
@@ -57,9 +67,13 @@ describe("TradeApiClient", () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(fetchMock).toHaveBeenCalledWith("https://trade-api.test/internal/accounts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer internal-service-token",
+        },
         body: JSON.stringify({ userId: "user-123" }),
       });
+      expect(tokenService.createInternalAccessToken).toHaveBeenCalledTimes(1);
       expect(response.json).toHaveBeenCalledTimes(1);
     });
 
@@ -104,7 +118,13 @@ describe("TradeApiClient", () => {
 
       expect(fetchMock).toHaveBeenCalledWith(
         "https://trade-api.test/internal/accounts/by-user/user-123",
+        {
+          headers: {
+            Authorization: "Bearer internal-service-token",
+          },
+        },
       );
+      expect(tokenService.createInternalAccessToken).toHaveBeenCalledTimes(1);
       expect(response.json).toHaveBeenCalledTimes(1);
     });
 
@@ -145,7 +165,7 @@ describe("TradeApiClient", () => {
 
   it("uses the default Trade API URL when the environment variable is absent", async () => {
     delete process.env.TRADE_API_URL;
-    const defaultClient = new TradeApiClient();
+    const defaultClient = new TradeApiClient(tokenService as unknown as TokenService);
     fetchMock.mockResolvedValue(
       makeResponse({ json: jest.fn().mockResolvedValue(null) }),
     );
@@ -154,6 +174,13 @@ describe("TradeApiClient", () => {
 
     // The documented client contract supplies localhost when TRADE_API_URL is absent.
     // Keep this as a regression test until the production client honors that default.
-    expect(fetchMock).toHaveBeenCalledWith("http://localhost:8080/internal/accounts/by-user/user-123");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:8080/internal/accounts/by-user/user-123",
+      {
+        headers: {
+          Authorization: "Bearer internal-service-token",
+        },
+      },
+    );
   });
 });
