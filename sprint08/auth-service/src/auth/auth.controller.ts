@@ -147,6 +147,9 @@ export class AuthController {
       }
 
       const accessToken = this.tokenService.createAccessToken(user.userId, account.accountId, ["CUSTOMER"]);
+
+      
+      await this.refreshTokenService.revokeAllRefreshTokensForUser(user.userId);
       const refreshToken = this.refreshTokenService.generateRefreshToken();
       const tokenHash = await this.refreshTokenService.hashRefreshToken(refreshToken);
       await this.refreshTokenService.storeRefreshToken(user.userId, tokenHash);
