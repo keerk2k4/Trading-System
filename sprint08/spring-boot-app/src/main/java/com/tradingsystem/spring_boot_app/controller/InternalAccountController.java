@@ -8,15 +8,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * Internal-only endpoints, called by Auth Service during registration and
- * login/refresh. Not part of the public contract in contracts/auth-api.yaml.
- *
- * SECURITY NOTE: this must be blocked from public network access -- either
- * by not exposing this port outside the Docker network in
- * docker-compose.yml, or by adding a shared-secret header check here.
- * Neither is wired in yet; do this before demoing.
- */
 @RestController
 @RequestMapping("/internal/accounts")
 public class InternalAccountController {
@@ -40,11 +31,6 @@ public class InternalAccountController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    /**
-     * Called on every login and refresh. Looks up the real, current
-     * account belonging to this Auth Service user -- never cached in
-     * Auth DB, always read fresh from here.
-     */
     @GetMapping("/by-user/{userId}")
     public ResponseEntity<InternalAccountResponse> getAccountByUserId(
             @PathVariable String userId) {
