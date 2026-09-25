@@ -15,7 +15,7 @@ export class BearerGuard implements CanActivate {
         message: "Unauthorised",
       });
     }
-
+    
     const token = authHeader.substring(7); // Remove "Bearer " prefix
 
     if (!token) {
@@ -25,8 +25,6 @@ export class BearerGuard implements CanActivate {
       });
     }
 
-    // verifyAccessToken checks the signature FIRST (HS256 + JWT_SECRET),
-    // then expiry and issuer. No claim is trusted before verification.
     const result = this.tokenService.verifyAccessToken(token);
 
     if (!result.valid) {
@@ -35,8 +33,7 @@ export class BearerGuard implements CanActivate {
         message: "Unauthorised",
       });
     }
-
-    // Attach verified payload to request for use in controller
+    
     request.user = result.payload;
     return true;
   }

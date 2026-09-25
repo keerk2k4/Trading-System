@@ -31,10 +31,6 @@ export class ThrottleService {
     return entry.blockedUntil !== undefined;
   }
 
-  /**
-   * Record a failed login attempt for a user.
-   * @param username - The username
-   */
   recordFailedAttempt(username: string): void {
     const now = Date.now();
     let entry = this.throttleMap.get(username);
@@ -67,20 +63,10 @@ export class ThrottleService {
     }
   }
 
-  /**
-   * Clear the throttle state for a user (e.g., after successful login).
-   * @param username - The username
-   */
   resetThrottle(username: string): void {
     this.throttleMap.delete(username);
   }
 
-  /**
-   * Get the time remaining (in seconds) before throttle expires for a user.
-   * Returns 0 if not throttled.
-   * @param username - The username
-   * @returns Seconds remaining, or 0 if not throttled
-   */
   getThrottleTimeRemaining(username: string): number {
     const entry = this.throttleMap.get(username);
 
@@ -92,9 +78,6 @@ export class ThrottleService {
     return remaining > 0 ? Math.ceil(remaining / 1000) : 0;
   }
 
-  /**
-   * Get configuration for documentation.
-   */
   getConfiguration() {
     return {
       maxAttempts: this.MAX_ATTEMPTS,

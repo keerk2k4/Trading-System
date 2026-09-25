@@ -37,16 +37,6 @@ export class AuthController {
     private throttleService: ThrottleService,
   ) { }
 
-  /**
-   * POST /auth/register
-   *
-   * 1. Reject if the username is already taken (AUTH-409).
-   * 2. Hash the password.
-   * 3. Create the user row in auth.users.
-   * 4. Ask Trade REST API to create a brand new trading account for
-   *    this user (balance 0, status ACTIVE), linked by the user's UUID.
-   * 5. Return confirmation only -- no token, matching the contract.
-   */
   @Post("register")
   @ApiTags("Auth")
   @HttpCode(HttpStatus.CREATED)
@@ -78,8 +68,6 @@ export class AuthController {
         status: "ACTIVE",
       });
 
-      // Auto-create the trading account, per the team's chosen design --
-      // this is a deliberate, documented tradeoff (see security review).
       let accountId = 0;
       try {
         const account = await this.tradeApiClient.createAccount(user.userId);
@@ -107,13 +95,6 @@ export class AuthController {
     }
   }
 
-  /**
-   * POST /auth/login
-   *
-   * Authenticates a user with username and password.
-   * Returns an access token and refresh token on success.
-   * Implements uniform failure response and login throttle for security.
-   */
   @Post("login")
   @ApiTags("Auth")
   @HttpCode(HttpStatus.OK)
@@ -123,7 +104,6 @@ export class AuthController {
   @ApiResponse({ status: 422, description: "Invalid input", type: ErrorResponse })
   async login(@Body() loginRequest: LoginRequest, @Request() req: any, @Res() res: Response): Promise<void> {
     try {
-      // Check if this user is throttled after failed login attempts
       if (this.throttleService.isThrottled(loginRequest.username)) {
         const response: ErrorResponse = {
           errorCode: "AUTH-401",
@@ -143,8 +123,7 @@ export class AuthController {
         await this.passwordService.verifyPassword(loginRequest.password, dummyHash);
       }
 
-      if (!user || !passwordValid) {
-        // Record failed attempt for throttle tracking
+      if (!user || !passwordValid) {        
         this.throttleService.recordFailedAttempt(loginRequest.username);
 
         const response: ErrorResponse = {
@@ -154,11 +133,9 @@ export class AuthController {
         res.status(401).json(response);
         return;
       }
-
-      // Fetch the real, current account for this user from Trade API.
+      
       const account = await this.tradeApiClient.getAccountByUserId(user.userId);
       if (!account) {
-        // Record failed attempt for throttle tracking
         this.throttleService.recordFailedAttempt(loginRequest.username);
 
         const response: ErrorResponse = {
@@ -173,8 +150,7 @@ export class AuthController {
       const refreshToken = this.refreshTokenService.generateRefreshToken();
       const tokenHash = await this.refreshTokenService.hashRefreshToken(refreshToken);
       await this.refreshTokenService.storeRefreshToken(user.userId, tokenHash);
-
-      // Reset throttle on successful login
+      
       this.throttleService.resetThrottle(loginRequest.username);
 
       const response: TokenResponse = {
@@ -195,9 +171,6 @@ export class AuthController {
     }
   }
 
-  /**
-   * POST /auth/refresh
-   */
   @Post("refresh")
   @ApiTags("Auth")
   @HttpCode(HttpStatus.OK)
@@ -220,8 +193,6 @@ export class AuthController {
 
       const userId = validation.userId!;
 
-      // Revoke the presented token (matched via bcrypt.compare inside the
-      // service, then revoked by id) so it cannot be exchanged twice.
       await this.refreshTokenService.revokeRefreshToken(refreshRequest.refreshToken);
 
       const user = await this.userRepository.findByUserId(userId);
@@ -268,9 +239,6 @@ export class AuthController {
     }
   }
 
-  /**
-   * GET /auth/me
-   */
   @Get("me")
   @UseGuards(BearerGuard)
   @HttpCode(HttpStatus.OK)
