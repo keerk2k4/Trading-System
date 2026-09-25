@@ -33,7 +33,7 @@ up. Fill in the security review as each part lands.
 | Jest suites, including the guard paths named below | alongside the code, as `*.spec.ts` |
 | A multi-stage `Dockerfile` | this folder |
 | Your service added to your local orchestration | repository root |
-| The OWASP review, filled in | `security-review/` |
+| The OWASP review, filled in | `../security-review/SPRINT08-SECURITY-REVIEW.md` |
 
 No starter code and no project skeleton ships. Deciding how this service is
 decomposed, and where the verification happens inside it, is most of what the
