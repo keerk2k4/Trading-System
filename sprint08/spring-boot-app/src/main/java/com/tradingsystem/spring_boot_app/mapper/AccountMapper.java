@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * MyBatis mapper for Account entity (trading_accounts table).
+ * MyBatis mapper for Account entity (trading.trading_accounts table).
  * All parameters are bound as JDBC bind parameters to prevent SQL injection.
  *
  * NOTE: trading_accounts.user_id is now VARCHAR(36) holding a UUID string
@@ -35,7 +35,7 @@ public interface AccountMapper {
      * @return the generated accountId
      */
     @Select("""
-    INSERT INTO trading_accounts (account_number, user_id, account_status, available_balance, blocked_balance, version, created_at, updated_at)
+    INSERT INTO trading.trading_accounts (account_number, user_id, account_status, available_balance, blocked_balance, version, created_at, updated_at)
     VALUES (#{accountNumber}, #{userId}, #{accountStatus}, 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     RETURNING trading_account_id
     """)
@@ -52,7 +52,7 @@ Long insertAccount(
      */
     @Select("""
         SELECT trading_account_id, account_number, user_id, available_balance, account_status, version
-        FROM trading_accounts
+        FROM trading.trading_accounts
         WHERE trading_account_id = #{accountId}
         """)
     @Results({
@@ -80,7 +80,7 @@ Long insertAccount(
      */
     @Select("""
         SELECT trading_account_id, account_number, user_id, status, available_balance, blocked_balance, account_status, created_at, updated_at
-        FROM trading_accounts
+        FROM trading.trading_accounts
         WHERE account_number = #{accountNumber}
         """)
     @Results({
@@ -100,7 +100,7 @@ Long insertAccount(
      */
     @Select("""
         SELECT trading_account_id, account_number, user_id, status, available_balance, blocked_balance, account_status, created_at, updated_at
-        FROM trading_accounts
+        FROM trading.trading_accounts
         WHERE account_status = #{status}
         ORDER BY trading_account_id
         """)
@@ -120,7 +120,7 @@ Long insertAccount(
      * @return number of rows affected
      */
     @Update("""
-        UPDATE trading_accounts
+        UPDATE trading.trading_accounts
         SET available_balance = #{availableBalance}, version = version + 1,
             updated_at = CURRENT_TIMESTAMP
         WHERE trading_account_id = #{accountId} AND version = #{version}
@@ -136,7 +136,7 @@ Long insertAccount(
      * @return number of rows affected
      */
     @Update("""
-        UPDATE trading_accounts
+        UPDATE trading.trading_accounts
         SET blocked_balance = #{blockedBalance}, version = version + 1,
             updated_at = CURRENT_TIMESTAMP
         WHERE trading_account_id = #{accountId} AND version = #{version}
@@ -152,7 +152,7 @@ Long insertAccount(
      * @return number of rows affected
      */
     @Update("""
-        UPDATE trading_accounts
+        UPDATE trading.trading_accounts
         SET account_status = #{status}, version = version + 1,
             updated_at = CURRENT_TIMESTAMP
         WHERE trading_account_id = #{accountId} AND version = #{version}
@@ -168,7 +168,7 @@ Long insertAccount(
      */
     @Select("""
         SELECT trading_account_id, account_number, user_id, status, available_balance, blocked_balance, account_status, created_at, updated_at
-        FROM trading_accounts
+        FROM trading.trading_accounts
         WHERE created_at >= #{createdAfter}
         ORDER BY created_at
         """)
@@ -188,7 +188,7 @@ Long insertAccount(
      */
     @Select("""
     SELECT trading_account_id, account_number, user_id, available_balance, account_status, version
-    FROM trading_accounts
+    FROM trading.trading_accounts
     WHERE user_id = #{userId}
     """)
 @ConstructorArgs({

@@ -33,6 +33,15 @@ do
         -f "$file"
 done
 
+echo "Setting database search_path..."
+psql \
+    -h "$POSTGRES_HOST" \
+    -p "$POSTGRES_PORT" \
+    -U "$POSTGRES_USER" \
+    -d "$DATABASE" \
+    -v ON_ERROR_STOP=1 \
+    -c "ALTER DATABASE \"$DATABASE\" SET search_path TO auth, trading, public;"
+
 for file in seed/*.sql
 do
     echo "Applying seed: $file"
