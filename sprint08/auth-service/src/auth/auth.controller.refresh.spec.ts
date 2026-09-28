@@ -109,7 +109,13 @@ describe("Auth refresh rotation", () => {
         PasswordService,
         ThrottleService,
         { provide: DatabaseService, useValue: fakeDb },
-        { provide: UserRepository, useValue: { findByUserId: async () => fakeUser } },
+        {
+          provide: UserRepository,
+          useValue: {
+            findByUserId: async () => fakeUser,
+            getRoles: async () => ["CUSTOMER"],
+          },
+        },
         {
           provide: TradeApiClient,
           useValue: {

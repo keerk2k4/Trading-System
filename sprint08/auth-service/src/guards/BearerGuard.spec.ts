@@ -14,6 +14,14 @@ function mockContext(authHeader?: string): any {
   };
 }
 
+function mockContextWithHeaders(headers: Record<string, string>): any {
+  const request: any = { headers: { ...headers } };
+  return {
+    switchToHttp: () => ({ getRequest: () => request }),
+    __request: request,
+  };
+}
+
 function auth401Of(fn: () => void): any {
   try {
     fn();
@@ -54,6 +62,30 @@ describe("BearerGuard", () => {
     expect(ctx.__request.user).toBeDefined();
     expect(ctx.__request.user.sub).toBe(USER_ID);
     expect(ctx.__request.user.accountId).toBe(42);
+  });
+
+  it("# bearer parsing is case-insensitive", () => {
+    const token = tokenService.createAccessToken(USER_ID, 42, ["CUSTOMER"]);
+    const ctx = mockContext(`bearer ${token}`);
+
+    expect(guard.canActivate(ctx)).toBe(true);
+    expect(ctx.__request.user.sub).toBe(USER_ID);
+  });
+
+  it("# x-access-token is accepted when authorization header is absent", () => {
+    const token = tokenService.createAccessToken(USER_ID, 42, ["CUSTOMER"]);
+    const ctx = mockContextWithHeaders({ "x-access-token": token });
+
+    expect(guard.canActivate(ctx)).toBe(true);
+    expect(ctx.__request.user.sub).toBe(USER_ID);
+  });
+
+  it("# accessToken cookie is accepted when headers are absent", () => {
+    const token = tokenService.createAccessToken(USER_ID, 42, ["CUSTOMER"]);
+    const ctx = mockContextWithHeaders({ cookie: `accessToken=${encodeURIComponent(token)}` });
+
+    expect(guard.canActivate(ctx)).toBe(true);
+    expect(ctx.__request.user.sub).toBe(USER_ID);
   });
 
   it("# an expired token is refused (genuine token signed with a past expiry)", () => {

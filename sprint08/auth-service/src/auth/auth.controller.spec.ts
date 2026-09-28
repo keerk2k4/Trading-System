@@ -99,9 +99,12 @@ describe("AuthController", () => {
     userRepository = {
       isUsernameTaken: jest.fn(),
       create: jest.fn(),
+      assignRole: jest.fn(),
       deleteById: jest.fn(),
       findByUsername: jest.fn(),
       findByUserId: jest.fn(),
+      getRoles: jest.fn().mockResolvedValue([Role.CUSTOMER]),
+      hasRole: jest.fn().mockResolvedValue(false),
     };
     throttleService = {
       isThrottled: jest.fn().mockReturnValue(false),
@@ -125,7 +128,7 @@ describe("AuthController", () => {
   });
 
   describe("register", () => {
-    it("creates the auth user and linked trade account, ignoring self-declared roles", async () => {
+    it("creates auth user and linked trade account, ignoring self-declared roles", async () => {
       userRepository.isUsernameTaken.mockResolvedValue(false);
       passwordService.hashPassword.mockResolvedValue("hashed-password");
       userRepository.create.mockResolvedValue(user);
@@ -152,8 +155,9 @@ describe("AuthController", () => {
         phone: null,
         firstName: "",
         lastName: "",
-        status: "ACTIVE",
+        status: "PENDING",
       });
+      expect(userRepository.assignRole).toHaveBeenCalledWith(USER_ID, Role.CUSTOMER);
       expect(tradeApiClient.createAccount).toHaveBeenCalledWith(USER_ID);
     });
 
@@ -188,12 +192,30 @@ describe("AuthController", () => {
       expect(tradeApiClient.createAccount).not.toHaveBeenCalled();
     });
 
-    it("deletes a newly created user when Trade API account creation fails", async () => {
-      const tradeError = new Error("account service unavailable");
+    it("maps repository creation failures to 422", async () => {
+      const createError = new Error("db unavailable");
+      userRepository.isUsernameTaken.mockResolvedValue(false);
+      passwordService.hashPassword.mockResolvedValue("hashed-password");
+      userRepository.create.mockRejectedValue(createError);
+      const { res, state } = makeResponse();
+
+      await controller.register(registerRequest(), res);
+
+      expect(state).toEqual({
+        status: 422,
+        body: {
+          errorCode: "VAL-422",
+          message: "Invalid input",
+        },
+      });
+      expect(tradeApiClient.createAccount).not.toHaveBeenCalled();
+    });
+
+    it("deletes created user when account creation fails", async () => {
       userRepository.isUsernameTaken.mockResolvedValue(false);
       passwordService.hashPassword.mockResolvedValue("hashed-password");
       userRepository.create.mockResolvedValue(user);
-      tradeApiClient.createAccount.mockRejectedValue(tradeError);
+      tradeApiClient.createAccount.mockRejectedValue(new Error("trade api unavailable"));
       const { res, state } = makeResponse();
 
       await controller.register(registerRequest(), res);
@@ -231,6 +253,7 @@ describe("AuthController", () => {
   describe("login", () => {
     beforeEach(() => {
       userRepository.findByUsername.mockResolvedValue(user);
+      userRepository.getRoles.mockResolvedValue([Role.CUSTOMER]);
       passwordService.verifyPassword.mockResolvedValue(true);
       tradeApiClient.getAccountByUserId.mockResolvedValue(account);
     });
@@ -355,6 +378,88 @@ describe("AuthController", () => {
 
       expect(state).toEqual({ status: 401, body: errorResponse });
       expect(throttleService.recordFailedAttempt).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("admin register/login", () => {
+    beforeEach(() => {
+      userRepository.findByUsername.mockResolvedValue(user);
+      passwordService.verifyPassword.mockResolvedValue(true);
+      userRepository.getRoles.mockResolvedValue([Role.ADMIN]);
+      userRepository.hasRole.mockResolvedValue(true);
+    });
+
+    it("registers an admin user", async () => {
+      userRepository.isUsernameTaken.mockResolvedValue(false);
+      passwordService.hashPassword.mockResolvedValue("hashed-password");
+      userRepository.create.mockResolvedValue(user);
+      const { res, state } = makeResponse();
+
+      await controller.registerAdmin(registerRequest(), res);
+
+      expect(state).toEqual({
+        status: 201,
+        body: {
+          id: USER_ID,
+          username: user.userName,
+          accountId: 0,
+          roles: [Role.ADMIN],
+        },
+      });
+      expect(userRepository.assignRole).toHaveBeenCalledWith(USER_ID, Role.ADMIN);
+      expect(tradeApiClient.createAccount).not.toHaveBeenCalled();
+    });
+
+    it("rolls back admin user creation if role assignment fails", async () => {
+      userRepository.isUsernameTaken.mockResolvedValue(false);
+      passwordService.hashPassword.mockResolvedValue("hashed-password");
+      userRepository.create.mockResolvedValue(user);
+      userRepository.assignRole.mockRejectedValue(new Error("role assign failed"));
+      const { res, state } = makeResponse();
+
+      await controller.registerAdmin(registerRequest(), res);
+
+      expect(state).toEqual({
+        status: 422,
+        body: {
+          errorCode: "VAL-422",
+          message: "Invalid input",
+        },
+      });
+      expect(userRepository.deleteById).toHaveBeenCalledWith(USER_ID);
+    });
+
+    it("logs in an admin and issues tokens without trading account lookup", async () => {
+      tokenService.createAccessToken.mockReturnValue("admin-access-token");
+      refreshTokenService.generateRefreshToken.mockReturnValue("admin-refresh-token");
+      refreshTokenService.hashRefreshToken.mockResolvedValue("hashed-admin-refresh-token");
+      const { res, state } = makeResponse();
+
+      await controller.loginAdmin(loginRequest(), res);
+
+      expect(state).toEqual({
+        status: 200,
+        body: {
+          accessToken: "admin-access-token",
+          refreshToken: "admin-refresh-token",
+          tokenType: "Bearer",
+          expiresIn: 900,
+        },
+      });
+      expect(tradeApiClient.getAccountByUserId).not.toHaveBeenCalled();
+      expect(userRepository.hasRole).toHaveBeenCalledWith(USER_ID, Role.ADMIN);
+      expect(tokenService.createAccessToken).toHaveBeenCalledWith(USER_ID, 0, [Role.ADMIN]);
+    });
+
+    it("rejects admin login if user lacks ADMIN role", async () => {
+      userRepository.hasRole.mockResolvedValue(false);
+      const { res, state } = makeResponse();
+
+      await controller.loginAdmin(loginRequest(), res);
+
+      expect(state).toEqual({ status: 401, body: errorResponse });
+      expect(refreshTokenService.storeRefreshToken).not.toHaveBeenCalled();
+      expect(throttleService.recordFailedAttempt).toHaveBeenCalledWith(user.userName);
     });
   });
 

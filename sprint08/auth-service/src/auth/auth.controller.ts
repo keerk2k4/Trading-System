@@ -45,6 +45,65 @@ export class AuthController {
   @ApiResponse({ status: 409, description: "The username is already taken.", type: ErrorResponse })
   @ApiResponse({ status: 422, description: "Invalid input", type: ErrorResponse })
   async register(@Body() registerRequest: RegisterRequest, @Res() res: Response): Promise<void> {
+    let createdUserId: string | null = null;
+    try {
+      const alreadyTaken = await this.userRepository.isUsernameTaken(registerRequest.username);
+      if (alreadyTaken) {
+        const error: ErrorResponse = {
+          errorCode: "AUTH-409",
+          message: "Username already registered",
+        };
+        res.status(409).json(error);
+        return;
+      }
+
+      const passwordHash = await this.passwordService.hashPassword(registerRequest.password);
+
+      const user = await this.userRepository.create({
+        userName: registerRequest.username,
+        passwordHash,
+        email: `${registerRequest.username}@placeholder.local`,
+        phone: null,
+        firstName: "",
+        lastName: "",
+        status: "PENDING",
+      });
+      createdUserId = user.userId;
+      await this.userRepository.assignRole(user.userId, "CUSTOMER");
+      const account = await this.tradeApiClient.createAccount(user.userId);
+
+      const response: UserResponse = {
+        id: user.userId,
+        username: user.userName,
+        accountId: account.accountId,
+        // Public registration must never accept a caller-declared role.
+        // Administrative role assignment belongs on a separately protected path.
+        roles: ["CUSTOMER"],
+      };
+
+      res.status(201).json(response);
+    } catch (error) {
+      if (createdUserId) {
+        await this.userRepository.deleteById(createdUserId);
+      }
+      console.error("Register error:", error);
+      const response: ErrorResponse = {
+        errorCode: "VAL-422",
+        message: "Invalid input",
+      };
+      res.status(422).json(response);
+    }
+  }
+
+  @Post("admin/register")
+  @ApiTags("Auth")
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: "Register an admin user" })
+  @ApiResponse({ status: 201, description: "Admin user created.", type: UserResponse })
+  @ApiResponse({ status: 409, description: "The username is already taken.", type: ErrorResponse })
+  @ApiResponse({ status: 422, description: "Invalid input", type: ErrorResponse })
+  async registerAdmin(@Body() registerRequest: RegisterRequest, @Res() res: Response): Promise<void> {
+    let createdUserId: string | null = null;
     try {
       const alreadyTaken = await this.userRepository.isUsernameTaken(registerRequest.username);
       if (alreadyTaken) {
@@ -67,28 +126,22 @@ export class AuthController {
         lastName: "",
         status: "ACTIVE",
       });
-
-      let accountId = 0;
-      try {
-        const account = await this.tradeApiClient.createAccount(user.userId);
-        accountId = account.accountId;
-      } catch (accountError) {
-        await this.userRepository.deleteById(user.userId);
-        throw accountError;
-      }
+      createdUserId = user.userId;
+      await this.userRepository.assignRole(user.userId, "ADMIN");
 
       const response: UserResponse = {
         id: user.userId,
         username: user.userName,
-        accountId: accountId,
-        // Public registration must never accept a caller-declared role.
-        // Administrative role assignment belongs on a separately protected path.
-        roles: ["CUSTOMER"],
+        accountId: 0,
+        roles: ["ADMIN"],
       };
 
       res.status(201).json(response);
     } catch (error) {
-      console.error("Register error:", error);
+      if (createdUserId) {
+        await this.userRepository.deleteById(createdUserId);
+      }
+      console.error("Admin register error:", error);
       const response: ErrorResponse = {
         errorCode: "VAL-422",
         message: "Invalid input",
@@ -111,6 +164,7 @@ export class AuthController {
           errorCode: "AUTH-401",
           message: "Unauthorised",
         };
+        console.log("Login throttled for username:", loginRequest.username);
         res.status(401).json(response);
         return;
       }
@@ -132,6 +186,7 @@ export class AuthController {
           errorCode: "AUTH-401",
           message: "Unauthorised",
         };
+        console.log("Failed login attempt for username:", loginRequest.username);
         res.status(401).json(response);
         return;
       }
@@ -144,6 +199,7 @@ export class AuthController {
           errorCode: "AUTH-401",
           message: "Unauthorised",
         };
+        console.log("Failed login attempt due to missing trading account for username:", loginRequest.username);
         res.status(401).json(response);
         return;
       }
@@ -154,6 +210,7 @@ export class AuthController {
           errorCode: "ACC-403",
           message: "You are blocked from using this service.",
         };
+        console.log("Login attempt blocked due to suspended trading account for username:", loginRequest.username);
         res.status(403).json(response);
         return;
       }
@@ -178,6 +235,86 @@ export class AuthController {
       res.status(200).json(response);
     } catch (error) {
       console.error("Login error:", error);
+      const response: ErrorResponse = {
+        errorCode: "AUTH-401",
+        message: "Unauthorised",
+      };
+      console.log("Login failed for username:", loginRequest.username);
+      res.status(401).json(response);
+    }
+  }
+
+  @Post("admin/login")
+  @ApiTags("Auth")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Admin log in and receive tokens" })
+  @ApiResponse({ status: 200, description: "Authenticated.", type: TokenResponse })
+  @ApiResponse({ status: 401, description: "Unauthorised", type: ErrorResponse })
+  @ApiResponse({ status: 422, description: "Invalid input", type: ErrorResponse })
+  async loginAdmin(@Body() loginRequest: LoginRequest, @Res() res: Response): Promise<void> {
+    try {
+      if (this.throttleService.isThrottled(loginRequest.username)) {
+        const response: ErrorResponse = {
+          errorCode: "AUTH-401",
+          message: "Unauthorised",
+        };
+        res.status(401).json(response);
+        return;
+      }
+
+      const user = await this.userRepository.findByUsername(loginRequest.username);
+
+      let passwordValid = false;
+      if (user) {
+        passwordValid = await this.passwordService.verifyPassword(loginRequest.password, user.passwordHash);
+      } else {
+        const dummyHash = await this.passwordService.getDummyHash();
+        await this.passwordService.verifyPassword(loginRequest.password, dummyHash);
+      }
+
+      if (!user || !passwordValid) {
+        this.throttleService.recordFailedAttempt(loginRequest.username);
+
+        const response: ErrorResponse = {
+          errorCode: "AUTH-401",
+          message: "Unauthorised",
+        };
+        res.status(401).json(response);
+        return;
+      }
+
+      const isAdmin = await this.userRepository.hasRole(user.userId, "ADMIN");
+      if (!isAdmin) {
+        this.throttleService.recordFailedAttempt(loginRequest.username);
+
+        const response: ErrorResponse = {
+          errorCode: "AUTH-401",
+          message: "Unauthorised",
+        };
+        res.status(401).json(response);
+        return;
+      }
+
+      const roles = await this.userRepository.getRoles(user.userId);
+      const accessToken = this.tokenService.createAccessToken(user.userId, 0, roles.length > 0 ? roles : ["ADMIN"]);
+
+      await this.refreshTokenService.revokeAllRefreshTokensForUser(user.userId);
+      const refreshToken = this.refreshTokenService.generateRefreshToken();
+      const tokenHash = await this.refreshTokenService.hashRefreshToken(refreshToken);
+      await this.refreshTokenService.storeRefreshToken(user.userId, tokenHash);
+
+      this.throttleService.resetThrottle(loginRequest.username);
+
+      const response: TokenResponse = {
+        accessToken,
+        refreshToken,
+        tokenType: "Bearer",
+        expiresIn: this.tokenService.getAccessTokenExpiry(),
+      };
+
+      res.status(200).json(response);
+    } catch (error) {
+      console.error("Admin login error:", error);
       const response: ErrorResponse = {
         errorCode: "AUTH-401",
         message: "Unauthorised",
@@ -220,17 +357,24 @@ export class AuthController {
         return;
       }
 
-      const account = await this.tradeApiClient.getAccountByUserId(user.userId);
-      if (!account) {
-        const response: ErrorResponse = {
-          errorCode: "AUTH-401",
-          message: "Unauthorised",
-        };
-        res.status(401).json(response);
-        return;
+      const roles = await this.userRepository.getRoles(user.userId);
+      const effectiveRoles = roles.length > 0 ? roles : ["CUSTOMER"];
+
+      let accountId = 0;
+      if (!effectiveRoles.some((role) => role.toUpperCase() === "ADMIN")) {
+        const account = await this.tradeApiClient.getAccountByUserId(user.userId);
+        if (!account) {
+          const response: ErrorResponse = {
+            errorCode: "AUTH-401",
+            message: "Unauthorised",
+          };
+          res.status(401).json(response);
+          return;
+        }
+        accountId = account.accountId;
       }
 
-      const newAccessToken = this.tokenService.createAccessToken(user.userId, account.accountId, ["CUSTOMER"]);
+      const newAccessToken = this.tokenService.createAccessToken(user.userId, accountId, effectiveRoles);
 
       const newRefreshToken = this.refreshTokenService.generateRefreshToken();
       const newTokenHash = await this.refreshTokenService.hashRefreshToken(newRefreshToken);

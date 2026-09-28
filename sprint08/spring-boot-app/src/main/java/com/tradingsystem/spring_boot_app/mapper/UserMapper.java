@@ -11,7 +11,7 @@ import java.util.Optional;
 public interface UserMapper {
 
     @Insert("""
-        INSERT INTO users (first_name, last_name, email, phone, password_hash, status, created_at, updated_at)
+        INSERT INTO trading.users (first_name, last_name, email, phone, password_hash, status, created_at, updated_at)
         VALUES (#{user.firstName}, #{user.lastName}, #{user.email}, #{user.phone}, #{user.passwordHash}, #{user.status}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """)
     @Options(useGeneratedKeys = true, keyProperty = "user.userId")
@@ -19,7 +19,7 @@ public interface UserMapper {
 
     @Select("""
         SELECT user_id, first_name, last_name, email, phone, password_hash, status
-        FROM users
+        FROM trading.users
         WHERE user_id = #{userId}::uuid
         """)
     @Results({
@@ -48,7 +48,7 @@ public interface UserMapper {
     @Deprecated
     @Select("""
         SELECT user_id, first_name, last_name, email, phone, password_hash, status
-        FROM users
+        FROM trading.users
         WHERE email = #{email}
         """)
     @Results({
@@ -61,7 +61,7 @@ public interface UserMapper {
 
     @Select("""
         SELECT user_id, first_name, last_name, email, phone, password_hash, status
-        FROM users
+        FROM trading.users
         WHERE status = #{status}
         ORDER BY user_id
         """)
@@ -74,18 +74,18 @@ public interface UserMapper {
     List<User> findUsersByStatus(@Param("status") UserStatus status);
 
     @Update("""
-        UPDATE users
+        UPDATE trading.users
         SET status = #{status}, updated_at = CURRENT_TIMESTAMP
         WHERE user_id = #{userId}::uuid
         """)
     int updateUserStatus(@Param("userId") String userId, @Param("status") UserStatus status);
 
     @Delete("""
-        DELETE FROM users
+        DELETE FROM trading.users
         WHERE user_id = #{userId}::uuid
         """)
     int deleteUser(@Param("userId") String userId);
 
-    @Select("SELECT COUNT(*) FROM users")
+    @Select("SELECT COUNT(*) FROM trading.users")
     int countUsers();
 }
