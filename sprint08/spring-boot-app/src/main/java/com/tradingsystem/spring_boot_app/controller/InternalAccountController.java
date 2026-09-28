@@ -47,13 +47,17 @@ public class InternalAccountController {
      */
     private String validateAndExtractToken(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
+
+        System.out.println(authHeader);
         
         if (authHeader == null || authHeader.isBlank()) {
             LOGGER.warn("Missing Authorization header on internal endpoint");
+            System.out.println("1");
             throw new UnauthorisedException();
         }
         
         if (!authHeader.startsWith(BEARER_PREFIX)) {
+            System.out.println("2");
             LOGGER.warn("Authorization header does not start with 'Bearer '");
             throw new UnauthorisedException();
         }
@@ -61,12 +65,14 @@ public class InternalAccountController {
         String token = authHeader.substring(BEARER_PREFIX.length());
         
         if (token.isBlank()) {
+            System.out.println("3");
             LOGGER.warn("Bearer token is empty");
             throw new UnauthorisedException();
         }
         
         // Validate token signature, expiry, and service claim
         if (!tokenProvider.validateInternalServiceToken(token)) {
+            System.out.println("4");
             LOGGER.warn("Internal service token validation failed");
             throw new UnauthorisedException();
         }

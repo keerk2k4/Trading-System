@@ -18,7 +18,7 @@ psql \
     -p "$POSTGRES_PORT" \
     -U "$POSTGRES_USER" \
     -d "$DATABASE" \
-    -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
+    -c "DROP SCHEMA IF EXISTS auth CASCADE; DROP SCHEMA IF EXISTS trading CASCADE; DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
 
 for file in migrations/*.sql
 do
