@@ -14,6 +14,76 @@ verifies a signature with no network call and no shared database. Sprints 6 and
 7 verified tokens minted by a team-owned test fixture. This sprint builds the
 process that issues them for real.
 
+## Local runtime topology
+
+This workspace now uses Docker for Kafka only. PostgreSQL, the Trade REST API,
+the Trade Executor, and the Auth Service run locally on the host outside the
+Linux VM. The broker advertises one host-reachable listener, and every local
+process reads that address from its environment rather than from hard-coded
+container names.
+
+### What `docker compose` runs
+
+- `kafka` on port `9092`
+- `kafka-topics` once, to create the required topics against Kafka's internal
+  listener
+
+No Postgres, Spring Boot, Trade Executor, or Auth Service container is started
+from [docker-compose.yml](c:/Users/Administrator/Desktop/Capstone%20Project/sprint%2008/chennai-capstone-SE1-team5/sprint08/docker-compose.yml).
+
+### Required environment values
+
+Before starting Kafka in Docker:
+
+```powershell
+$env:KAFKA_EXTERNAL_HOST = "10.8.75.49"
+$env:KAFKA_EXTERNAL_PORT = "9092"
+docker compose --profile platform up -d kafka kafka-topics
+```
+
+Before starting the local Java and Nest processes:
+
+```powershell
+# Shared Kafka address for all host-side services
+$env:KAFKA_BOOTSTRAP_SERVERS = "10.8.75.49:9092"
+
+# Trade REST API and Trade Executor JDBC connection
+$env:DB_URL = "jdbc:postgresql://localhost:5432/trading_system"
+$env:DB_USERNAME = "postgres"
+$env:DB_PASSWORD = "postgres"
+
+# Auth Service database and local Trade API target
+$env:AUTH_DB_URL = "postgresql://postgres:postgres@localhost:5432/trading_system"
+$env:TRADE_API_URL = "http://localhost:8080"
+```
+
+If PostgreSQL is not on the same host as the Java and Nest processes, replace
+`localhost` with the reachable database host.
+
+### Start order
+
+1. Start PostgreSQL locally and ensure `trading_system` exists.
+2. Apply the SQL under `migrations/` and `seed/` to that database from the host.
+3. Start Kafka in Docker with `KAFKA_EXTERNAL_HOST=10.8.75.49`.
+4. Start the Trade REST API locally.
+5. Start the Trade Executor locally.
+6. Start the Auth Service locally.
+
+### What must line up
+
+- `KAFKA_BOOTSTRAP_SERVERS` must point every local service at `10.8.75.49:9092`.
+- `TRADE_API_URL` in the Auth Service must point at the locally running Trade
+  REST API.
+- `JWT_SECRET` must still match between the Auth Service and the Trade REST API.
+- PostgreSQL must accept TCP connections from the local Java and Nest processes.
+
+### Missing pieces outside Docker
+
+- A running local PostgreSQL instance.
+- A host-side way to apply `migrations/` and `seed/`.
+- The shared environment variables above in whichever shell, IDE, or service
+  launcher starts the Spring Boot app, Trade Executor, and Auth Service.
+
 ## A short week
 
 Two SME cloud sessions run on Monday and Tuesday, so the order of the work

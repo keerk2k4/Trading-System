@@ -12,16 +12,15 @@
 #   ./create-topics.sh --describe      # Show detailed topic configuration
 #
 # Requirements:
-#   - Docker daemon running
-#   - Kafka container named 'kafka' running at 10.8.66.137:9092
-#   - docker command accessible in PATH
+#   - Reachable Kafka broker
+#   - kafka-topics.sh available in PATH or under KAFKA_HOME/bin
 #
 ###############################################################################
 
 set -e
 
 # Configuration
-BOOTSTRAP_SERVER="${KAFKA_BOOTSTRAP_SERVER:-kafka:9092}"
+BOOTSTRAP_SERVER="${KAFKA_TOPICS_BOOTSTRAP_SERVERS:-${KAFKA_BOOTSTRAP_SERVERS:-${KAFKA_BOOTSTRAP_SERVER:-localhost:9092}}}"
 KAFKA_BIN_DIR="${KAFKA_HOME:-/opt/kafka}/bin"
 
 # Color codes for output
@@ -314,8 +313,10 @@ print_usage() {
     echo "  --help        Show this help message"
     echo ""
     echo "Environment Variables:"
-    echo "  KAFKA_BOOTSTRAP_SERVER  Kafka broker address (default: localhost:9092)"
-    echo "  KAFKA_HOME              Kafka installation directory (default: /opt/kafka)"
+    echo "  KAFKA_TOPICS_BOOTSTRAP_SERVERS  Kafka broker address for topic management"
+    echo "  KAFKA_BOOTSTRAP_SERVERS         Fallback broker address for app/topic tooling"
+    echo "  KAFKA_BOOTSTRAP_SERVER          Legacy singular fallback"
+    echo "  KAFKA_HOME                      Kafka installation directory (default: /opt/kafka)"
     echo ""
 }
 
