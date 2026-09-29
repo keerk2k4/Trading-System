@@ -20,6 +20,15 @@ psql \
     -d "$DATABASE" \
     -c "DROP SCHEMA IF EXISTS auth CASCADE; DROP SCHEMA IF EXISTS trading CASCADE; DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"
 
+echo "Setting bootstrap search_path to public..."
+psql \
+    -h "$POSTGRES_HOST" \
+    -p "$POSTGRES_PORT" \
+    -U "$POSTGRES_USER" \
+    -d "$DATABASE" \
+    -v ON_ERROR_STOP=1 \
+    -c "ALTER DATABASE \"$DATABASE\" SET search_path TO public;"
+
 for file in migrations/*.sql
 do
     echo "Applying migration: $file"
