@@ -8,6 +8,7 @@ import { TradeApiClient } from "../services/TradeApiClient";
 import { UserRepository } from "../repositories/UserRepository";
 import { ThrottleService } from "../services/ThrottleService";
 import { DatabaseService } from "../database/database.service";
+import { AccountProvisioningEventService } from "../services/AccountProvisioningEventService";
 
 const SECRET = "refresh-rotation-test-secret-min32";
 const USER_ID = "11111111-2222-4333-8444-555555555555";
@@ -125,6 +126,12 @@ describe("Auth refresh rotation", () => {
               availableBalance: "0",
               accountStatus: "ACTIVE",
             }),
+          },
+        },
+        {
+          provide: AccountProvisioningEventService,
+          useValue: {
+            publishUserRegistered: async () => undefined,
           },
         },
       ],

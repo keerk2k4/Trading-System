@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -79,5 +80,32 @@ class InternalAccountServiceTest {
         when(accounts.findAccountByUserId(USER_ID)).thenReturn(Optional.empty());
 
         assertTrue(service.findAccountByUserId(USER_ID).isEmpty());
+    }
+
+    @Test
+    void createAccountForUserIfMissingCreatesWhenNoAccountExists() {
+        when(accounts.findAccountByUserId(USER_ID)).thenReturn(Optional.empty());
+        when(accounts.insertAccount(anyString(), eq(USER_ID), eq("ACTIVE"))).thenReturn(99L);
+
+        InternalAccountResponse response = service.createAccountForUserIfMissing(USER_ID);
+
+        assertEquals(99L, response.accountId());
+        verify(accounts).insertAccount(anyString(), eq(USER_ID), eq("ACTIVE"));
+    }
+
+    @Test
+    void createAccountForUserIfMissingDoesNotCreateDuplicate() {
+        Account account = org.mockito.Mockito.mock(Account.class);
+        when(account.getAccountId()).thenReturn(77L);
+        when(account.getAccountReference()).thenReturn("ACC-existing");
+        when(account.getCashBalance()).thenReturn(new BigDecimal("12.34"));
+        when(account.getTradingStatus()).thenReturn(TradingStatus.ACTIVE);
+        when(accounts.findAccountByUserId(USER_ID)).thenReturn(Optional.of(account));
+
+        InternalAccountResponse response = service.createAccountForUserIfMissing(USER_ID);
+
+        assertEquals(77L, response.accountId());
+        assertEquals("ACC-existing", response.accountNumber());
+        verify(accounts, never()).insertAccount(anyString(), eq(USER_ID), eq("ACTIVE"));
     }
 }

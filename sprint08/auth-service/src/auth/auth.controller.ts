@@ -25,6 +25,7 @@ import { RefreshTokenService } from "../services/RefreshTokenService";
 import { TradeApiClient } from "../services/TradeApiClient";
 import { UserRepository } from "../repositories/UserRepository";
 import { ThrottleService } from "../services/ThrottleService";
+import { AccountProvisioningEventService } from "../services/AccountProvisioningEventService";
 
 @Controller("auth")
 export class AuthController {
@@ -35,6 +36,7 @@ export class AuthController {
     private tradeApiClient: TradeApiClient,
     private userRepository: UserRepository,
     private throttleService: ThrottleService,
+    private accountProvisioningEventService: AccountProvisioningEventService,
   ) { }
 
   @Post("register")
@@ -70,12 +72,11 @@ export class AuthController {
       });
       createdUserId = user.userId;
       await this.userRepository.assignRole(user.userId, "CUSTOMER");
-      const account = await this.tradeApiClient.createAccount(user.userId);
+      await this.accountProvisioningEventService.publishUserRegistered(user.userId, user.userName);
 
       const response: UserResponse = {
         id: user.userId,
         username: user.userName,
-        accountId: account.accountId,
         // Public registration must never accept a caller-declared role.
         // Administrative role assignment belongs on a separately protected path.
         roles: ["CUSTOMER"],

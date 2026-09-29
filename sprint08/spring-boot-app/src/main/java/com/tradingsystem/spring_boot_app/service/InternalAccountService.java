@@ -29,6 +29,11 @@ public class InternalAccountService {
         return new InternalAccountResponse(newAccountId, accountNumber, STARTING_BALANCE, STARTING_STATUS);
     }
 
+    @Transactional
+    public InternalAccountResponse createAccountForUserIfMissing(String userId) {
+        return findAccountByUserId(userId).orElseGet(() -> createAccountForUser(userId));
+    }
+
     public Optional<InternalAccountResponse> findAccountByUserId(String userId) {
         return accountMapper.findAccountByUserId(userId)
         .map(account -> new InternalAccountResponse(

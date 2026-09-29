@@ -3,7 +3,7 @@
 ###############################################################################
 # Kafka Topics Creation Script
 # 
-# Creates the three main topics and their dead-letter topics for Sprint 7
+# Creates the platform topics and their dead-letter topics
 # 
 # Usage:
 #   ./create-topics.sh                 # Create topics
@@ -36,12 +36,14 @@ declare -A TOPICS=(
     [orders]="3:604800000"           # 3 partitions, 7 days retention (ms)
     [trade-events]="3:2592000000"    # 3 partitions, 30 days retention (ms)
     [market-data]="6:86400000"       # 6 partitions, 1 day retention (ms)
+    [user-registrations]="3:604800000" # 3 partitions, 7 days retention (ms)
 )
 
 declare -A DLT_TOPICS=(
     [orders.DLT]="1:2592000000"      # 1 partition, 30 days retention
     [trade-events.DLT]="1:7776000000" # 1 partition, 90 days retention
     [market-data.DLT]="1:604800000"  # 1 partition, 7 days retention
+    [user-registrations.DLT]="1:2592000000" # 1 partition, 30 days retention
 )
 
 ###############################################################################
@@ -191,7 +193,7 @@ describe_topics() {
     echo ""
     
     /opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP_SERVER" --describe \
-        --topics-with-overrides | grep -E "(orders|trade-events|market-data|DLT)" || true
+        --topics-with-overrides | grep -E "(orders|trade-events|market-data|user-registrations|DLT)" || true
     
     echo ""
 }
@@ -280,6 +282,7 @@ print_summary() {
     printf "%-20s %-12s %-20s\n" "orders" "3" "7 days (604800000ms)"
     printf "%-20s %-12s %-20s\n" "trade-events" "3" "30 days (2592000000ms)"
     printf "%-20s %-12s %-20s\n" "market-data" "6" "1 day (86400000ms)"
+    printf "%-20s %-12s %-20s\n" "user-registrations" "3" "7 days (604800000ms)"
     
     echo ""
     echo -e "${BLUE}Dead-Letter Topics (error handling):${NC}"
@@ -288,6 +291,7 @@ print_summary() {
     printf "%-20s %-12s %-20s\n" "orders.DLT" "1" "30 days (2592000000ms)"
     printf "%-20s %-12s %-20s\n" "trade-events.DLT" "1" "90 days (7776000000ms)"
     printf "%-20s %-12s %-20s\n" "market-data.DLT" "1" "7 days (604800000ms)"
+    printf "%-20s %-12s %-20s\n" "user-registrations.DLT" "1" "30 days (2592000000ms)"
     
     echo ""
     echo -e "${BLUE}Key Design Decisions:${NC}"

@@ -5,8 +5,8 @@ export class UserResponse {
   id!: string; // UUID (sub claim)
   @ApiProperty()
   username!: string;
-  @ApiProperty()
-  accountId!: number;
+  @ApiPropertyOptional()
+  accountId?: number;
   @ApiProperty({ isArray: true, example: ['CUSTOMER'] })
   roles!: string[]; // ["CUSTOMER"] or ["ADMIN"]
   @ApiPropertyOptional({ format: 'date-time' })

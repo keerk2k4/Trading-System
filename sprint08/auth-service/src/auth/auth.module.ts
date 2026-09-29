@@ -11,6 +11,7 @@ import { ThrottleService } from "../services/ThrottleService";
 import { EmailEncryptionService } from "../services/EmailEncryptionService";
 import { BearerGuard } from "../guards/BearerGuard";
 import { KycController } from "./kyc.controller";
+import { AccountProvisioningEventService } from "../services/AccountProvisioningEventService";
 
 @Module({
   imports: [DatabaseModule],
@@ -23,6 +24,7 @@ import { KycController } from "./kyc.controller";
     UserRepository,
     KycRepository,
     ThrottleService,
+    AccountProvisioningEventService,
     EmailEncryptionService,
     BearerGuard,
   ],
@@ -34,6 +36,7 @@ import { KycController } from "./kyc.controller";
     UserRepository,
     KycRepository,
     ThrottleService,
+    AccountProvisioningEventService,
     EmailEncryptionService,
     BearerGuard,
   ],

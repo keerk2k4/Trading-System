@@ -15,6 +15,7 @@ Both problems have the same answer. The service that accepts the order records i
 | `orders` | Orders accepted by the Trade REST API and awaiting execution. A work queue with one logical consumer group. | `accountId` as a string | 3 | 1 locally, 3 in a real cluster | 7 days | delete |
 | `trade-events` | Order lifecycle outcomes: filled, rejected, cancelled. The platform's event log, read by many consumers. | `accountId` as a string | 3 | 1 locally, 3 in a real cluster | 30 days | delete |
 | `market-data` | Quotes polled from the Fauxnance API. High volume, low value per message. | `symbol` | 6 | 1 locally, 3 in a real cluster | 1 day | delete |
+| `user-registrations` | User registration events emitted by auth-service so trade-api can provision trading accounts asynchronously. | `userId` as a string | 3 | 1 locally, 3 in a real cluster | 7 days | delete |
 
 The specification calls the first topic `trades`. This catalogue names it `orders`, because everything on it is an accepted order that has not yet been executed. `trades` is accepted where a team has already built against it, but one repository uses one name.
 
@@ -184,20 +185,48 @@ A rejection is an event. Publish it. Notifications, analytics and the blotter al
 
 Publish one message per symbol, not one message per batch. Batching the HTTP call is a quota optimisation; batching the Kafka message would break per-symbol keying and ordering.
 
+### `user-registrations`
+
+`eventType` is always `USER_REGISTERED`.
+
+| Payload field | Type | Notes |
+|---|---|---|
+| `userId` | string, UUID | Also the message key. Auth user identifier. |
+| `username` | string | Registered username at the time of event emission. |
+
+```json
+{
+  "eventId": "4b9d65ac-2cf0-4187-91d9-22bb2cbb1f4a",
+  "eventType": "USER_REGISTERED",
+  "eventTime": "2026-09-28T09:16:02Z",
+  "source": "auth-service",
+  "schemaVersion": 1,
+  "payload": {
+    "userId": "9ec5f4cc-8a78-4df6-8de6-98f5ec18866a",
+    "username": "alice"
+  }
+}
+```
+
+This event exists to decouple account provisioning from synchronous user registration. auth-service emits the event after creating the user record, and trade-api consumes it to create the trading account with idempotent handling.
+
 ## Producer and consumer matrix
 
-| Service | `orders` | `trade-events` | `market-data` |
-|---|---|---|---|
-| Trade REST API | produce | consume, optional, to update read models | not used |
-| Trade Executor | consume, group `trade-executor` | produce | produce, from the scheduled poller inside it |
-| Python ETL | not used | consume, optional, group `analytics-loader` | not used |
-| Portfolio and P&L, in the Trade REST API | not used | consume, group `portfolio-service` | consume, group `portfolio-service` |
-| Watchlists and price alerts, in the Trade REST API | not used | not used | consume, group `watchlist-service` |
-| Customer notifications, in the Trade REST API | not used | consume, group `notification-service` | not used |
-| Customer preferences, in the Trade REST API | not used | not used | not used |
-| Trade advice and signals, in the Trade REST API | not used | consume, group `advice-service` | consume, group `advice-service` |
-| Automated strategy execution, in the Trade REST API | not used | consume, group `strategy-service` | consume, group `strategy-service` |
-| Angular UI | never | never | never |
+| Service | `orders` | `trade-events` | `market-data` | `user-registrations` |
+|---|---|---|---|---|
+| Trade REST API | produce | consume, optional, to update read models | not used | consume, group `account-provisioning` |
+| Trade Executor | consume, group `trade-executor` | produce | produce, from the scheduled poller inside it | not used |
+| Auth Service | not used | not used | not used | produce |
+| Python ETL | not used | consume, optional, group `analytics-loader` | not used | not used |
+| Portfolio and P&L, in the Trade REST API | not used | consume, group `portfolio-service` | consume, group `portfolio-service` | not used |
+| Watchlists and price alerts, in the Trade REST API | not used | not used | consume, group `watchlist-service` | not used |
+| Customer notifications, in the Trade REST API | not used | consume, group `notification-service` | not used | not used |
+| Customer preferences, in the Trade REST API | not used | not used | not used | not used |
+| Trade advice and signals, in the Trade REST API | not used | consume, group `advice-service` | consume, group `advice-service` | not used |
+| Automated strategy execution, in the Trade REST API | not used | consume, group `strategy-service` | consume, group `strategy-service` | not used |
+| Angular UI | never | never | never | never |
+
+For registration provisioning, auth-service produces to `user-registrations` and trade-api consumes from it using a dedicated group id (for example `account-provisioning`).
 
 Two rules follow from the matrix.
 
@@ -252,6 +281,10 @@ kafka-topics.sh --bootstrap-server localhost:9092 --create \
 kafka-topics.sh --bootstrap-server localhost:9092 --create \
   --topic market-data --partitions 6 --replication-factor 1 \
   --config retention.ms=86400000
+
+kafka-topics.sh --bootstrap-server localhost:9092 --create \
+  --topic user-registrations --partitions 3 --replication-factor 1 \
+  --config retention.ms=604800000
 ```
 
 Watch consumer lag while testing. A group whose lag climbs steadily is not keeping up, and on `market-data` that usually means the poller interval is shorter than the consumer's processing time.

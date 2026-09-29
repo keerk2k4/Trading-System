@@ -9,6 +9,7 @@ import { TradeApiClient } from "../services/TradeApiClient";
 import { UserRepository } from "../repositories/UserRepository";
 import { ThrottleService } from "../services/ThrottleService";
 import { User } from "../entities/User";
+import { AccountProvisioningEventService } from "../services/AccountProvisioningEventService";
 
 const USER_ID = "11111111-2222-4333-8444-555555555555";
 const ACCOUNT_ID = 73;
@@ -75,6 +76,7 @@ describe("AuthController", () => {
   let tradeApiClient: any;
   let userRepository: any;
   let throttleService: any;
+  let accountProvisioningEventService: any;
 
   beforeEach(() => {
     tokenService = {
@@ -95,6 +97,9 @@ describe("AuthController", () => {
     tradeApiClient = {
       createAccount: jest.fn(),
       getAccountByUserId: jest.fn(),
+    };
+    accountProvisioningEventService = {
+      publishUserRegistered: jest.fn(),
     };
     userRepository = {
       isUsernameTaken: jest.fn(),
@@ -119,6 +124,7 @@ describe("AuthController", () => {
       tradeApiClient,
       userRepository,
       throttleService,
+      accountProvisioningEventService,
     );
     jest.spyOn(console, "error").mockImplementation(() => undefined);
   });
@@ -128,11 +134,11 @@ describe("AuthController", () => {
   });
 
   describe("register", () => {
-    it("creates auth user and linked trade account, ignoring self-declared roles", async () => {
+    it("creates auth user and publishes account provisioning event, ignoring self-declared roles", async () => {
       userRepository.isUsernameTaken.mockResolvedValue(false);
       passwordService.hashPassword.mockResolvedValue("hashed-password");
       userRepository.create.mockResolvedValue(user);
-      tradeApiClient.createAccount.mockResolvedValue(account);
+      accountProvisioningEventService.publishUserRegistered.mockResolvedValue(undefined);
       const { res, state } = makeResponse();
 
       await controller.register(registerRequest({ roles: [Role.ADMIN] }), res);
@@ -142,7 +148,6 @@ describe("AuthController", () => {
         body: {
           id: USER_ID,
           username: user.userName,
-          accountId: ACCOUNT_ID,
           roles: [Role.CUSTOMER],
         },
       });
@@ -158,14 +163,15 @@ describe("AuthController", () => {
         status: "PENDING",
       });
       expect(userRepository.assignRole).toHaveBeenCalledWith(USER_ID, Role.CUSTOMER);
-      expect(tradeApiClient.createAccount).toHaveBeenCalledWith(USER_ID);
+      expect(accountProvisioningEventService.publishUserRegistered).toHaveBeenCalledWith(USER_ID, user.userName);
+      expect(tradeApiClient.createAccount).not.toHaveBeenCalled();
     });
 
     it("defaults omitted roles to CUSTOMER", async () => {
       userRepository.isUsernameTaken.mockResolvedValue(false);
       passwordService.hashPassword.mockResolvedValue("hashed-password");
       userRepository.create.mockResolvedValue(user);
-      tradeApiClient.createAccount.mockResolvedValue(account);
+      accountProvisioningEventService.publishUserRegistered.mockResolvedValue(undefined);
       const { res, state } = makeResponse();
 
       await controller.register(registerRequest(), res);
@@ -211,11 +217,11 @@ describe("AuthController", () => {
       expect(tradeApiClient.createAccount).not.toHaveBeenCalled();
     });
 
-    it("deletes created user when account creation fails", async () => {
+    it("deletes created user when event publishing fails", async () => {
       userRepository.isUsernameTaken.mockResolvedValue(false);
       passwordService.hashPassword.mockResolvedValue("hashed-password");
       userRepository.create.mockResolvedValue(user);
-      tradeApiClient.createAccount.mockRejectedValue(new Error("trade api unavailable"));
+      accountProvisioningEventService.publishUserRegistered.mockRejectedValue(new Error("kafka unavailable"));
       const { res, state } = makeResponse();
 
       await controller.register(registerRequest(), res);
@@ -228,6 +234,7 @@ describe("AuthController", () => {
         },
       });
       expect(userRepository.deleteById).toHaveBeenCalledWith(USER_ID);
+      expect(tradeApiClient.createAccount).not.toHaveBeenCalled();
     });
 
     it("maps a hashing failure to 422 without attempting database creation", async () => {
