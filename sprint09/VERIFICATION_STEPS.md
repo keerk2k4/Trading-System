@@ -2,7 +2,7 @@
 
 ## Step 1: Build the Auth Service
 ```bash
-cd sprint08/auth-service
+cd sprint09/auth-service
 npm run build
 ```
 Expected: No errors, successful compilation.
@@ -19,7 +19,7 @@ Expected: All tests pass (TokenService, ThrottleService, PasswordService tests).
 
 ## Step 3: Start Auth Service (in a new terminal)
 ```bash
-cd sprint08/auth-service
+cd sprint09/auth-service
 npm run start
 ```
 Expected: Output shows "Auth Service running on port 3000"

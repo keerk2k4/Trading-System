@@ -29,7 +29,7 @@ container names.
   listener
 
 No Postgres, Spring Boot, Trade Executor, or Auth Service container is started
-from [docker-compose.yml](c:/Users/Administrator/Desktop/Capstone%20Project/sprint%2008/chennai-capstone-SE1-team5/sprint08/docker-compose.yml).
+from [docker-compose.yml](../docker-compose.yml).
 
 ### Required environment values
 
@@ -139,7 +139,7 @@ fixed, because the contract and your teammates depend on them.
   it.
 
 ```bash
-cd sprint-08-auth-service
+cd sprint09/auth-service
 npm install                  # first run, and whenever you add a dependency
 npm run build
 npm test

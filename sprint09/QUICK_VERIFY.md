@@ -2,14 +2,14 @@
 
 ## Terminal 1: Build & Test
 ```bash
-cd sprint08/auth-service
+cd sprint09/auth-service
 npm run build
 npm test
 ```
 
 ## Terminal 2: Start Service
 ```bash
-cd sprint08/auth-service
+cd sprint09/auth-service
 npm run start
 ```
 

@@ -68,7 +68,7 @@ Trade-off (documented): each validate/revoke costs up to N `bcrypt.compare`s (on
 ## 4. How to verify
 
 ```bash
-cd sprint08/auth-service
+cd sprint09/auth-service
 
 # all unit tests (44 passing: TokenService, PasswordService,
 # ThrottleService, BearerGuard, refresh rotation)
