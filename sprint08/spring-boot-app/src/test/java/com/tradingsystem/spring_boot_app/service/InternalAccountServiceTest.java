@@ -40,18 +40,18 @@ class InternalAccountServiceTest {
 
     @Test
     void createAccountUsesGeneratedReferenceAndInitialTradingState() {
-        when(accounts.insertAccount(anyString(), eq(USER_ID), eq("ACTIVE"))).thenReturn(41L);
+        when(accounts.insertAccount(anyString(), eq(USER_ID), eq("PENDING"))).thenReturn(41L);
 
         InternalAccountResponse response = service.createAccountForUser(USER_ID);
 
         ArgumentCaptor<String> generatedReference = ArgumentCaptor.forClass(String.class);
-        verify(accounts).insertAccount(generatedReference.capture(), eq(USER_ID), eq("ACTIVE"));
+        verify(accounts).insertAccount(generatedReference.capture(), eq(USER_ID), eq("PENDING"));
         assertAll(
                 () -> assertTrue(generatedReference.getValue().matches("ACC-\\d+")),
                 () -> assertEquals(generatedReference.getValue(), response.accountNumber()),
                 () -> assertEquals(41L, response.accountId()),
                 () -> assertEquals(BigDecimal.ZERO, response.availableBalance()),
-                () -> assertEquals("ACTIVE", response.accountStatus())
+            () -> assertEquals("PENDING", response.accountStatus())
         );
     }
 
@@ -85,12 +85,12 @@ class InternalAccountServiceTest {
     @Test
     void createAccountForUserIfMissingCreatesWhenNoAccountExists() {
         when(accounts.findAccountByUserId(USER_ID)).thenReturn(Optional.empty());
-        when(accounts.insertAccount(anyString(), eq(USER_ID), eq("ACTIVE"))).thenReturn(99L);
+        when(accounts.insertAccount(anyString(), eq(USER_ID), eq("PENDING"))).thenReturn(99L);
 
         InternalAccountResponse response = service.createAccountForUserIfMissing(USER_ID);
 
         assertEquals(99L, response.accountId());
-        verify(accounts).insertAccount(anyString(), eq(USER_ID), eq("ACTIVE"));
+        verify(accounts).insertAccount(anyString(), eq(USER_ID), eq("PENDING"));
     }
 
     @Test
@@ -106,6 +106,40 @@ class InternalAccountServiceTest {
 
         assertEquals(77L, response.accountId());
         assertEquals("ACC-existing", response.accountNumber());
-        verify(accounts, never()).insertAccount(anyString(), eq(USER_ID), eq("ACTIVE"));
+        verify(accounts, never()).insertAccount(anyString(), eq(USER_ID), eq("PENDING"));
+    }
+
+    @Test
+    void activateAccountForUserPromotesPendingToActive() {
+        Account pending = org.mockito.Mockito.mock(Account.class);
+        when(pending.getTradingStatus()).thenReturn(TradingStatus.PENDING);
+
+        Account active = org.mockito.Mockito.mock(Account.class);
+        when(active.getAccountId()).thenReturn(12L);
+        when(active.getAccountReference()).thenReturn("ACC-12");
+        when(active.getCashBalance()).thenReturn(BigDecimal.ZERO);
+        when(active.getTradingStatus()).thenReturn(TradingStatus.ACTIVE);
+
+        when(accounts.findAccountByUserId(USER_ID)).thenReturn(Optional.of(pending), Optional.of(active));
+
+        InternalAccountResponse response = service.activateAccountForUser(USER_ID);
+
+        verify(accounts).activatePendingAccountByUserId(USER_ID);
+        assertEquals("ACTIVE", response.accountStatus());
+    }
+
+    @Test
+    void activateAccountForUserLeavesActiveAsIs() {
+        Account active = org.mockito.Mockito.mock(Account.class);
+        when(active.getAccountId()).thenReturn(55L);
+        when(active.getAccountReference()).thenReturn("ACC-55");
+        when(active.getCashBalance()).thenReturn(new BigDecimal("5.00"));
+        when(active.getTradingStatus()).thenReturn(TradingStatus.ACTIVE);
+        when(accounts.findAccountByUserId(USER_ID)).thenReturn(Optional.of(active));
+
+        InternalAccountResponse response = service.activateAccountForUser(USER_ID);
+
+        verify(accounts, never()).activatePendingAccountByUserId(USER_ID);
+        assertEquals("ACTIVE", response.accountStatus());
     }
 }

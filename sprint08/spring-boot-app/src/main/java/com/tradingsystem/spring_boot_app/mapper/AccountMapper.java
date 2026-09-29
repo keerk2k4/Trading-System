@@ -200,4 +200,12 @@ Long insertAccount(
     @Arg(column = "version", javaType = Long.class)
 })
 Optional<Account> findAccountByUserId(@Param("userId") String userId);
+
+    @Update("""
+    UPDATE trading.trading_accounts
+    SET account_status = 'ACTIVE', version = version + 1,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = #{userId} AND account_status = 'PENDING'
+    """)
+    int activatePendingAccountByUserId(@Param("userId") String userId);
 }

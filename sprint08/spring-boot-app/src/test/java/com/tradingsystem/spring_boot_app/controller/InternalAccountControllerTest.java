@@ -1,7 +1,9 @@
 package com.tradingsystem.spring_boot_app.controller;
 
 import com.tradingsystem.spring_boot_app.dto.internal.InternalAccountResponse;
+import com.tradingsystem.spring_boot_app.security.JwtTokenProvider;
 import com.tradingsystem.spring_boot_app.service.InternalAccountService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -43,20 +45,29 @@ class InternalAccountControllerTest {
     @MockitoBean
     private InternalAccountService internalAccounts;
 
+        @MockitoBean
+        private JwtTokenProvider tokenProvider;
+
+        @BeforeEach
+        void configureTokenValidation() {
+                when(tokenProvider.validateInternalServiceToken("internal-token")).thenReturn(true);
+        }
+
     @Test
     void createAccountAnswers201AndReturnsCreatedAccount() throws Exception {
         InternalAccountResponse created = new InternalAccountResponse(
-                17L, "ACC-1750000000000", BigDecimal.ZERO, "ACTIVE");
+                17L, "ACC-1750000000000", BigDecimal.ZERO, "PENDING");
         when(internalAccounts.createAccountForUser(USER_ID)).thenReturn(created);
 
         mvc.perform(post("/internal/accounts")
+                        .header("Authorization", "Bearer internal-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"userId\":\"%s\"}".formatted(USER_ID)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.accountId").value(17))
                 .andExpect(jsonPath("$.accountNumber").value("ACC-1750000000000"))
                 .andExpect(jsonPath("$.availableBalance").value(0))
-                .andExpect(jsonPath("$.accountStatus").value("ACTIVE"));
+                .andExpect(jsonPath("$.accountStatus").value("PENDING"));
 
         verify(internalAccounts).createAccountForUser(USER_ID);
     }
@@ -64,6 +75,7 @@ class InternalAccountControllerTest {
     @Test
     void createAccountRejectsBlankUserIdBeforeCallingService() throws Exception {
         mvc.perform(post("/internal/accounts")
+                        .header("Authorization", "Bearer internal-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"userId\":\"   \"}"))
                 .andExpect(status().isUnprocessableEntity())
@@ -76,6 +88,7 @@ class InternalAccountControllerTest {
     @Test
     void createAccountRejectsMalformedJsonBeforeCallingService() throws Exception {
         mvc.perform(post("/internal/accounts")
+                        .header("Authorization", "Bearer internal-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"userId\":"))
                 .andExpect(status().isUnprocessableEntity())
@@ -89,7 +102,8 @@ class InternalAccountControllerTest {
         when(internalAccounts.findAccountByUserId(USER_ID)).thenReturn(Optional.of(
                 new InternalAccountResponse(23L, "ACC-current", new BigDecimal("125.50"), "SUSPENDED")));
 
-        mvc.perform(get("/internal/accounts/by-user/{userId}", USER_ID))
+        mvc.perform(get("/internal/accounts/by-user/{userId}", USER_ID)
+                        .header("Authorization", "Bearer internal-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accountId").value(23))
                 .andExpect(jsonPath("$.accountNumber").value("ACC-current"))
@@ -101,8 +115,23 @@ class InternalAccountControllerTest {
     void getAccountByUserAnswers404WhenNoAccountExists() throws Exception {
         when(internalAccounts.findAccountByUserId(USER_ID)).thenReturn(Optional.empty());
 
-        mvc.perform(get("/internal/accounts/by-user/{userId}", USER_ID))
+        mvc.perform(get("/internal/accounts/by-user/{userId}", USER_ID)
+                        .header("Authorization", "Bearer internal-token"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void activateAccountAnswers200WithActiveStatus() throws Exception {
+        when(internalAccounts.activateAccountForUser(USER_ID)).thenReturn(
+                new InternalAccountResponse(23L, "ACC-current", new BigDecimal("125.50"), "ACTIVE"));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch("/internal/accounts/by-user/{userId}/activate", USER_ID)
+                        .header("Authorization", "Bearer internal-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accountStatus").value("ACTIVE"));
+
+        verify(internalAccounts).activateAccountForUser(USER_ID);
     }
 
     @Test
@@ -111,6 +140,7 @@ class InternalAccountControllerTest {
                 .thenThrow(new IllegalArgumentException("sensitive backend detail"));
 
         mvc.perform(post("/internal/accounts")
+                        .header("Authorization", "Bearer internal-token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"userId\":\"%s\"}".formatted(USER_ID)))
                 .andExpect(status().isInternalServerError())

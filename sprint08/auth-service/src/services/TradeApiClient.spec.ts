@@ -163,6 +163,49 @@ describe("TradeApiClient", () => {
     });
   });
 
+  describe("activateAccount", () => {
+    it("activates a pending account and returns the updated account", async () => {
+      const account: TradeAccountResponse = {
+        accountId: 9,
+        accountNumber: "ACC-9",
+        availableBalance: "0.00",
+        accountStatus: "ACTIVE",
+      };
+      const response = makeResponse({ json: jest.fn().mockResolvedValue(account) });
+      fetchMock.mockResolvedValue(response);
+
+      await expect(client.activateAccount("user-123")).resolves.toEqual(account);
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://trade-api.test/internal/accounts/by-user/user-123/activate",
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: "Bearer internal-service-token",
+          },
+        },
+      );
+    });
+
+    it("maps failed activation responses to AUTH-500", async () => {
+      fetchMock.mockResolvedValue(makeResponse({ ok: false, status: 409 }));
+
+      let thrown: unknown;
+      try {
+        await client.activateAccount("user-123");
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBeInstanceOf(HttpException);
+      expect((thrown as HttpException).getStatus()).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
+      expect((thrown as HttpException).getResponse()).toEqual({
+        errorCode: "AUTH-500",
+        message: "Failed to activate trading account",
+      });
+    });
+  });
+
   it("uses the default Trade API URL when the environment variable is absent", async () => {
     delete process.env.TRADE_API_URL;
     const defaultClient = new TradeApiClient(tokenService as unknown as TokenService);

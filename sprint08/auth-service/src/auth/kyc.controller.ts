@@ -163,7 +163,7 @@ export class KycController {
 
       let accountId: number | undefined;
       if (request.status === KycReviewStatus.APPROVED) {
-        const account = await this.tradeApiClient.createAccount(request.userId);
+        const account = await this.tradeApiClient.activateAccount(request.userId);
         accountId = account.accountId;
       }
 

@@ -75,4 +75,32 @@ export class TradeApiClient {
 
     return response.json() as Promise<TradeAccountResponse>;
   }
+
+  async activateAccount(userId: string): Promise<TradeAccountResponse> {
+    const internalAccessToken = this.tokenService.createInternalAccessToken();
+    const endpoint = `${this.baseUrl}/internal/accounts/by-user/${userId}/activate`;
+
+    console.log("[TradeApiClient] Calling activateAccount", {
+      endpoint,
+      userId,
+      authScheme: "Bearer",
+      tokenPrefix: internalAccessToken.slice(0, 16),
+    });
+
+    const response = await fetch(endpoint, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${internalAccessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new HttpException(
+        { errorCode: "AUTH-500", message: "Failed to activate trading account" },
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+
+    return response.json() as Promise<TradeAccountResponse>;
+  }
 }

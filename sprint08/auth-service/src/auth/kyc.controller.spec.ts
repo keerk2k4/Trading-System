@@ -54,6 +54,7 @@ describe("KycController", () => {
 
     tradeApiClient = {
       createAccount: jest.fn(),
+      activateAccount: jest.fn(),
     } as unknown as jest.Mocked<TradeApiClient>;
 
     controller = new KycController(kycRepository, userRepository, tradeApiClient);
@@ -143,7 +144,7 @@ describe("KycController", () => {
     expect(kycRepository.reviewSubmission).not.toHaveBeenCalled();
   });
 
-  it("approves KYC and creates trading account when reviewed by admin", async () => {
+  it("approves KYC and activates pending trading account when reviewed by admin", async () => {
     kycRepository.findByUserId.mockResolvedValue(kycRow);
     kycRepository.reviewSubmission.mockResolvedValue({
       ...kycRow,
@@ -151,7 +152,7 @@ describe("KycController", () => {
       reviewedAt: "2026-09-28T01:00:00.000Z",
       reviewedBy: ADMIN_ID,
     });
-    tradeApiClient.createAccount.mockResolvedValue({
+    tradeApiClient.activateAccount.mockResolvedValue({
       accountId: 73,
       accountNumber: "ACC-73",
       availableBalance: "0.00",
@@ -168,7 +169,7 @@ describe("KycController", () => {
     expect(state.status).toBe(200);
     expect(state.body.status).toBe("APPROVED");
     expect(state.body.accountId).toBe(73);
-    expect(tradeApiClient.createAccount).toHaveBeenCalledWith(USER_ID);
+    expect(tradeApiClient.activateAccount).toHaveBeenCalledWith(USER_ID);
   });
 
   it("updates KYC to rejected without creating trading account", async () => {
@@ -195,6 +196,6 @@ describe("KycController", () => {
     expect(state.status).toBe(200);
     expect(state.body.status).toBe("REJECTED");
     expect(state.body.accountId).toBeUndefined();
-    expect(tradeApiClient.createAccount).not.toHaveBeenCalled();
+    expect(tradeApiClient.activateAccount).not.toHaveBeenCalled();
   });
 });

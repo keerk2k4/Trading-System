@@ -81,8 +81,8 @@ public class InternalAccountController {
     }
 
     /**
-     * Called once, during registration. Creates a brand new trading account
-     * with balance 0.00 and status ACTIVE, linked to the given Auth
+    * Called once, during registration. Creates a brand new trading account
+    * with balance 0.00 and status PENDING, linked to the given Auth
      * Service user (a UUID string).
      * 
      * SECURITY: Requires valid Authorization header with Bearer token from Auth Service.
@@ -119,5 +119,23 @@ public class InternalAccountController {
         return internalAccountService.findAccountByUserId(userId)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Called by Auth Service when admin approves KYC.
+     * Activates a trading account from PENDING to ACTIVE.
+     *
+     * SECURITY: Requires valid Authorization header with Bearer token from Auth Service.
+     */
+    @PatchMapping("/by-user/{userId}/activate")
+    public ResponseEntity<InternalAccountResponse> activateAccountByUserId(
+            @PathVariable String userId,
+            HttpServletRequest httpRequest) {
+
+        validateAndExtractToken(httpRequest);
+
+        LOGGER.info("Activating account for user: {}", userId);
+        InternalAccountResponse response = internalAccountService.activateAccountForUser(userId);
+        return ResponseEntity.ok(response);
     }
 }
