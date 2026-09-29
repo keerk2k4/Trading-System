@@ -1,0 +1,15 @@
+<header class="top-bar">
+  <span class="brand">Trading UI</span>
+  <nav>
+    @if (session.isSignedIn()) {
+      <button type="button" (click)="signOut()" data-testid="sign-out">Sign out</button>
+    } @else {
+      <a routerLink="/login">Sign in</a>
+      <a routerLink="/register">Register</a>
+    }
+  </nav>
+</header>
+
+<main>
+  <router-outlet />
+</main>

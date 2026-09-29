@@ -1,0 +1,33 @@
+<section class="auth-card">
+  <h1>Administrator sign-in</h1>
+
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <label for="admin-username">Username</label>
+    <input
+      id="admin-username"
+      type="text"
+      formControlName="username"
+      data-testid="admin-login-username"
+      autocomplete="username"
+    />
+
+    <label for="admin-password">Password</label>
+    <input
+      id="admin-password"
+      type="password"
+      formControlName="password"
+      data-testid="admin-login-password"
+      autocomplete="current-password"
+    />
+
+    @if (errorMessage()) {
+      <p class="form-error" role="alert">{{ errorMessage() }}</p>
+    }
+
+    <button type="submit" data-testid="admin-login-submit" [disabled]="submitting()">
+      {{ submitting() ? 'Signing in…' : 'Sign in' }}
+    </button>
+  </form>
+
+  <p class="switch-link"><a routerLink="/login">Back to customer sign-in</a></p>
+</section>

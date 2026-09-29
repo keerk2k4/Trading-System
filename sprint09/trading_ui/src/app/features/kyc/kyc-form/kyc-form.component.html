@@ -1,0 +1,40 @@
+<section class="auth-card">
+  <h1>Submit KYC details</h1>
+
+  @if (!session.isSignedIn()) {
+    <p class="form-error" role="alert">
+      You're not signed in. <a routerLink="/login">Sign in</a> first.
+    </p>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <label for="kyc-dob">Date of birth</label>
+    <input id="kyc-dob" type="date" formControlName="dateOfBirth" data-testid="kyc-date-of-birth" />
+
+    <label for="kyc-doc-type">Document type</label>
+    <select id="kyc-doc-type" formControlName="documentType" data-testid="kyc-document-type">
+      <option value="PASSPORT">Passport</option>
+      <option value="DRIVERS_LICENSE">Driver's licence</option>
+      <option value="NATIONAL_ID">National ID</option>
+    </select>
+
+    <label for="kyc-doc-number">Document number</label>
+    <input
+      id="kyc-doc-number"
+      type="text"
+      formControlName="documentNumber"
+      data-testid="kyc-document-number"
+    />
+
+    @if (errorMessage()) {
+      <p class="form-error" role="alert">{{ errorMessage() }}</p>
+    }
+    @if (successMessage()) {
+      <p class="form-success" role="status">{{ successMessage() }}</p>
+    }
+
+    <button type="submit" data-testid="kyc-submit" [disabled]="submitting()">
+      {{ submitting() ? 'Submitting…' : 'Submit KYC' }}
+    </button>
+  </form>
+</section>

@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/@openapitools/openapi-generator-cli/config.schema.json",
+  "spaces": 2,
+  "generator-cli": {
+    "version": "7.10.0",
+    "generators": {
+      "auth-api": {
+        "generatorName": "typescript-angular",
+        "input": "../contracts/auth-api.yaml",
+        "output": "src/app/generated/auth-api",
+        "skipValidateSpec": true,
+        "additionalProperties": {
+          "ngVersion": "21.0.0",
+          "providedInRoot": true,
+          "supportsES6": true,
+          "npmName": "@trading-ui/auth-api-client",
+          "withInterfaces": true
+        }
+      },
+      "trade-api": {
+        "generatorName": "typescript-angular",
+        "input": "../contracts/trade-api.yaml",
+        "output": "src/app/generated/trade-api",
+        "skipValidateSpec": true,
+        "additionalProperties": {
+          "ngVersion": "21.0.0",
+          "providedInRoot": true,
+          "supportsES6": true,
+          "npmName": "@trading-ui/trade-api-client",
+          "withInterfaces": true
+        }
+      }
+    }
+  }
+}
