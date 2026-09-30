@@ -21,7 +21,7 @@ import { ErrorMappingService } from '../../../shared/services/error-mapping.serv
 
         <div *ngIf="kycStatus() === 'PENDING'" class="alert alert-info">
           <strong>Application Under Review</strong>
-          <p>Your KYC application has been submitted and is awaiting admin approval. You will be notified once your application is reviewed.</p>
+          <p>Your KYC application has been submitted and is awaiting admin approval. You will be notified by email once your application is reviewed.</p>
           <p><strong>Status:</strong> <span class="badge badge-pending">PENDING</span></p>
         </div>
 
@@ -177,7 +177,7 @@ export class KycFormComponent implements OnInit {
       next: () => {
         this.isLoading.set(false);
         this.kycStatus.set('PENDING');
-        this.successMessage.set('KYC submitted successfully!');
+        this.successMessage.set('KYC submitted successfully! A confirmation email has been sent to you.');
       },
       error: (err) => {
         this.isLoading.set(false);

@@ -134,10 +134,20 @@ describe('authTokenInterceptor', () => {
     const auth = TestBed.inject(MockAuthService);
     const http = TestBed.inject(HttpTestingController);
 
-    auth.register({ username: 'new.user', password: 'secret', confirmPassword: 'secret' }).subscribe();
+    auth.register({
+      username: 'new.user',
+      email: 'new.user@example.com',
+      password: 'secret',
+      confirmPassword: 'secret'
+    }).subscribe();
 
     const req = http.expectOne('http://localhost:3000/auth/register');
     expect(req.request.headers.has('Authorization')).toBe(false);
+    expect(req.request.body).toEqual({
+      username: 'new.user',
+      password: 'secret',
+      email: 'new.user@example.com'
+    });
     req.flush({});
     http.verify();
     localStorage.removeItem('auth_token');

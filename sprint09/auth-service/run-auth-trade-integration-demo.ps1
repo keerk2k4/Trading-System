@@ -283,6 +283,7 @@ Write-Step "Calling /auth/register"
 $registerResponse = Invoke-JsonPost -Url "$AuthBaseUrl/auth/register" -Body @{
   username = $Username
   password = $Password
+  email = "$Username@example.com"
   roles = @("CUSTOMER")
 }
 
@@ -349,6 +350,7 @@ $fakePassword = "testpassword123"
 $fakeRegisterResponse = Invoke-JsonPost -Url "$AuthBaseUrl/auth/register" -Body @{
   username = $fakeUsername
   password = $fakePassword
+  email = "$fakeUsername@example.com"
   roles = @("CUSTOMER")
 }
 

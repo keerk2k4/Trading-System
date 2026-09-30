@@ -19,6 +19,7 @@ import { AuthenticatedUser, CurrentUser } from "../guards/CurrentUser";
 import { KycRepository } from "../repositories/KycRepository";
 import { UserRepository } from "../repositories/UserRepository";
 import { TradeApiClient } from "../services/TradeApiClient";
+import { NotificationService } from "../services/NotificationService";
 
 @Controller("kyc")
 @ApiTags("KYC")
@@ -27,6 +28,7 @@ export class KycController {
     private kycRepository: KycRepository,
     private userRepository: UserRepository,
     private tradeApiClient: TradeApiClient,
+    private notificationService: NotificationService,
   ) {}
 
   @Post()
@@ -96,6 +98,9 @@ export class KycController {
         reviewedBy: created.reviewedBy,
         rejectionReason: created.rejectionReason,
       };
+
+      // Fire and forget: a mail outage must not fail the KYC submission.
+      void this.notificationService.sendKycSubmitted(user.userId, user.email, user.userName);
 
       res.status(201).json(response);
     } catch (error) {
@@ -181,11 +186,41 @@ export class KycController {
         accountId,
       };
 
+      void this.notifyApplicantOfReview(reviewed.userId, reviewed.status, reviewed.rejectionReason);
+
       res.status(200).json(response);
     } catch (error) {
       console.error("Review KYC error:", error);
       const response: ErrorResponse = { errorCode: "VAL-422", message: "Invalid input" };
       res.status(422).json(response);
+    }
+  }
+
+  // Emails the applicant (not the reviewing admin) the review outcome.
+  // Best-effort: any failure is logged and never affects the review response.
+  private async notifyApplicantOfReview(
+    userId: string,
+    status: string,
+    rejectionReason: string | null,
+  ): Promise<void> {
+    try {
+      const applicant = await this.userRepository.findByUserId(userId);
+      if (!applicant) {
+        return;
+      }
+
+      if (status === KycReviewStatus.APPROVED) {
+        await this.notificationService.sendKycApproved(applicant.userId, applicant.email, applicant.userName);
+      } else if (status === KycReviewStatus.REJECTED) {
+        await this.notificationService.sendKycRejected(
+          applicant.userId,
+          applicant.email,
+          applicant.userName,
+          rejectionReason,
+        );
+      }
+    } catch (error) {
+      console.error(`KYC review notification failed for user ${userId}:`, (error as Error)?.message);
     }
   }
 }

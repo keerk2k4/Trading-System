@@ -57,6 +57,20 @@ info:
     and cannot trade, until an admin approves the user's KYC submission (see the KYC endpoints
     below), which moves it to `ACTIVE`.
 
+    ## Email notifications
+
+    The service emails the user at the address given at registration:
+
+    | Trigger | Email |
+    |---|---|
+    | `POST /auth/register` returns `201` | Registered; next step is KYC |
+    | `POST /kyc` returns `201` | KYC submitted, awaiting approval |
+    | `PATCH /kyc` returns `200` with `APPROVED` | KYC approved, trading account active |
+    | `PATCH /kyc` returns `200` with `REJECTED` | KYC not approved, with the rejection reason |
+
+    Delivery is best-effort and asynchronous. A mail failure never changes the HTTP response,
+    so clients must not treat a successful response as proof that an email was delivered.
+
     ## Security rules
 
     - Store passwords with argon2id or bcrypt at cost 12 or above. Never MD5, never SHA-256, never
@@ -492,7 +506,7 @@ components:
     RegisterRequest:
       type: object
       additionalProperties: false
-      required: [username, password]
+      required: [username, password, email]
       properties:
         username:
           type: string
@@ -508,6 +522,15 @@ components:
             Minimum twelve characters. Length beats character-class rules, so do not impose a
             symbol requirement that pushes users towards a shorter password.
           writeOnly: true
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: |
+            Address for notification emails (registration, KYC submitted, KYC approved or
+            rejected). PII: stored encrypted at rest, never returned in any response, never logged.
+          writeOnly: true
+          example: priya.menon@example.com
         roles:
           type: array
           minItems: 1
@@ -521,6 +544,7 @@ components:
       example:
         username: priya.menon
         password: 'correct horse battery staple'
+        email: priya.menon@example.com
 
     LoginRequest:
       type: object

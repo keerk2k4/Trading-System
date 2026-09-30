@@ -5,6 +5,9 @@ import { RouterLink, Router } from '@angular/router';
 import { MockAuthService } from '../../../shared/services/mock-auth.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
 
+// Deliberately loose: the auth-service's @IsEmail() is the real check.
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 @Component({
   selector: 'app-register',
   standalone: true,
@@ -43,6 +46,27 @@ import { ErrorMappingService } from '../../../shared/services/error-mapping.serv
             <strong>Username requirements:</strong>
             <ul>
               <li *ngFor="let error of getUsernameValidationErrors()">{{ error }}</li>
+            </ul>
+          </div>
+
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              [(ngModel)]="email"
+              required
+              maxlength="254"
+              placeholder="you@example.com"
+            />
+            <small>We'll email you about your registration and KYC status</small>
+          </div>
+
+          <div class="validation-summary" *ngIf="getEmailValidationErrors().length > 0">
+            <strong>Email requirements:</strong>
+            <ul>
+              <li *ngFor="let error of getEmailValidationErrors()">{{ error }}</li>
             </ul>
           </div>
 
@@ -174,6 +198,7 @@ import { ErrorMappingService } from '../../../shared/services/error-mapping.serv
 })
 export class RegisterComponent {
   username = '';
+  email = '';
   password = '';
   confirmPassword = '';
   
@@ -224,11 +249,28 @@ export class RegisterComponent {
     return errors;
   }
 
+  getEmailValidationErrors(): string[] {
+    const errors: string[] = [];
+
+    if (this.email.length > 0) {
+      if (!EMAIL_PATTERN.test(this.email.trim())) {
+        errors.push('Enter a valid email address, e.g. you@example.com');
+      }
+      if (this.email.trim().length > 254) {
+        errors.push('Email cannot exceed 254 characters');
+      }
+    }
+
+    return errors;
+  }
+
   isFormValid(): boolean {
     return (
       this.username.length >= 3 &&
       this.username.length <= 64 &&
       /^[a-zA-Z0-9._-]+$/.test(this.username) &&
+      this.email.trim().length > 0 &&
+      this.getEmailValidationErrors().length === 0 &&
       this.password.length >= 12 &&
       this.password.length <= 128 &&
       this.confirmPassword.length >= 12 &&
@@ -237,7 +279,7 @@ export class RegisterComponent {
   }
 
   onRegister(): void {
-    if (!this.username || !this.password || !this.confirmPassword) {
+    if (!this.username || !this.email || !this.password || !this.confirmPassword) {
       this.errorMessage.set('All fields are required');
       return;
     }
@@ -245,6 +287,11 @@ export class RegisterComponent {
     const usernameErrors = this.getUsernameValidationErrors();
     if (usernameErrors.length > 0) {
       this.errorMessage.set('Please fix username requirements before submitting');
+      return;
+    }
+
+    if (this.getEmailValidationErrors().length > 0) {
+      this.errorMessage.set('Please enter a valid email address before submitting');
       return;
     }
 
@@ -259,6 +306,7 @@ export class RegisterComponent {
 
     this.authService.register({
       username: this.username,
+      email: this.email.trim(),
       password: this.password,
       confirmPassword: this.confirmPassword
     }).subscribe({
@@ -266,7 +314,9 @@ export class RegisterComponent {
         // The real endpoint only returns { id, username, roles } - the
         // trading account itself is provisioned asynchronously afterwards,
         // so there's no accountId to show yet at this point.
-        this.successMessage.set(`Account created for ${response.username}. Redirecting to login...`);
+        this.successMessage.set(
+          `Account created for ${response.username}. A confirmation email is on its way. Redirecting to login...`
+        );
         this.isLoading.set(false);
         setTimeout(() => {
           this.router.navigate(['/login']);

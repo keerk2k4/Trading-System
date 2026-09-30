@@ -56,6 +56,7 @@ function registerRequest(overrides: Partial<RegisterRequest> = {}): RegisterRequ
   return {
     username: "new.trader",
     password: "correct horse battery staple",
+    email: "new.trader@example.com",
     ...overrides,
   };
 }
@@ -77,8 +78,12 @@ describe("AuthController", () => {
   let userRepository: any;
   let throttleService: any;
   let accountProvisioningEventService: any;
+  let notificationService: any;
 
   beforeEach(() => {
+    notificationService = {
+      sendUserRegistered: jest.fn().mockResolvedValue(undefined),
+    };
     tokenService = {
       createAccessToken: jest.fn(),
       getAccessTokenExpiry: jest.fn().mockReturnValue(900),
@@ -125,6 +130,7 @@ describe("AuthController", () => {
       userRepository,
       throttleService,
       accountProvisioningEventService,
+      notificationService,
     );
     jest.spyOn(console, "error").mockImplementation(() => undefined);
   });
@@ -156,7 +162,7 @@ describe("AuthController", () => {
       expect(userRepository.create).toHaveBeenCalledWith({
         userName: "new.trader",
         passwordHash: "hashed-password",
-        email: "new.trader@placeholder.local",
+        email: "new.trader@example.com",
         phone: null,
         firstName: "",
         lastName: "",
@@ -165,6 +171,25 @@ describe("AuthController", () => {
       expect(userRepository.assignRole).toHaveBeenCalledWith(USER_ID, Role.CUSTOMER);
       expect(accountProvisioningEventService.publishUserRegistered).toHaveBeenCalledWith(USER_ID, user.userName);
       expect(tradeApiClient.createAccount).not.toHaveBeenCalled();
+      expect(notificationService.sendUserRegistered).toHaveBeenCalledWith(
+        USER_ID,
+        "new.trader@example.com",
+        user.userName,
+      );
+    });
+
+    it("does not send a registration email when registration fails", async () => {
+      userRepository.isUsernameTaken.mockResolvedValue(false);
+      passwordService.hashPassword.mockResolvedValue("hashed-password");
+      userRepository.create.mockResolvedValue(user);
+      accountProvisioningEventService.publishUserRegistered.mockRejectedValue(new Error("kafka down"));
+      const { res, state } = makeResponse();
+
+      await controller.register(registerRequest(), res);
+
+      expect(state.status).toBe(422);
+      expect(userRepository.deleteById).toHaveBeenCalledWith(USER_ID);
+      expect(notificationService.sendUserRegistered).not.toHaveBeenCalled();
     });
 
     it("defaults omitted roles to CUSTOMER", async () => {
