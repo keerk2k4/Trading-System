@@ -461,8 +461,12 @@ components:
 
     AccountStatus:
       type: string
-      enum: [ACTIVE, SUSPENDED, CLOSED]
-      description: Only an ACTIVE account may place or cancel orders.
+      enum: [PENDING, ACTIVE, SUSPENDED, BLOCKED, CLOSED]
+      description: |
+        Only an ACTIVE account may place or cancel orders. `PENDING` is the status a newly
+        registered user's account is created in, before KYC is approved; the Auth Service's
+        `PATCH /kyc` review endpoint moves it to `ACTIVE` on approval. `BLOCKED` and `SUSPENDED`
+        are both non-trading holds; `CLOSED` is terminal.
 
     PlaceOrderRequest:
       type: object
