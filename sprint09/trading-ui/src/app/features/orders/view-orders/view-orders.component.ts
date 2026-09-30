@@ -1,14 +1,17 @@
 import { Component, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { NavbarComponent } from '../../../shared/navbar/navbar.component';
-import { MockOrderService } from '../../../shared/services/mock-order.service';
-import { Order } from '../../../shared/models/order.models';
+import { MockAuthService } from '../../../shared/services/mock-auth.service';
+import { TradeApiService } from '../../../shared/services/trade-api.service';
+import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
+import { Order, OrderStatus, TradeApiError } from '../../../shared/models/order.models';
 
 @Component({
   selector: 'app-view-orders',
   standalone: true,
-  imports: [CommonModule, RouterLink, NavbarComponent],
+  imports: [CommonModule, FormsModule, RouterLink, NavbarComponent],
   template: `
     <app-navbar></app-navbar>
 
@@ -21,8 +24,24 @@ import { Order } from '../../../shared/models/order.models';
         </button>
       </div>
 
-      <div *ngIf="orders().length === 0" class="empty-state">
-        <p>No orders yet. <a routerLink="/orders/new">Place your first order</a></p>
+      <div class="orders-filter">
+        <label for="statusFilter">Status</label>
+        <select id="statusFilter" name="statusFilter" [(ngModel)]="statusFilter" (ngModelChange)="loadOrders()">
+          <option value="">All</option>
+          <option value="NEW">NEW</option>
+          <option value="FILLED">FILLED</option>
+          <option value="REJECTED">REJECTED</option>
+          <option value="CANCELLED">CANCELLED</option>
+        </select>
+      </div>
+
+      <div *ngIf="errorMessage()" class="alert alert-error">
+        {{ errorMessage() }}
+      </div>
+
+      <div *ngIf="!errorMessage() && !isRefreshing() && orders().length === 0" class="empty-state">
+        <p *ngIf="!statusFilter">No orders yet. <a routerLink="/orders/new">Place your first order</a></p>
+        <p *ngIf="statusFilter">No {{ statusFilter }} orders found.</p>
       </div>
 
       <div *ngIf="orders().length > 0" class="table-container">
@@ -40,7 +59,7 @@ import { Order } from '../../../shared/models/order.models';
           </thead>
           <tbody>
             <tr *ngFor="let order of orders()">
-              <td><strong>{{ order.id }}</strong></td>
+              <td><strong>{{ order.orderId }}</strong></td>
               <td>{{ order.symbol }}</td>
               <td>
                 <span [ngClass]="order.side === 'BUY' ? 'side-buy' : 'side-sell'">
@@ -48,13 +67,13 @@ import { Order } from '../../../shared/models/order.models';
                 </span>
               </td>
               <td class="text-right">{{ order.quantity }}</td>
-              <td class="text-right">$ {{ order.price.toFixed(2) }}</td>
+              <td class="text-right">$ {{ order.price | number:'1.2-2' }}</td>
               <td>
                 <span [ngClass]="'badge badge-' + order.status.toLowerCase()">
                   {{ order.status }}
                 </span>
               </td>
-              <td>{{ formatDate(order.createdAt) }}</td>
+              <td>{{ formatDate(order.createdOn) }}</td>
             </tr>
           </tbody>
         </table>
@@ -109,6 +128,28 @@ import { Order } from '../../../shared/models/order.models';
     .subtitle {
       color: var(--steel-blue);
       margin: 0;
+    }
+
+    .orders-filter {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .orders-filter label {
+      margin: 0;
+      font-weight: 600;
+      color: var(--prussian-blue);
+    }
+
+    .orders-filter select {
+      width: auto;
+      min-width: 160px;
+    }
+
+    .alert {
+      margin-bottom: var(--spacing-lg);
     }
 
     .empty-state {
@@ -200,25 +241,48 @@ import { Order } from '../../../shared/models/order.models';
 export class ViewOrdersComponent implements OnInit {
   orders = signal<Order[]>([]);
   isRefreshing = signal<boolean>(false);
+  errorMessage = signal<string>('');
+  statusFilter: OrderStatus | '' = '';
 
-  constructor(private orderService: MockOrderService) {}
+  constructor(
+    private authService: MockAuthService,
+    private orderService: TradeApiService,
+    private errorMapping: ErrorMappingService
+  ) {}
 
   ngOnInit(): void {
     this.loadOrders();
   }
 
   loadOrders(): void {
+    // accountId is 0 until the trading account has been provisioned and the
+    // user has signed in again to pick it up in a fresh token.
+    const accountId = this.authService.getCurrentUser()?.accountId;
+    if (!accountId) {
+      this.orders.set([]);
+      this.errorMessage.set(this.errorMapping.getErrorMessage('ACC-404'));
+      return;
+    }
+
     this.isRefreshing.set(true);
-    this.orderService.getOrders().subscribe({
+    this.errorMessage.set('');
+
+    this.orderService.getOrders(accountId, { status: this.statusFilter || undefined }).subscribe({
       next: (orders) => {
-        // Sort by createdAt descending (newest first)
-        this.orders.set(orders.sort((a, b) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        // Sort by createdOn descending (newest first)
+        this.orders.set([...orders].sort((a, b) =>
+          new Date(b.createdOn).getTime() - new Date(a.createdOn).getTime()
         ));
         this.isRefreshing.set(false);
       },
-      error: () => {
+      error: (err: TradeApiError) => {
+        this.orders.set([]);
         this.isRefreshing.set(false);
+        this.errorMessage.set(
+          this.errorMapping.isNetworkError(err.status)
+            ? this.errorMapping.getNetworkErrorMessage()
+            : this.errorMapping.getErrorMessage(err.errorCode)
+        );
       }
     });
   }
@@ -227,7 +291,7 @@ export class ViewOrdersComponent implements OnInit {
     this.loadOrders();
   }
 
-  formatDate(date: Date): string {
+  formatDate(date: string): string {
     return new Date(date).toLocaleString('en-US', {
       year: 'numeric',
       month: 'short',
