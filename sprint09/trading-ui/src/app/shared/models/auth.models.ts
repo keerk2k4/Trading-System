@@ -21,12 +21,13 @@ export interface RegisterRequest {
   confirmPassword: string;
 }
 
+// Matches the real POST /auth/register response exactly: no accountId and
+// no createdOn come back - the trading account is provisioned asynchronously
+// after registration, not returned in this response.
 export interface UserResponseData {
   id: string;
   username: string;
-  accountId: number;
   roles: string[];
-  createdOn?: string;
 }
 
 export interface LoginRequest {
