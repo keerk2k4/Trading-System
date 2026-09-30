@@ -16,10 +16,6 @@ import { ErrorMappingService } from '../../../shared/services/error-mapping.serv
         <h1>Sign In</h1>
         <p class="subtitle">Welcome back to the Trading Platform</p>
 
-        <div *ngIf="demoCredentials()" class="alert alert-info">
-          <strong>Demo Account:</strong> username: <code>priya.menon</code>, password: <code>Test@123456</code>
-        </div>
-
         <div *ngIf="errorMessage()" class="alert alert-error">
           {{ errorMessage() }}
         </div>
@@ -127,7 +123,6 @@ export class LoginComponent {
   
   errorMessage = signal<string>('');
   isLoading = signal<boolean>(false);
-  demoCredentials = signal<boolean>(true);
 
   constructor(
     private authService: MockAuthService,
@@ -146,10 +141,12 @@ export class LoginComponent {
     this.isLoading.set(true);
     this.errorMessage.set('');
 
+    const isAdminRoute = this.route.snapshot.data['isAdmin'] === true;
+
     this.authService.login({
       username: this.username,
       password: this.password
-    }).subscribe({
+    }, isAdminRoute).subscribe({
       next: (response) => {
         this.isLoading.set(false);
         
