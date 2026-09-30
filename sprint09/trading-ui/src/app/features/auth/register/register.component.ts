@@ -263,7 +263,10 @@ export class RegisterComponent {
       confirmPassword: this.confirmPassword
     }).subscribe({
       next: (response) => {
-        this.successMessage.set(`Account created! Your trading account (ID: ${response.accountId}) is ready. Redirecting to login...`);
+        // The real endpoint only returns { id, username, roles } - the
+        // trading account itself is provisioned asynchronously afterwards,
+        // so there's no accountId to show yet at this point.
+        this.successMessage.set(`Account created for ${response.username}. Redirecting to login...`);
         this.isLoading.set(false);
         setTimeout(() => {
           this.router.navigate(['/login']);

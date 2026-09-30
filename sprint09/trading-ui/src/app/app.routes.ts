@@ -15,7 +15,9 @@ export const routes: Routes = [
   { path: '', redirectTo: '/login', pathMatch: 'full' },
   { path: 'register', component: RegisterComponent },
   { path: 'login', component: LoginComponent },
-  { path: 'admin-login', component: LoginComponent },
+  // isAdmin tells LoginComponent to call POST /auth/admin/login instead of
+  // POST /auth/login - the real backend treats these as separate endpoints.
+  { path: 'admin-login', component: LoginComponent, data: { isAdmin: true } },
 
   // Authenticated routes (user flow)
   { path: 'kyc-submission', component: KycFormComponent, canActivate: [mockAuthGuard] },
