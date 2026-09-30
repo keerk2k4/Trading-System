@@ -4,8 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { NavbarComponent } from '../../../shared/navbar/navbar.component';
 import { MockAuthService } from '../../../shared/services/mock-auth.service';
-import { MockOrderService } from '../../../shared/services/mock-order.service';
+import { TradeApiService } from '../../../shared/services/trade-api.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
+import { OrderSide, OrderStatus, TradeApiError } from '../../../shared/models/order.models';
 
 @Component({
   selector: 'app-place-order',
@@ -26,8 +27,11 @@ import { ErrorMappingService } from '../../../shared/services/error-mapping.serv
         <div *ngIf="successMessage()" class="alert alert-success">
           <strong>Order Placed Successfully!</strong>
           <p>Order ID: <strong>{{ orderId() }}</strong></p>
-          <p>Status: <span class="badge badge-new">NEW</span></p>
-          <p>Your order has been submitted and is waiting for execution.</p>
+          <p>
+            Status:
+            <span [ngClass]="'badge badge-' + orderStatus().toLowerCase()">{{ orderStatus() }}</span>
+          </p>
+          <p>{{ successMessage() }}</p>
         </div>
 
         <form (ngSubmit)="onPlaceOrder()" #orderForm="ngForm" *ngIf="!successMessage()">
@@ -203,11 +207,15 @@ export class PlaceOrderComponent {
   errorMessage = signal<string>('');
   successMessage = signal<string>('');
   orderId = signal<string>('');
+  orderStatus = signal<OrderStatus>('NEW');
   isLoading = signal<boolean>(false);
+
+  // Kept across a retry of the same submission (see onPlaceOrder).
+  private idempotencyKey = '';
 
   constructor(
     private authService: MockAuthService,
-    private orderService: MockOrderService,
+    private orderService: TradeApiService,
     private errorMapping: ErrorMappingService,
     private router: Router
   ) {
@@ -259,27 +267,49 @@ export class PlaceOrderComponent {
       return;
     }
 
+    // accountId is 0 until the trading account has been provisioned and the
+    // user has signed in again to pick it up in a fresh token.
+    const accountId = parseInt(this.accountId);
+    if (!accountId) {
+      this.errorMessage.set(this.errorMapping.getErrorMessage('ACC-404'));
+      return;
+    }
+
     // Generate idempotencyKey (unique identifier for order idempotency)
-    const idempotencyKey = `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    if (!this.idempotencyKey) {
+      this.idempotencyKey = crypto.randomUUID();
+    }
 
     this.isLoading.set(true);
     this.errorMessage.set('');
 
     this.orderService.placeOrder({
-      accountId: parseInt(this.accountId),
-      symbol: this.symbol.toUpperCase(),
-      side: this.side,
+      accountId,
+      symbol: this.symbol.trim().toUpperCase(),
+      side: this.side as OrderSide,
       quantity: parseInt(this.quantity),
       price: parseFloat(this.price),
-      idempotencyKey: idempotencyKey
+      idempotencyKey: this.idempotencyKey
     }).subscribe({
       next: (response) => {
         this.isLoading.set(false);
-        this.successMessage.set(response.message);
+        this.idempotencyKey = '';
+        this.successMessage.set(response.message || 'Your order has been submitted.');
         this.orderId.set(response.orderId);
+        this.orderStatus.set(response.status);
       },
-      error: (err) => {
+      error: (err: TradeApiError) => {
         this.isLoading.set(false);
+        if (this.errorMapping.isNetworkError(err.status)) {
+          // No answer from the backend, so the order may or may not have
+          // been recorded. The key is kept so that pressing submit again
+          // retries the same order instead of placing a second one.
+          this.errorMessage.set(this.errorMapping.getNetworkErrorMessage());
+          return;
+        }
+        // The backend answered, so this attempt is settled; a corrected
+        // resubmission is a new order and needs a new key.
+        this.idempotencyKey = '';
         this.errorMessage.set(this.errorMapping.getErrorMessage(err.errorCode));
       }
     });
@@ -293,5 +323,7 @@ export class PlaceOrderComponent {
     this.errorMessage.set('');
     this.successMessage.set('');
     this.orderId.set('');
+    this.orderStatus.set('NEW');
+    this.idempotencyKey = '';
   }
 }

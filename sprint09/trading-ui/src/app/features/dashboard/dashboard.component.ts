@@ -4,6 +4,10 @@ import { RouterLink } from '@angular/router';
 import { NavbarComponent } from '../../shared/navbar/navbar.component';
 import { MockAuthService } from '../../shared/services/mock-auth.service';
 import { MockKycService } from '../../shared/services/mock-kyc.service';
+import { TradeApiService } from '../../shared/services/trade-api.service';
+import { ErrorMappingService } from '../../shared/services/error-mapping.service';
+import { Account, TradeApiError } from '../../shared/models/order.models';
+import { forkJoin } from 'rxjs';
 
 @Component({
   selector: 'app-dashboard',
@@ -34,6 +38,14 @@ import { MockKycService } from '../../shared/services/mock-kyc.service';
               <span *ngSwitchDefault class="badge badge-pending">NOT SUBMITTED</span>
             </span>
           </div>
+          <div class="info-item" *ngIf="account() as acc">
+            <label>Account Holder:</label>
+            <span>{{ acc.holderName }}</span>
+          </div>
+          <div class="info-item" *ngIf="account() as acc">
+            <label>Account Status:</label>
+            <span>{{ acc.status }}</span>
+          </div>
         </div>
       </div>
 
@@ -56,18 +68,22 @@ import { MockKycService } from '../../shared/services/mock-kyc.service';
 
       <div class="account-section card">
         <h2>Account Summary</h2>
-        <div class="summary-grid">
+        <div *ngIf="errorMessage()" class="alert alert-error">
+          {{ errorMessage() }}
+        </div>
+        <p *ngIf="isLoading()" class="subtitle">Loading account summary...</p>
+        <div class="summary-grid" *ngIf="!isLoading() && !errorMessage()">
           <div class="summary-item">
             <label>Available Cash:</label>
-            <span class="amount">$ {{ availableCash() }}</span>
+            <span class="amount">$ {{ availableCash() | number:'1.2-2' }}</span>
           </div>
           <div class="summary-item">
             <label>Holdings Value:</label>
-            <span class="amount">$ {{ holdingsValue() }}</span>
+            <span class="amount">$ {{ holdingsValue() | number:'1.2-2' }}</span>
           </div>
           <div class="summary-item">
             <label>Total Portfolio:</label>
-            <span class="amount">$ {{ totalPortfolio() }}</span>
+            <span class="amount">$ {{ totalPortfolio() | number:'1.2-2' }}</span>
           </div>
         </div>
       </div>
@@ -190,13 +206,18 @@ import { MockKycService } from '../../shared/services/mock-kyc.service';
 export class DashboardComponent implements OnInit {
   currentUser = signal<any>(null);
   kycStatus = signal<string>('NOT_SUBMITTED');
-  availableCash = signal<string>('');
-  holdingsValue = signal<string>('');
-  totalPortfolio = signal<string>('');
+  account = signal<Account | null>(null);
+  availableCash = signal<number>(0);
+  holdingsValue = signal<number>(0);
+  totalPortfolio = signal<number>(0);
+  isLoading = signal<boolean>(false);
+  errorMessage = signal<string>('');
 
   constructor(
     private authService: MockAuthService,
-    private kycService: MockKycService
+    private kycService: MockKycService,
+    private tradeApi: TradeApiService,
+    private errorMapping: ErrorMappingService
   ) {}
 
   ngOnInit(): void {
@@ -208,9 +229,47 @@ export class DashboardComponent implements OnInit {
       this.kycStatus.set(status || 'NOT_SUBMITTED');
     }
 
-    // Generate mock account values
-    this.availableCash.set((Math.random() * 50000 + 10000).toFixed(2));
-    this.holdingsValue.set((Math.random() * 100000 + 50000).toFixed(2));
-    this.totalPortfolio.set((Math.random() * 150000 + 60000).toFixed(2));
+    this.loadAccountSummary(user?.accountId);
+  }
+
+  private loadAccountSummary(accountId: number | undefined): void {
+    // accountId is 0 until the trading account has been provisioned and the
+    // user has signed in again to pick it up in a fresh token.
+    if (!accountId) {
+      this.errorMessage.set(this.errorMapping.getErrorMessage('ACC-404'));
+      return;
+    }
+
+    this.isLoading.set(true);
+    this.errorMessage.set('');
+
+    forkJoin({
+      account: this.tradeApi.getAccount(accountId),
+      balance: this.tradeApi.getBalance(accountId),
+      positions: this.tradeApi.getPositions(accountId)
+    }).subscribe({
+      next: ({ account, balance, positions }) => {
+        // The positions endpoint carries no market price, so holdings are
+        // valued at cost: quantity x average cost per position.
+        const holdings = positions.reduce(
+          (total, position) => total + position.quantity * position.averageCost,
+          0
+        );
+
+        this.account.set(account);
+        this.availableCash.set(balance.cashBalance);
+        this.holdingsValue.set(holdings);
+        this.totalPortfolio.set(balance.cashBalance + holdings);
+        this.isLoading.set(false);
+      },
+      error: (err: TradeApiError) => {
+        this.isLoading.set(false);
+        this.errorMessage.set(
+          this.errorMapping.isNetworkError(err.status)
+            ? this.errorMapping.getNetworkErrorMessage()
+            : this.errorMapping.getErrorMessage(err.errorCode)
+        );
+      }
+    });
   }
 }
