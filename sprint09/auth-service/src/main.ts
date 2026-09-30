@@ -6,6 +6,11 @@ import { AppModule } from "./app.module.js";
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Allow the Angular UI (served from a different origin) to call this API.
+  app.enableCors({
+    origin: process.env.UI_ORIGIN || "http://localhost:4200",
+  });
+
   // Enable validation pipe globally
   app.useGlobalPipes(
     new ValidationPipe({
