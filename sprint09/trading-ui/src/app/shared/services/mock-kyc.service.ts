@@ -1,8 +1,12 @@
 import { Injectable, signal, inject } from '@angular/core';
+import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { KycSubmission, KycStatus } from '../models/kyc.models';
-import { Observable, of } from 'rxjs';
-import { delay } from 'rxjs/operators';
+import { Observable, of, throwError } from 'rxjs';
+import { catchError, delay, tap } from 'rxjs/operators';
 import { MockAuthService } from './mock-auth.service';
+
+// Same real auth-service the KYC endpoints live on (see mock-auth.service.ts).
+const AUTH_API_BASE_URL = 'http://localhost:3000';
 
 @Injectable({
   providedIn: 'root'
@@ -11,6 +15,7 @@ export class MockKycService {
   private kycDatabase = new Map<string, KycSubmission>();
   private kycStatus = signal<KycStatus | null>(null);
   private authService = inject(MockAuthService);
+  private http = inject(HttpClient);
 
   constructor() {
     this.initializeMockData();
@@ -28,28 +33,42 @@ export class MockKycService {
     }
   }
 
-  // Submit KYC
+  // Submit KYC against the real backend: POST /kyc, bearer-authenticated
+  // with the signed-in user's own access token. The real endpoint takes the
+  // user from that token, not from a body field, so `userId` is only used
+  // here to key the local kycStatus signal/localStorage the rest of the UI
+  // already reads - the same local bookkeeping the mock version did.
   submitKyc(userId: string, data: any): Observable<KycSubmission> {
-    return new Observable(observer => {
-      setTimeout(() => {
-        const kyc: KycSubmission = {
-          id: 'KYC-' + this.generateId(),
-          userId,
+    const token = this.authService.getToken();
+    if (!token) {
+      return throwError(() => ({ errorCode: 'AUTH-401', message: 'Sign in first' }));
+    }
+
+    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
+
+    return this.http
+      .post<KycSubmission>(
+        `${AUTH_API_BASE_URL}/kyc`,
+        {
           dateOfBirth: data.dateOfBirth,
           documentType: data.documentType,
           documentNumber: data.documentNumber,
-          status: 'PENDING',
-          submittedAt: new Date()
-        };
-
-        this.kycDatabase.set(userId, kyc);
-        this.kycStatus.set('PENDING');
-        localStorage.setItem('kyc_status', 'PENDING');
-
-        observer.next(kyc);
-        observer.complete();
-      }, 800);
-    });
+        },
+        { headers }
+      )
+      .pipe(
+        tap((kyc) => {
+          // Same local bookkeeping the mock version kept, so the rest of
+          // the app (login redirect, dashboard) still has something to read
+          // until a real "get my KYC status" endpoint exists (see PR notes).
+          this.kycDatabase.set(userId, kyc);
+          this.kycStatus.set('PENDING');
+          localStorage.setItem('kyc_status', 'PENDING');
+        }),
+        catchError((err: HttpErrorResponse) => {
+          throw err.error ?? { errorCode: 'AUTH-500', message: 'Unexpected error' };
+        })
+      );
   }
 
   // Get KYC status for current user
@@ -148,10 +167,6 @@ export class MockKycService {
     };
 
     this.kycDatabase.set('b2c3d4e5-f6a7-5b6c-7d8e-9f0a1b2c3d4e', approvedKyc);
-  }
-
-  private generateId(): string {
-    return Math.random().toString(36).substring(2, 15);
   }
 
   private loadKycStatusFromStorage(): KycStatus | null {
