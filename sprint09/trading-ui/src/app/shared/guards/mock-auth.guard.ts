@@ -1,10 +1,14 @@
-import { Injectable } from '@angular/core';
+import { inject } from '@angular/core';
 import { Router, CanActivateFn, ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
 import { MockAuthService } from '../services/mock-auth.service';
 
+// `inject()` is required here, not `new MockAuthService()`/`new Router()` -
+// constructing them manually bypasses Angular's DI, so MockAuthService never
+// gets the HttpClient it now needs, and a manually-`new`'d Router has none
+// of its own injected dependencies either.
 export const mockAuthGuard: CanActivateFn = (route: ActivatedRouteSnapshot, state: RouterStateSnapshot) => {
-  const authService = new MockAuthService();
-  const router = new Router();
+  const authService = inject(MockAuthService);
+  const router = inject(Router);
 
   if (authService.isAuthenticated()) {
     return true;
@@ -15,8 +19,8 @@ export const mockAuthGuard: CanActivateFn = (route: ActivatedRouteSnapshot, stat
 };
 
 export const mockAdminGuard: CanActivateFn = (route: ActivatedRouteSnapshot, state: RouterStateSnapshot) => {
-  const authService = new MockAuthService();
-  const router = new Router();
+  const authService = inject(MockAuthService);
+  const router = inject(Router);
 
   if (!authService.isAuthenticated()) {
     return router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
