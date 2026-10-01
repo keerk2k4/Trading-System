@@ -1,5 +1,9 @@
 # See http://help.github.com/ignore-files/ for more about ignoring files.
 
+# Generated API clients: src/generated/* is COMMITTED on purpose and must not be
+# ignored here. It is produced from ../contracts/*.yaml by `npm run generate:clients`
+# (see src/generated/README.md); never edit it by hand, regenerate instead.
+
 # Compiled output
 /dist
 /tmp

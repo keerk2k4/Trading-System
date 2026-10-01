@@ -5,6 +5,9 @@ import { TradeApiService, TRADE_API_BASE_URL } from './trade-api.service';
 import { MockAuthService } from './mock-auth.service';
 import { authTokenInterceptor } from '../interceptors/auth-token.interceptor';
 import { PlaceOrderRequest, TradeApiError } from '../models/order.models';
+import { KycSubmission } from '../models/kyc.models';
+import { MockKycService } from './mock-kyc.service';
+import { AUTH_API_BASE_URL, provideApiClients } from '../api/api-clients';
 
 describe('TradeApiService', () => {
   let service: TradeApiService;
@@ -77,9 +80,16 @@ describe('TradeApiService', () => {
       .subscribe();
 
     const req = http.expectOne((r) => r.url === `${TRADE_API_BASE_URL}/api/v1/accounts/17/orders`);
-    expect(req.request.params.get('status')).toBe('FILLED');
-    expect(req.request.params.get('from')).toBe('2026-01-01T00:00:00.000Z');
-    expect(req.request.params.get('to')).toBe('2026-02-01T00:00:00.000Z');
+    // The generated client percent-encodes each value exactly once before
+    // handing it to HttpParams, so decode before comparing.
+    const param = (name: string) => decodeURIComponent(req.request.params.get(name) ?? '');
+    expect(param('status')).toBe('FILLED');
+    expect(param('from')).toBe('2026-01-01T00:00:00.000Z');
+    expect(param('to')).toBe('2026-02-01T00:00:00.000Z');
+    expect(req.request.urlWithParams).toBe(
+      `${TRADE_API_BASE_URL}/api/v1/accounts/17/orders` +
+        '?status=FILLED&from=2026-01-01T00%3A00%3A00.000Z&to=2026-02-01T00%3A00%3A00.000Z'
+    );
     req.flush([]);
   });
 
@@ -138,8 +148,77 @@ describe('authTokenInterceptor', () => {
 
     const req = http.expectOne('http://localhost:3000/auth/register');
     expect(req.request.headers.has('Authorization')).toBe(false);
+    expect(req.request.body).toEqual({
+      username: 'new.user',
+      password: 'secret',
+      email: 'new.user@example.com'
+    });
     req.flush({});
     http.verify();
     localStorage.removeItem('auth_token');
+  });
+});
+
+describe('generated auth client wiring (provideApiClients)', () => {
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(withInterceptors([authTokenInterceptor])),
+        provideHttpClientTesting(),
+        ...provideApiClients()
+      ]
+    });
+    localStorage.setItem('auth_token', 'user.jwt.token');
+  });
+
+  afterEach(() => localStorage.removeItem('auth_token'));
+
+  it('sends the bearer token on POST /kyc and maps the contract response', () => {
+    const kyc = TestBed.inject(MockKycService);
+    const http = TestBed.inject(HttpTestingController);
+    let submission: KycSubmission | undefined;
+
+    kyc
+      .submitKyc('user-1', { dateOfBirth: '1995-04-12', documentType: 'PASSPORT', documentNumber: 'N1234567' })
+      .subscribe((s) => (submission = s));
+
+    const req = http.expectOne(`${AUTH_API_BASE_URL}/kyc`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.headers.get('Authorization')).toBe('Bearer user.jwt.token');
+    expect(req.request.body).toEqual({
+      dateOfBirth: '1995-04-12',
+      documentType: 'PASSPORT',
+      documentNumber: 'N1234567'
+    });
+    req.flush({
+      id: 42,
+      userId: 'user-1',
+      status: 'PENDING',
+      dateOfBirth: '1995-04-12',
+      documentType: 'PASSPORT',
+      documentNumber: 'N1234567',
+      submittedAt: '2026-09-30T08:00:00Z',
+      reviewedAt: null,
+      reviewedBy: null,
+      rejectionReason: null
+    });
+
+    expect(submission?.id).toBe('42');
+    expect(submission?.status).toBe('PENDING');
+    expect(submission?.submittedAt).toEqual(new Date('2026-09-30T08:00:00Z'));
+    expect(submission?.reviewedAt).toBeUndefined();
+    http.verify();
+  });
+
+  it('never sends a bearer token on login, which the contract marks as public', () => {
+    const auth = TestBed.inject(MockAuthService);
+    const http = TestBed.inject(HttpTestingController);
+
+    auth.login({ username: 'priya.menon', password: 'correct horse battery staple' }).subscribe();
+
+    const req = http.expectOne(`${AUTH_API_BASE_URL}/auth/login`);
+    expect(req.request.headers.has('Authorization')).toBe(false);
+    req.flush({ accessToken: 'a.b.c', refreshToken: 'r', tokenType: 'Bearer', expiresIn: 900 });
+    http.verify();
   });
 });

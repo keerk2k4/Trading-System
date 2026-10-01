@@ -107,7 +107,39 @@ curl -X POST http://localhost:3000/auth/refresh \
   -d '{"refreshToken":"<oldRefreshToken>"}'
 ```
 
-## 5. Last verification run
+## 5. Email notifications
+
+`POST /auth/register` now requires an `email` (stored AES-256-GCM encrypted,
+see `EmailEncryptionService`). `src/services/NotificationService.ts` sends:
+
+| Trigger | Email |
+|---|---|
+| `POST /auth/register` succeeds | Welcome / registered, next step is KYC |
+| `POST /kyc` succeeds | KYC submitted, awaiting approval |
+| `PATCH /kyc` with `APPROVED` | KYC approved, trading account active |
+| `PATCH /kyc` with `REJECTED` | KYC not approved, with the rejection reason |
+
+Sending is fire-and-forget: an SMTP failure is logged and never fails the
+request. Logs carry the user id only, never the address. Users registered
+before email capture (`@placeholder.local`) are skipped.
+
+| Env var | Default | Meaning |
+|---|---|---|
+| `SMTP_HOST` | unset | SMTP server. **Unset disables sending** (each email is logged as skipped). |
+| `SMTP_PORT` | `1025` | SMTP port. |
+| `SMTP_SECURE` | `false` | `true` for implicit TLS (port 465). |
+| `SMTP_USER` / `SMTP_PASS` | unset | SMTP auth, only sent when `SMTP_USER` is set. |
+| `MAIL_FROM` | `Enterprise Trading Platform <no-reply@trading.local>` | Sender address. |
+
+Local testing with Mailpit (from `sprint09/`):
+
+```bash
+docker compose --profile platform up -d mailpit
+SMTP_HOST=localhost SMTP_PORT=1025 npm run dev   # PowerShell: $env:SMTP_HOST="localhost"; $env:SMTP_PORT="1025"; npm run dev
+# open http://localhost:8025 to read captured mail
+```
+
+## 6. Last verification run
 
 - `npx jest` → **5 suites, 45 tests, all pass** (includes the 4 guard paths + 4 refresh paths above).
 - `npx tsc --noEmit` → clean, no errors.

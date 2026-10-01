@@ -1,4 +1,7 @@
-// Auth models and interfaces
+// Auth models and interfaces.
+// Wire types are aliases of the models generated from contracts/auth-api.yaml
+// (src/generated/auth-client); the rest are UI-only shapes.
+import type { UserResponse } from '../../../generated/auth-client';
 
 export interface User {
   id: string;
@@ -23,17 +26,13 @@ export interface AuthResponse extends TokenResponse {
 // frontend-only check and is never part of this request.
 export interface RegisterRequest {
   username: string;
+  email: string;
   password: string;
 }
 
-// Matches the real POST /auth/register response exactly: no accountId and
-// no createdOn come back - the trading account is provisioned asynchronously
-// after registration, not returned in this response.
-export interface UserResponseData {
-  id: string;
-  username: string;
-  roles: string[];
-}
+// POST /auth/register response. accountId is absent at registration - the
+// trading account is provisioned asynchronously afterwards.
+export type UserResponseData = UserResponse;
 
 export interface LoginRequest {
   username: string;

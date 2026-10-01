@@ -53,6 +53,7 @@ export class MockAuthService {
       .post<UserResponseData>(`${AUTH_API_BASE_URL}/auth/register`, {
         username: data.username,
         password: data.password,
+        email: data.email,
       })
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }

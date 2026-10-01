@@ -1,9 +1,7 @@
 import { inject } from '@angular/core';
-import { HttpErrorResponse, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
-import { Router } from '@angular/router';
-import { catchError, switchMap, throwError } from 'rxjs';
-import { AUTH_API_BASE_URL, MockAuthService } from '../services/mock-auth.service';
-import { TRADE_API_BASE_URL } from '../services/trade-api.service';
+import { HttpInterceptorFn } from '@angular/common/http';
+import { MockAuthService } from '../services/mock-auth.service';
+import { TRADE_API_BASE_URL } from '../api/api-clients';
 
 // Auth-service endpoints that are called without a session. They must never
 // carry a bearer token, and a 401 from them is a real answer, not an expired

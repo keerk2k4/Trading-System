@@ -3,10 +3,10 @@ openapi: 3.1.0
 info:
   title: Auth service
   version: 1.0.0
-  summary: Registration, login, token refresh and current-user lookup for the Enterprise Trading Platform.
+  summary: Registration, login, token refresh, KYC and current-user lookup for the Enterprise Trading Platform.
   description: |
-    Binding contract for the NestJS auth service built in Sprint 8. The Trade REST API and Angular
-    UI must depend on this contract rather than on implementation details.
+    Binding contract for the NestJS auth service. The Trade REST API and Angular UI must depend on
+    this contract rather than on implementation details.
 
     ## JWT claims contract
 
@@ -16,11 +16,11 @@ info:
     | Claim | Type | Meaning |
     |---|---|---|
     | `sub` | string | The user identifier. A UUID. Stable for the life of the user. Not the username, not the email, because both can change. |
-    | `accountId` | integer | The numeric trading account key, `ACCOUNTS.id`. The Trade REST API compares this against the account in the request path or body and returns `ACC-403` if they differ. |
+    | `accountId` | integer | The numeric trading account key, `ACCOUNTS.id`. The Trade REST API compares this against the account in the request path or body and returns `ACC-403` if they differ. `0` for an admin token, which is not tied to a trading account. |
     | `roles` | array of string | Authorisation roles. `CUSTOMER` for a normal trading user, `ADMIN` for an operator. Always present, never empty. |
     | `iat` | integer | Issued-at, seconds since the Unix epoch. |
     | `exp` | integer | Expiry, seconds since the Unix epoch. Fifteen minutes after `iat` for an access token. |
-    | `iss` | string | Issuer. Use `auth-service` for the Sprint 8 service. Consumers must validate the configured issuer. |
+    | `iss` | string | Issuer. Use `auth-service`. Consumers must validate the configured issuer. |
 
     Decoded example:
 
@@ -35,17 +35,43 @@ info:
     }
     ```
 
-    Signing: `HS256` with a shared secret in development, read from `JWT_SECRET`. The auth service
-    and Trade REST API must use the same algorithm and secret. Move to `RS256` with a published public key
-    if a team wants the Trade REST API to verify without holding the signing secret. That is a
+    Signing: `HS256` with a shared secret, read from `JWT_SECRET`. The auth service and Trade REST
+    API must use the same algorithm and secret. Move to `RS256` with a published public key if a
+    team wants the Trade REST API to verify without holding the signing secret. That is a
     documented upgrade, not a requirement.
 
     Lifetimes: access token 15 minutes, refresh token 7 days. Access tokens are not revocable, which
     is why they are short. Refresh tokens are stored and can be revoked.
 
-    ## Security rules
+    ## Registration and account provisioning
 
-    These are assessed in the Sprint 8 security review.
+    Registration no longer takes a caller-supplied `accountId`. `POST /auth/register` creates the
+    user record only, assigns the `CUSTOMER` role, and publishes a `user-registrations` Kafka event.
+    The Trade REST API consumes that event asynchronously and provisions a new trading account for
+    the user with `accountStatus = PENDING`. Because provisioning is asynchronous, the account may
+    not exist yet at the instant registration returns `201` — `UserResponse` does not include an
+    `accountId` at registration time.
+
+    A user cannot log in successfully until that account exists: `POST /auth/login` looks the
+    account up and fails with `AUTH-401` if none is found yet. The account also stays `PENDING`,
+    and cannot trade, until an admin approves the user's KYC submission (see the KYC endpoints
+    below), which moves it to `ACTIVE`.
+
+    ## Email notifications
+
+    The service emails the user at the address given at registration:
+
+    | Trigger | Email |
+    |---|---|
+    | `POST /auth/register` returns `201` | Registered; next step is KYC |
+    | `POST /kyc` returns `201` | KYC submitted, awaiting approval |
+    | `PATCH /kyc` returns `200` with `APPROVED` | KYC approved, trading account active |
+    | `PATCH /kyc` returns `200` with `REJECTED` | KYC not approved, with the rejection reason |
+
+    Delivery is best-effort and asynchronous. A mail failure never changes the HTTP response,
+    so clients must not treat a successful response as proof that an email was delivered.
+
+    ## Security rules
 
     - Store passwords with argon2id or bcrypt at cost 12 or above. Never MD5, never SHA-256, never
       an unsalted hash.
@@ -57,6 +83,11 @@ info:
     - Validate the signature, the expiry and the issuer on every protected request. Never trust a
       decoded payload that has not had its signature checked.
     - Do not put anything in a JWT that you would not publish. The payload is base64, not encrypted.
+    - `POST /auth/admin/register` is **not** guarded by an admin token in the current
+      implementation — it is reachable by anyone, exactly like `POST /auth/register`. This is a
+      known gap, not an intended design, and is called out here so the contract does not imply a
+      protection that does not exist. Lock this down before using it outside a training
+      environment.
   contact:
     name: Enterprise Trading Platform, programme materials
   license:
@@ -73,6 +104,8 @@ tags:
     description: Registration, login and token lifecycle.
   - name: Profile
     description: The authenticated user.
+  - name: KYC
+    description: Know-your-customer submission and admin review.
 
 paths:
   /auth/register:
@@ -82,13 +115,16 @@ paths:
       security: []
       summary: Register a user
       description: |
-        Creates a user and links it to an existing trading account. It does not create the trading
-        account: accounts are owned by the Trade REST API's schema and seeded in Sprint 3. Registering
-        against an unknown `accountId` fails validation.
+        Creates a user, assigns the `CUSTOMER` role, and publishes a `user-registrations` event so
+        the Trade REST API can provision a trading account asynchronously. It does not create the
+        trading account itself and does not accept a caller-supplied `accountId`.
 
         Registration does not return tokens. The client logs in afterwards. Returning a session from
         a registration endpoint makes the endpoint an unauthenticated session factory, and any
         weakness in it becomes an authentication bypass.
+
+        A caller-supplied `roles` field is ignored on this route regardless of what is sent: the
+        service always assigns `CUSTOMER`. Use `/auth/admin/register` to create an admin user.
       requestBody:
         required: true
         content:
@@ -102,6 +138,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserResponse'
+              examples:
+                created:
+                  value:
+                    id: 8f14e45f-ceea-4c1b-9d3b-1a2b3c4d5e6f
+                    username: priya.menon
+                    roles: [CUSTOMER]
         '409':
           description: The username is already taken.
           content:
@@ -112,7 +154,54 @@ paths:
                 taken:
                   value:
                     errorCode: AUTH-409
-                    message: Registration failed
+                    message: Username already registered
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+  /auth/admin/register:
+    post:
+      tags: [Auth]
+      operationId: registerAdmin
+      security: []
+      summary: Register an admin user
+      description: |
+        Creates a user with the `ADMIN` role and no linked trading account (`accountId: 0`). Unlike
+        `/auth/register`, the created user's status is `ACTIVE` immediately; no KYC/provisioning
+        flow applies to admins.
+
+        See the "Security rules" note above: this endpoint currently applies no additional
+        authorisation of its own.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Admin user created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+              examples:
+                created:
+                  value:
+                    id: 2b6b1a1e-6b3d-4a6a-9f2e-1a2b3c4d5e6f
+                    username: admin.ops
+                    accountId: 0
+                    roles: [ADMIN]
+        '409':
+          description: The username is already taken.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                taken:
+                  value:
+                    errorCode: AUTH-409
+                    message: Username already registered
         '422':
           $ref: '#/components/responses/InvalidInput'
 
@@ -123,8 +212,12 @@ paths:
       security: []
       summary: Log in and receive tokens
       description: |
-        Verifies the credentials and issues an access token and a refresh token. Every failure,
-        whatever its cause, returns the same `AUTH-401` body.
+        Verifies the credentials and issues an access token and a refresh token. Every credential
+        failure, whatever its cause (unknown username, wrong password, or no trading account
+        provisioned yet), returns the same `AUTH-401` body.
+
+        If the credentials are valid but the linked trading account is `SUSPENDED`, login is refused
+        with `ACC-403` instead, and no tokens are issued or rotated.
       requestBody:
         required: true
         content:
@@ -145,6 +238,45 @@ paths:
                 $ref: '#/components/schemas/TokenResponse'
         '401':
           $ref: '#/components/responses/Unauthorised'
+        '403':
+          description: The linked trading account is suspended.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                suspended:
+                  value:
+                    errorCode: ACC-403
+                    message: You are blocked from using this service.
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+  /auth/admin/login:
+    post:
+      tags: [Auth]
+      operationId: loginAdmin
+      security: []
+      summary: Admin log in and receive tokens
+      description: |
+        Same credential check as `/auth/login`, plus a check that the user holds the `ADMIN` role.
+        A valid customer's credentials presented here fail with `AUTH-401`, the same body as an
+        unknown user, so this route does not disclose which accounts are admins.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
         '422':
           $ref: '#/components/responses/InvalidInput'
 
@@ -156,8 +288,9 @@ paths:
       summary: Exchange a refresh token for a new token pair
       description: |
         Consumes the presented refresh token and issues a new pair. The presented token stops working
-        immediately. Presenting a token that has already been consumed is treated as theft: revoke
-        every refresh token for that user and return `AUTH-401`.
+        immediately. For a customer token, the trading account is looked up again and a missing
+        account fails the refresh with `AUTH-401`, the same as login. An admin token skips the
+        account lookup (`accountId` stays `0`).
       requestBody:
         required: true
         content:
@@ -197,6 +330,128 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorised'
 
+  /kyc:
+    post:
+      tags: [KYC]
+      operationId: submitKyc
+      summary: Submit KYC details for the authenticated user
+      description: |
+        Requires a `CUSTOMER` token; an `ADMIN` token, or one that is not a customer, is refused
+        with `AUTH-403`. Exactly one submission is allowed per user — a second call while one
+        already exists (in any status) fails with `KYC-409`, even if the first was rejected.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateKycRequest'
+      responses:
+        '201':
+          description: KYC submitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycResponse'
+              examples:
+                submitted:
+                  value:
+                    id: 42
+                    userId: 8f14e45f-ceea-4c1b-9d3b-1a2b3c4d5e6f
+                    status: PENDING
+                    dateOfBirth: '1995-04-12'
+                    documentType: PASSPORT
+                    documentNumber: N1234567
+                    submittedAt: '2026-09-30T08:00:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: This user has already submitted KYC.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                alreadySubmitted:
+                  value:
+                    errorCode: KYC-409
+                    message: KYC already submitted
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+      security:
+        - bearerAuth: []
+
+    patch:
+      tags: [KYC]
+      operationId: reviewKyc
+      summary: Review KYC status (admin only)
+      description: |
+        Requires an `ADMIN` token. Looks up the KYC submission by the `userId` in the request body,
+        not by the caller's own identity, since the caller here is the reviewing admin, not the
+        applicant.
+
+        Approving (`status: APPROVED`) calls the Trade REST API to activate the linked trading
+        account and returns the new `accountId` in the response. Rejecting does not touch the
+        trading account. Reviewing an already-approved submission again fails with `KYC-409`; there
+        is no such guard for re-rejecting a rejected one.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateKycRequest'
+      responses:
+        '200':
+          description: KYC reviewed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycResponse'
+              examples:
+                approved:
+                  value:
+                    id: 42
+                    userId: 8f14e45f-ceea-4c1b-9d3b-1a2b3c4d5e6f
+                    status: APPROVED
+                    dateOfBirth: '1995-04-12'
+                    documentType: PASSPORT
+                    documentNumber: N1234567
+                    submittedAt: '2026-09-30T08:00:00Z'
+                    reviewedAt: '2026-09-30T09:00:00Z'
+                    reviewedBy: 2b6b1a1e-6b3d-4a6a-9f2e-1a2b3c4d5e6f
+                    accountId: 1
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No KYC submission exists for this userId.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  value:
+                    errorCode: KYC-404
+                    message: KYC record not found
+        '409':
+          description: This submission has already been approved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                alreadyApproved:
+                  value:
+                    errorCode: KYC-409
+                    message: KYC already approved
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+      security:
+        - bearerAuth: []
+
 components:
 
   securitySchemes:
@@ -204,14 +459,15 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: An access token issued by `/auth/login` or `/auth/refresh`.
+      description: An access token issued by `/auth/login`, `/auth/admin/login` or `/auth/refresh`.
 
   responses:
     Unauthorised:
       description: |
         Authentication failed. Returned for an unknown username, a wrong password, an expired token,
-        a wrongly signed token, a consumed refresh token and a malformed header. The body is
-        identical in every case, on purpose.
+        a wrongly signed token, a consumed refresh token, a malformed header, and (on login/refresh)
+        a customer whose trading account has not been provisioned yet. The body is identical in
+        every case, on purpose.
       content:
         application/json:
           schema:
@@ -221,6 +477,18 @@ components:
               value:
                 errorCode: AUTH-401
                 message: Unauthorised
+    Forbidden:
+      description: |
+        Authenticated, but not allowed to perform this action (wrong role for the endpoint).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            forbidden:
+              value:
+                errorCode: AUTH-403
+                message: Forbidden
     InvalidInput:
       description: The request failed field validation.
       content:
@@ -238,7 +506,7 @@ components:
     RegisterRequest:
       type: object
       additionalProperties: false
-      required: [username, password, accountId]
+      required: [username, password, email]
       properties:
         username:
           type: string
@@ -254,25 +522,29 @@ components:
             Minimum twelve characters. Length beats character-class rules, so do not impose a
             symbol requirement that pushes users towards a shorter password.
           writeOnly: true
-        accountId:
-          type: integer
-          format: int64
-          minimum: 1
-          description: The numeric trading account key, `ACCOUNTS.id`, that this user will trade.
-          example: 1
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: |
+            Address for notification emails (registration, KYC submitted, KYC approved or
+            rejected). PII: stored encrypted at rest, never returned in any response, never logged.
+          writeOnly: true
+          example: priya.menon@example.com
         roles:
           type: array
           minItems: 1
           items:
             $ref: '#/components/schemas/Role'
           description: |
-            Optional. Defaults to `["CUSTOMER"]`. Ignore this field on a public registration route
-            unless the caller already holds an `ADMIN` token. Accepting a self-declared role is a
-            privilege-escalation bug, and the Sprint 8 security review looks for it.
+            Accepted by the schema but ignored by `/auth/register`, which always assigns
+            `CUSTOMER`, and by `/auth/admin/register`, which always assigns `ADMIN`. Kept on the
+            request shape only so both endpoints can share one DTO; do not rely on it changing the
+            assigned role.
       example:
         username: priya.menon
         password: 'correct horse battery staple'
-        accountId: 1
+        email: priya.menon@example.com
 
     LoginRequest:
       type: object
@@ -320,7 +592,7 @@ components:
     UserResponse:
       type: object
       additionalProperties: false
-      required: [id, username, accountId, roles]
+      required: [id, username, roles]
       properties:
         id:
           type: string
@@ -333,7 +605,11 @@ components:
         accountId:
           type: integer
           format: int64
-          description: The numeric trading account key, `ACCOUNTS.id`.
+          description: |
+            The numeric trading account key, `ACCOUNTS.id`. Absent on the `POST /auth/register`
+            response, because the account is provisioned asynchronously and may not exist yet.
+            `0` for an admin user, who has no linked trading account. Present and populated on
+            `GET /auth/me` once the account exists, since it is read from the verified token.
           example: 1
         roles:
           type: array
@@ -344,11 +620,105 @@ components:
         createdOn:
           type: string
           format: date-time
-          example: '2026-10-05T08:00:00Z'
+          description: Not currently populated by any endpoint; reserved for future use.
+          example: '2026-09-30T08:00:00Z'
 
     Role:
       type: string
       enum: [CUSTOMER, ADMIN]
+
+    CreateKycRequest:
+      type: object
+      additionalProperties: false
+      required: [dateOfBirth, documentType, documentNumber]
+      properties:
+        dateOfBirth:
+          type: string
+          format: date
+          description: ISO 8601 calendar date.
+          example: '1995-04-12'
+        documentType:
+          type: string
+          minLength: 2
+          maxLength: 50
+          example: PASSPORT
+        documentNumber:
+          type: string
+          minLength: 3
+          maxLength: 100
+          example: N1234567
+
+    KycStatus:
+      type: string
+      enum: [PENDING, APPROVED, REJECTED]
+
+    KycReviewStatus:
+      type: string
+      enum: [APPROVED, REJECTED]
+      description: The two outcomes an admin can set. A submission cannot be reviewed back to `PENDING`.
+
+    UpdateKycRequest:
+      type: object
+      additionalProperties: false
+      required: [userId, status]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: The applicant whose submission is being reviewed, not the reviewing admin.
+        status:
+          $ref: '#/components/schemas/KycReviewStatus'
+        rejectionReason:
+          type: string
+          maxLength: 500
+          description: Required by the client when `status` is `REJECTED`; ignored when approving.
+      example:
+        userId: 8f14e45f-ceea-4c1b-9d3b-1a2b3c4d5e6f
+        status: APPROVED
+
+    KycResponse:
+      type: object
+      additionalProperties: false
+      required: [id, userId, status, dateOfBirth, documentType, documentNumber, submittedAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 42
+        userId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/KycStatus'
+        dateOfBirth:
+          type: string
+          format: date
+        documentType:
+          type: string
+        documentNumber:
+          type: string
+        submittedAt:
+          type: string
+          format: date-time
+        reviewedAt:
+          type: ['string', 'null']
+          format: date-time
+          description: Set once an admin has reviewed the submission; `null` while `PENDING`.
+        reviewedBy:
+          type: ['string', 'null']
+          format: uuid
+          description: The reviewing admin's user id; `null` while `PENDING`.
+        rejectionReason:
+          type: ['string', 'null']
+          description: Set only when `status` is `REJECTED`.
+        accountId:
+          type: integer
+          format: int64
+          description: |
+            Present only in the `PATCH /kyc` response, and only when this review approved the
+            submission — it is the trading account's id after activation. Never present on the
+            `POST /kyc` response.
+          example: 1
 
     ErrorResponse:
       type: object
@@ -359,24 +729,28 @@ components:
       properties:
         errorCode:
           type: string
-          enum: [AUTH-401, AUTH-409, VAL-422]
+          enum: [AUTH-401, AUTH-403, AUTH-409, ACC-403, KYC-404, KYC-409, VAL-422]
           description: |
             | Code | HTTP | Meaning |
             |---|---|---|
             | `AUTH-401` | 401 | Unauthorised or invalid token |
+            | `AUTH-403` | 403 | Authenticated, but the wrong role for this endpoint |
             | `AUTH-409` | 409 | Username already taken |
+            | `ACC-403` | 403 | Linked trading account is suspended (login only) |
+            | `KYC-404` | 404 | No KYC submission exists for the given user |
+            | `KYC-409` | 409 | KYC already submitted, or already approved |
             | `VAL-422` | 422 | Invalid input |
 
-            `AUTH-409` extends the platform error catalogue and is scoped to this service. The
-            catalogue in `trade-api.yaml` has no registration-conflict code because registration is
-            not a trading operation.
+            `AUTH-403`, `AUTH-409`, `KYC-404` and `KYC-409` extend the platform error catalogue and
+            are scoped to this service. `ACC-403` is shared with `trade-api.yaml` and carries the
+            same meaning.
           example: AUTH-401
         message:
           type: string
           description: |
-            Deliberately vague on this service. `Unauthorised` and `Registration failed` are the
-            only two messages that should appear on a failure path, because a more helpful message
-            tells an attacker which half of the credential pair was wrong.
+            Human-readable, for display only. Clients branch on `errorCode`, never on `message`.
+            Credential failures stay deliberately vague (`Unauthorised`), because a more helpful
+            message tells an attacker which half of the credential pair was wrong.
           example: Unauthorised
 
 security:

@@ -2,6 +2,7 @@ import { KycController } from "./kyc.controller";
 import { KycRepository } from "../repositories/KycRepository";
 import { UserRepository } from "../repositories/UserRepository";
 import { TradeApiClient } from "../services/TradeApiClient";
+import { NotificationService } from "../services/NotificationService";
 import { KycReviewStatus } from "../dtos/UpdateKycRequest";
 
 const USER_ID = "11111111-2222-4333-8444-555555555555";
@@ -27,6 +28,16 @@ describe("KycController", () => {
   let kycRepository: jest.Mocked<KycRepository>;
   let userRepository: jest.Mocked<UserRepository>;
   let tradeApiClient: jest.Mocked<TradeApiClient>;
+  let notificationService: jest.Mocked<NotificationService>;
+
+  const applicant = {
+    userId: USER_ID,
+    userName: "alice.trader",
+    email: "alice.trader@example.com",
+  };
+
+  // Review notifications run after the response is sent; let them settle.
+  const flushPromises = () => new Promise((resolve) => setImmediate(resolve));
 
   const kycRow = {
     id: 1,
@@ -57,7 +68,13 @@ describe("KycController", () => {
       activateAccount: jest.fn(),
     } as unknown as jest.Mocked<TradeApiClient>;
 
-    controller = new KycController(kycRepository, userRepository, tradeApiClient);
+    notificationService = {
+      sendKycSubmitted: jest.fn().mockResolvedValue(undefined),
+      sendKycApproved: jest.fn().mockResolvedValue(undefined),
+      sendKycRejected: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<NotificationService>;
+
+    controller = new KycController(kycRepository, userRepository, tradeApiClient, notificationService);
     jest.spyOn(console, "error").mockImplementation(() => undefined);
   });
 
@@ -67,7 +84,7 @@ describe("KycController", () => {
 
   it("creates KYC for authenticated user", async () => {
     kycRepository.findByUserId.mockResolvedValue(null);
-    userRepository.findByUserId.mockResolvedValue({ userId: USER_ID } as any);
+    userRepository.findByUserId.mockResolvedValue(applicant as any);
     kycRepository.createSubmission.mockResolvedValue(kycRow);
     const { res, state } = makeResponse();
 
@@ -85,6 +102,24 @@ describe("KycController", () => {
       documentType: "PASSPORT",
       documentNumber: "P1234567",
     });
+    expect(notificationService.sendKycSubmitted).toHaveBeenCalledWith(
+      USER_ID,
+      "alice.trader@example.com",
+      "alice.trader",
+    );
+  });
+
+  it("does not send a KYC-submitted email when KYC already exists", async () => {
+    kycRepository.findByUserId.mockResolvedValue(kycRow);
+    const { res } = makeResponse();
+
+    await controller.createKyc(
+      { sub: USER_ID, roles: ["CUSTOMER"] } as any,
+      { dateOfBirth: "1996-02-14", documentType: "PASSPORT", documentNumber: "P1234567" },
+      res,
+    );
+
+    expect(notificationService.sendKycSubmitted).not.toHaveBeenCalled();
   });
 
   it("rejects admin token for KYC submission", async () => {
@@ -152,6 +187,7 @@ describe("KycController", () => {
       reviewedAt: "2026-09-28T01:00:00.000Z",
       reviewedBy: ADMIN_ID,
     });
+    userRepository.findByUserId.mockResolvedValue(applicant as any);
     tradeApiClient.activateAccount.mockResolvedValue({
       accountId: 73,
       accountNumber: "ACC-73",
@@ -170,6 +206,38 @@ describe("KycController", () => {
     expect(state.body.status).toBe("APPROVED");
     expect(state.body.accountId).toBe(73);
     expect(tradeApiClient.activateAccount).toHaveBeenCalledWith(USER_ID);
+
+    await flushPromises();
+    expect(userRepository.findByUserId).toHaveBeenCalledWith(USER_ID);
+    expect(notificationService.sendKycApproved).toHaveBeenCalledWith(
+      USER_ID,
+      "alice.trader@example.com",
+      "alice.trader",
+    );
+    expect(notificationService.sendKycRejected).not.toHaveBeenCalled();
+  });
+
+  it("still returns 200 when the approval email cannot be sent", async () => {
+    kycRepository.findByUserId.mockResolvedValue(kycRow);
+    kycRepository.reviewSubmission.mockResolvedValue({ ...kycRow, status: "APPROVED" });
+    tradeApiClient.activateAccount.mockResolvedValue({
+      accountId: 73,
+      accountNumber: "ACC-73",
+      availableBalance: "0.00",
+      accountStatus: "ACTIVE",
+    });
+    userRepository.findByUserId.mockRejectedValue(new Error("db down"));
+    const { res, state } = makeResponse();
+
+    await controller.reviewKyc(
+      { sub: ADMIN_ID, roles: ["ADMIN"] } as any,
+      { userId: USER_ID, status: KycReviewStatus.APPROVED },
+      res,
+    );
+    await flushPromises();
+
+    expect(state.status).toBe(200);
+    expect(notificationService.sendKycApproved).not.toHaveBeenCalled();
   });
 
   it("updates KYC to rejected without creating trading account", async () => {
@@ -181,6 +249,7 @@ describe("KycController", () => {
       reviewedBy: ADMIN_ID,
       rejectionReason: "Document is unreadable",
     });
+    userRepository.findByUserId.mockResolvedValue(applicant as any);
     const { res, state } = makeResponse();
 
     await controller.reviewKyc(
@@ -197,5 +266,14 @@ describe("KycController", () => {
     expect(state.body.status).toBe("REJECTED");
     expect(state.body.accountId).toBeUndefined();
     expect(tradeApiClient.activateAccount).not.toHaveBeenCalled();
+
+    await flushPromises();
+    expect(notificationService.sendKycRejected).toHaveBeenCalledWith(
+      USER_ID,
+      "alice.trader@example.com",
+      "alice.trader",
+      "Document is unreadable",
+    );
+    expect(notificationService.sendKycApproved).not.toHaveBeenCalled();
   });
 });

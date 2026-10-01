@@ -42,6 +42,22 @@ services:
     networks:
       - trading-net
 
+  # Local SMTP catcher for auth-service notification emails (registration,
+  # KYC submitted/approved/rejected). Nothing is delivered to real inboxes;
+  # read captured mail at http://localhost:8025.
+  # Point auth-service at it with SMTP_HOST=localhost SMTP_PORT=1025
+  # (or SMTP_HOST=mailpit from inside this network).
+  mailpit:
+    image: axllent/mailpit:v1.21
+    container_name: mailpit
+    profiles:
+      - platform
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    networks:
+      - trading-net
+
 networks:
   trading-net:
     driver: bridge

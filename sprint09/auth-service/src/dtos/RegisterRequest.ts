@@ -1,4 +1,4 @@
-import { IsString, MinLength, MaxLength, Matches, IsOptional, IsArray, IsEnum } from "class-validator";
+import { IsString, MinLength, MaxLength, Matches, IsOptional, IsArray, IsEnum, IsEmail } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export enum Role {
@@ -21,6 +21,13 @@ export class RegisterRequest {
   @MinLength(12)
   @MaxLength(128)
   password!: string;
+
+  // Used for notification emails (registration, KYC status). Stored
+  // AES-256-GCM encrypted by UserRepository, never in plaintext.
+  @ApiProperty({ maxLength: 254, example: 'priya.menon@example.com' })
+  @IsEmail()
+  @MaxLength(254)
+  email!: string;
 
   // NOTE: accountId removed deliberately. The team decided registration
   // auto-creates a new trading account via Trade REST API, rather than

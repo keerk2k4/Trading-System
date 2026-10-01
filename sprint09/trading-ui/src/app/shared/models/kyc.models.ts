@@ -1,6 +1,10 @@
-// KYC models and interfaces
+// KYC models and interfaces.
+// KycStatus comes from contracts/auth-api.yaml (src/generated/auth-client);
+// KycSubmission is the UI's view model, mapped from the contract's
+// KycResponse in MockKycService.
+import type { KycStatus as ContractKycStatus } from '../../../generated/auth-client';
 
-export type KycStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type KycStatus = ContractKycStatus;
 
 export interface KycSubmission {
   id?: string;

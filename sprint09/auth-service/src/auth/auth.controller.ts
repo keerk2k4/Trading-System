@@ -26,6 +26,7 @@ import { TradeApiClient } from "../services/TradeApiClient";
 import { UserRepository } from "../repositories/UserRepository";
 import { ThrottleService } from "../services/ThrottleService";
 import { AccountProvisioningEventService } from "../services/AccountProvisioningEventService";
+import { NotificationService } from "../services/NotificationService";
 
 @Controller("auth")
 export class AuthController {
@@ -37,6 +38,7 @@ export class AuthController {
     private userRepository: UserRepository,
     private throttleService: ThrottleService,
     private accountProvisioningEventService: AccountProvisioningEventService,
+    private notificationService: NotificationService,
   ) { }
 
   @Post("register")
@@ -64,7 +66,7 @@ export class AuthController {
       const user = await this.userRepository.create({
         userName: registerRequest.username,
         passwordHash,
-        email: `${registerRequest.username}@placeholder.local`,
+        email: registerRequest.email,
         phone: null,
         firstName: "",
         lastName: "",
@@ -73,6 +75,9 @@ export class AuthController {
       createdUserId = user.userId;
       await this.userRepository.assignRole(user.userId, "CUSTOMER");
       await this.accountProvisioningEventService.publishUserRegistered(user.userId, user.userName);
+
+      // Fire and forget: a mail outage must not fail or roll back registration.
+      void this.notificationService.sendUserRegistered(user.userId, registerRequest.email, user.userName);
 
       const response: UserResponse = {
         id: user.userId,
@@ -121,7 +126,7 @@ export class AuthController {
       const user = await this.userRepository.create({
         userName: registerRequest.username,
         passwordHash,
-        email: `${registerRequest.username}@placeholder.local`,
+        email: registerRequest.email,
         phone: null,
         firstName: "",
         lastName: "",

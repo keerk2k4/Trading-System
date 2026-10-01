@@ -1,12 +1,10 @@
 import { Injectable, signal, inject } from '@angular/core';
-import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
+import { HttpErrorResponse } from '@angular/common/http';
 import { KycSubmission, KycStatus } from '../models/kyc.models';
 import { Observable, of, throwError } from 'rxjs';
-import { catchError, delay, tap } from 'rxjs/operators';
+import { catchError, delay, map, tap } from 'rxjs/operators';
 import { MockAuthService } from './mock-auth.service';
-
-// Same real auth-service the KYC endpoints live on (see mock-auth.service.ts).
-const AUTH_API_BASE_URL = 'http://localhost:3000';
+import { KycResponse, KYCService as KycApiClient } from '../../../generated/auth-client';
 
 @Injectable({
   providedIn: 'root'
@@ -15,7 +13,7 @@ export class MockKycService {
   private kycDatabase = new Map<string, KycSubmission>();
   private kycStatus = signal<KycStatus | null>(null);
   private authService = inject(MockAuthService);
-  private http = inject(HttpClient);
+  private kycApi = inject(KycApiClient);
 
   constructor() {
     this.initializeMockData();
@@ -33,30 +31,25 @@ export class MockKycService {
     }
   }
 
-  // Submit KYC against the real backend: POST /kyc, bearer-authenticated
-  // with the signed-in user's own access token. The real endpoint takes the
-  // user from that token, not from a body field, so `userId` is only used
-  // here to key the local kycStatus signal/localStorage the rest of the UI
-  // already reads - the same local bookkeeping the mock version did.
+  // Submit KYC against the real backend: POST /kyc via the generated client,
+  // which adds the signed-in user's bearer token itself (configured in
+  // shared/api/api-clients.ts). The real endpoint takes the user from that
+  // token, not from a body field, so `userId` is only used here to key the
+  // local kycStatus signal/localStorage the rest of the UI already reads -
+  // the same local bookkeeping the mock version did.
   submitKyc(userId: string, data: any): Observable<KycSubmission> {
-    const token = this.authService.getToken();
-    if (!token) {
+    if (!this.authService.getToken()) {
       return throwError(() => ({ errorCode: 'AUTH-401', message: 'Sign in first' }));
     }
 
-    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
-
-    return this.http
-      .post<KycSubmission>(
-        `${AUTH_API_BASE_URL}/kyc`,
-        {
-          dateOfBirth: data.dateOfBirth,
-          documentType: data.documentType,
-          documentNumber: data.documentNumber,
-        },
-        { headers }
-      )
+    return this.kycApi
+      .submitKyc({
+        dateOfBirth: data.dateOfBirth,
+        documentType: data.documentType,
+        documentNumber: data.documentNumber,
+      })
       .pipe(
+        map((response) => this.toKycSubmission(response)),
         tap((kyc) => {
           // Same local bookkeeping the mock version kept, so the rest of
           // the app (login redirect, dashboard) still has something to read
@@ -167,6 +160,23 @@ export class MockKycService {
     };
 
     this.kycDatabase.set('b2c3d4e5-f6a7-5b6c-7d8e-9f0a1b2c3d4e', approvedKyc);
+  }
+
+  // Contract KycResponse (numeric id, ISO date strings, nullable review
+  // fields) -> the UI's KycSubmission view model.
+  private toKycSubmission(response: KycResponse): KycSubmission {
+    return {
+      id: String(response.id),
+      userId: response.userId,
+      dateOfBirth: response.dateOfBirth,
+      documentType: response.documentType,
+      documentNumber: response.documentNumber,
+      status: response.status,
+      submittedAt: new Date(response.submittedAt),
+      reviewedAt: response.reviewedAt ? new Date(response.reviewedAt) : undefined,
+      reviewedBy: response.reviewedBy ?? undefined,
+      rejectionReason: response.rejectionReason ?? undefined,
+    };
   }
 
   private loadKycStatusFromStorage(): KycStatus | null {
