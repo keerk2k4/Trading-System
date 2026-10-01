@@ -8,7 +8,6 @@ import { TradeApiClient } from "../services/TradeApiClient";
 import { UserRepository } from "../repositories/UserRepository";
 import { KycRepository } from "../repositories/KycRepository";
 import { ThrottleService } from "../services/ThrottleService";
-import { EmailEncryptionService } from "../services/EmailEncryptionService";
 import { BearerGuard } from "../guards/BearerGuard";
 import { KycController } from "./kyc.controller";
 import { AccountProvisioningEventService } from "../services/AccountProvisioningEventService";
@@ -26,7 +25,6 @@ import { NotificationService } from "../services/NotificationService";
     KycRepository,
     ThrottleService,
     AccountProvisioningEventService,
-    EmailEncryptionService,
     NotificationService,
     BearerGuard,
   ],
@@ -39,7 +37,6 @@ import { NotificationService } from "../services/NotificationService";
     KycRepository,
     ThrottleService,
     AccountProvisioningEventService,
-    EmailEncryptionService,
     NotificationService,
     BearerGuard,
   ],

@@ -20,8 +20,20 @@ describe('RegisterComponent', () => {
     input(id).dispatchEvent(new Event('input'));
   }
 
-  function fill(username: string, password: string, confirmPassword: string): void {
+  function fill(
+    username: string,
+    email: string,
+    firstName: string,
+    lastName: string,
+    phone: string,
+    password: string,
+    confirmPassword: string
+  ): void {
     type('register-username', username);
+    type('register-email', email);
+    type('register-first-name', firstName);
+    type('register-last-name', lastName);
+    type('register-phone', phone);
     type('register-password', password);
     type('register-confirm-password', confirmPassword);
   }
@@ -45,7 +57,7 @@ describe('RegisterComponent', () => {
 
   it('offers no role selector and links to the login page', () => {
     expect(page.querySelector('h1')?.textContent).toContain('Create your account');
-    expect(page.querySelectorAll('input').length).toBe(3);
+    expect(page.querySelectorAll('input').length).toBe(6);
     expect(page.querySelector('select')).toBeNull();
     expect(page.querySelector('a[href="/login"]')).not.toBeNull();
   });
@@ -62,18 +74,22 @@ describe('RegisterComponent', () => {
   });
 
   it('reports every invalid field on submit without calling the API', () => {
-    fill('bad name!', 'too short', 'different');
+    fill('bad name!', 'bad', '', '', '123', 'too short', 'different');
     submit();
 
     expect(auth.register).not.toHaveBeenCalled();
     expect(errorText('register-username')).toBe('Use only letters, numbers, dots, dashes and underscores.');
+    expect(errorText('register-email')).toBe('Enter a valid email address.');
+    expect(errorText('register-first-name')).toBe('Enter your first name.');
+    expect(errorText('register-last-name')).toBe('Enter your last name.');
+    expect(errorText('register-phone')).toBe('Enter a valid phone number in international format.');
     expect(errorText('register-password')).toBe('Password must be at least 12 characters.');
     expect(errorText('register-confirm-password')).toBe('Passwords do not match.');
     expect(document.activeElement).toBe(input('register-username'));
   });
 
   it('re-checks the confirmation when the password is edited afterwards', () => {
-    fill('gaurang123', PASSWORD, PASSWORD);
+    fill('gaurang123', 'gaurang@example.com', 'Gaurang', 'Patel', '+919900112233', PASSWORD, PASSWORD);
     type('register-password', `${PASSWORD}!`);
     submit();
 
@@ -81,15 +97,22 @@ describe('RegisterComponent', () => {
     expect(errorText('register-confirm-password')).toBe('Passwords do not match.');
   });
 
-  it('sends only the username and password, never the confirmation', () => {
-    fill('gaurang123', PASSWORD, PASSWORD);
+  it('sends the register payload without the confirmation field', () => {
+    fill('gaurang123', 'gaurang@example.com', 'Gaurang', 'Patel', '+919900112233', PASSWORD, PASSWORD);
     submit();
 
-    expect(auth.register).toHaveBeenCalledOnceWith({ username: 'gaurang123', password: PASSWORD });
+    expect(auth.register).toHaveBeenCalledOnceWith({
+      username: 'gaurang123',
+      email: 'gaurang@example.com',
+      firstName: 'Gaurang',
+      lastName: 'Patel',
+      phone: '+919900112233',
+      password: PASSWORD
+    });
   });
 
   it('shows a success state with a path to the login page', async () => {
-    fill('gaurang123', PASSWORD, PASSWORD);
+    fill('gaurang123', 'gaurang@example.com', 'Gaurang', 'Patel', '+919900112233', PASSWORD, PASSWORD);
     submit();
     await fixture.whenStable();
 
@@ -105,7 +128,7 @@ describe('RegisterComponent', () => {
     auth.register.and.returnValue(
       throwError(() => ({ errorCode: 'AUTH-409', message: 'Username already registered', status: 409 }))
     );
-    fill('gaurang123', PASSWORD, PASSWORD);
+    fill('gaurang123', 'gaurang@example.com', 'Gaurang', 'Patel', '+919900112233', PASSWORD, PASSWORD);
     submit();
 
     expect(errorText('register-username')).toBe('This username is already taken. Please choose another.');
@@ -116,7 +139,7 @@ describe('RegisterComponent', () => {
 
   it('shows a friendly message when the backend rejects the input', () => {
     auth.register.and.returnValue(throwError(() => ({ errorCode: 'VAL-422', message: 'Invalid input', status: 422 })));
-    fill('gaurang123', PASSWORD, PASSWORD);
+    fill('gaurang123', 'gaurang@example.com', 'Gaurang', 'Patel', '+919900112233', PASSWORD, PASSWORD);
     submit();
 
     const alert = page.querySelector('[role="alert"]')?.textContent;
@@ -126,7 +149,7 @@ describe('RegisterComponent', () => {
 
   it('shows a loading state and ignores a second submit while registering', () => {
     auth.register.and.returnValue(new Subject<UserResponseData>());
-    fill('gaurang123', PASSWORD, PASSWORD);
+    fill('gaurang123', 'gaurang@example.com', 'Gaurang', 'Patel', '+919900112233', PASSWORD, PASSWORD);
     submit();
     submit();
 

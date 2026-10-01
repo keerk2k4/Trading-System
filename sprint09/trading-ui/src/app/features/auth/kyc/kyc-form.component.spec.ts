@@ -12,9 +12,24 @@ describe('KycFormComponent', () => {
   let page: HTMLElement;
 
   function create(status: KycStatus | null): void {
-    kyc = jasmine.createSpyObj<MockKycService>('MockKycService', ['getCurrentUserKycStatus', 'submitKyc']);
+    kyc = jasmine.createSpyObj<MockKycService>('MockKycService', ['getCurrentUserKycStatus', 'getCurrentUserKyc', 'submitKyc']);
     kyc.getCurrentUserKycStatus.and.returnValue(status);
-    kyc.submitKyc.and.returnValue(of({ userId: 'u-1', dateOfBirth: '', documentType: '', documentNumber: '', status: 'PENDING' }));
+    kyc.getCurrentUserKyc.and.returnValue(
+      of(
+        status
+          ? {
+              userId: 'u-1',
+              dateOfBirth: '1990-05-15',
+              documentType: 'PASSPORT',
+              documentNumber: 'PS123456789',
+              status,
+            }
+          : null
+      )
+    );
+    kyc.submitKyc.and.returnValue(
+      of({ userId: 'u-1', dateOfBirth: '', documentType: '', documentNumber: '', status: 'PENDING' })
+    );
 
     TestBed.configureTestingModule({
       providers: [
@@ -60,16 +75,18 @@ describe('KycFormComponent', () => {
       documentType: 'PASSPORT',
       documentNumber: 'PS123456789'
     });
-    expect(page.querySelector('form')).toBeNull();
-    expect(page.querySelector('[role="status"]')?.textContent).toContain('submitted');
+    expect(page.querySelector('form')).not.toBeNull();
+    expect(page.querySelector('[role="status"]')?.textContent).toContain('updated');
     expect(page.querySelector('[aria-current="step"]')?.textContent).toContain('Administrator review');
   });
 
-  it('shows the review state without a form while an application is pending', () => {
+  it('shows existing pending KYC and keeps the form open for updates', () => {
     create('PENDING');
 
-    expect(page.querySelector('form')).toBeNull();
-    expect(page.querySelector('h2')?.textContent).toContain('Application under review');
+    expect(page.querySelector('form')).not.toBeNull();
+    expect(page.textContent).toContain('already have a submitted KYC');
+    expect((page.querySelector('#dob') as HTMLInputElement).value).toBe('1990-05-15');
+    expect(page.querySelector('button[type="submit"]')?.textContent).toContain('Update submission');
   });
 
   it('explains a rejection and offers the form again', () => {

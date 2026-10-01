@@ -35,11 +35,27 @@ describe('MockAuthService', () => {
     localStorage.clear();
   });
 
-  it('registers with only the username and password and does not sign the user in', () => {
-    service.register({ username: 'gaurang123', password: 'correct horse battery staple' }).subscribe();
+  it('registers with profile fields and does not sign the user in', () => {
+    service
+      .register({
+        username: 'gaurang123',
+        email: 'gaurang@example.com',
+        firstName: 'Gaurang',
+        lastName: 'Patel',
+        phone: '+919900112233',
+        password: 'correct horse battery staple'
+      })
+      .subscribe();
 
     const req = http.expectOne(`${AUTH_API_BASE_URL}/auth/register`);
-    expect(req.request.body).toEqual({ username: 'gaurang123', password: 'correct horse battery staple' });
+    expect(req.request.body).toEqual({
+      username: 'gaurang123',
+      email: 'gaurang@example.com',
+      firstName: 'Gaurang',
+      lastName: 'Patel',
+      phone: '+919900112233',
+      password: 'correct horse battery staple'
+    });
     req.flush({ id: 'user-1', username: 'gaurang123', roles: ['CUSTOMER'] });
 
     expect(service.isAuthenticated()).toBe(false);
@@ -113,6 +129,9 @@ describe('MockAuthService', () => {
     http.expectOne(`${AUTH_API_BASE_URL}/auth/me`).flush({ id: 'user-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] });
 
     service.logout();
+    const logout = http.expectOne(`${AUTH_API_BASE_URL}/auth/logout`);
+    expect(logout.request.body).toEqual({ refreshToken: 'refresh-1' });
+    logout.flush(null, { status: 204, statusText: 'No Content' });
 
     expect(service.isAuthenticated()).toBe(false);
     expect(service.getCurrentUser()).toBeNull();

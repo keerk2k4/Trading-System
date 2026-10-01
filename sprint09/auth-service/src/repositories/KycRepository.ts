@@ -59,6 +59,45 @@ export class KycRepository {
     return this.mapRowToKyc(result.rows[0]);
   }
 
+  async updateSubmissionByUserId(input: {
+    userId: string;
+    dateOfBirth: string;
+    documentType: string;
+    documentNumber: string;
+  }): Promise<Kyc | null> {
+    const result = await this.databaseService.query(
+      `UPDATE auth.kyc
+       SET date_of_birth = $2::date,
+           document_type = $3,
+           document_number = $4,
+           status = 'PENDING',
+           reviewed_at = NULL,
+           reviewed_by = NULL,
+           rejection_reason = NULL,
+           submitted_at = CURRENT_TIMESTAMP
+       WHERE user_id = $1
+       RETURNING *`,
+      [input.userId, input.dateOfBirth, input.documentType, input.documentNumber],
+    );
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    return this.mapRowToKyc(result.rows[0]);
+  }
+
+  async findAllPending(): Promise<Kyc[]> {
+    const result = await this.databaseService.query(
+      `SELECT *
+       FROM auth.kyc
+       WHERE status = 'PENDING'
+       ORDER BY submitted_at ASC`,
+    );
+
+    return result.rows.map((row: any) => this.mapRowToKyc(row));
+  }
+
   private mapRowToKyc(row: any): Kyc {
     return {
       id: row.id,

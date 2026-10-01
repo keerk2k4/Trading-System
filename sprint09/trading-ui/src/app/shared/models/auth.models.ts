@@ -27,6 +27,9 @@ export interface AuthResponse extends TokenResponse {
 export interface RegisterRequest {
   username: string;
   email: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
   password: string;
 }
 

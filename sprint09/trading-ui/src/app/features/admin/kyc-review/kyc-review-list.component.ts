@@ -141,7 +141,7 @@ export class KycReviewListComponent implements OnInit {
 
     this.processingId.set(kyc.id);
     this.kycService
-      .reviewKyc(kyc.id, approved, reason)
+      .reviewKyc(kyc.userId, approved, reason)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {

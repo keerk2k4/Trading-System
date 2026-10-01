@@ -17,8 +17,8 @@ export interface MailMessage {
  *   skipped with a log line, so local runs and tests need no mail server.
  * - Every public method is best-effort: it never throws. A mail outage must
  *   not fail registration or KYC, so callers fire and forget.
- * - Never log the recipient address or message body; the address is PII
- *   (stored encrypted, see EmailEncryptionService). Log the user id only.
+ * - Never log the recipient address or message body; the address is PII.
+ *   Log the user id only.
  */
 @Injectable()
 export class NotificationService {

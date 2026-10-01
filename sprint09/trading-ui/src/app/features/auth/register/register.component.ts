@@ -76,6 +76,76 @@ function matchesPassword(control: AbstractControl): ValidationErrors | null {
           </div>
 
           <div>
+            <label class="tp-label" for="register-email">Email</label>
+            <input
+              class="tp-input"
+              id="register-email"
+              type="email"
+              formControlName="email"
+              autocomplete="email"
+              autocapitalize="none"
+              spellcheck="false"
+              aria-required="true"
+              [attr.aria-invalid]="emailError() ? 'true' : null"
+              [attr.aria-describedby]="emailError() ? 'register-email-error' : null"
+            />
+            @if (emailError(); as message) {
+              <p class="tp-field-error" id="register-email-error">{{ message }}</p>
+            }
+          </div>
+
+          <div>
+            <label class="tp-label" for="register-first-name">First name</label>
+            <input
+              class="tp-input"
+              id="register-first-name"
+              type="text"
+              formControlName="firstName"
+              autocomplete="given-name"
+              aria-required="true"
+              [attr.aria-invalid]="firstNameError() ? 'true' : null"
+              [attr.aria-describedby]="firstNameError() ? 'register-first-name-error' : null"
+            />
+            @if (firstNameError(); as message) {
+              <p class="tp-field-error" id="register-first-name-error">{{ message }}</p>
+            }
+          </div>
+
+          <div>
+            <label class="tp-label" for="register-last-name">Last name</label>
+            <input
+              class="tp-input"
+              id="register-last-name"
+              type="text"
+              formControlName="lastName"
+              autocomplete="family-name"
+              aria-required="true"
+              [attr.aria-invalid]="lastNameError() ? 'true' : null"
+              [attr.aria-describedby]="lastNameError() ? 'register-last-name-error' : null"
+            />
+            @if (lastNameError(); as message) {
+              <p class="tp-field-error" id="register-last-name-error">{{ message }}</p>
+            }
+          </div>
+
+          <div>
+            <label class="tp-label" for="register-phone">Phone</label>
+            <input
+              class="tp-input"
+              id="register-phone"
+              type="tel"
+              formControlName="phone"
+              autocomplete="tel"
+              aria-required="true"
+              [attr.aria-invalid]="phoneError() ? 'true' : null"
+              [attr.aria-describedby]="phoneError() ? 'register-phone-error' : null"
+            />
+            @if (phoneError(); as message) {
+              <p class="tp-field-error" id="register-phone-error">{{ message }}</p>
+            }
+          </div>
+
+          <div>
             <label class="tp-label" for="register-password">Password</label>
             <div class="tp-input-wrap">
               <input
@@ -160,6 +230,10 @@ export class RegisterComponent {
         Validators.pattern(/^[a-zA-Z0-9._-]+$/)
       ]
     ],
+    email: ['', [Validators.required, Validators.email, Validators.maxLength(254)]],
+    firstName: ['', [Validators.required, Validators.maxLength(80)]],
+    lastName: ['', [Validators.required, Validators.maxLength(80)]],
+    phone: ['', [Validators.required, Validators.pattern(/^\+?[1-9]\d{7,14}$/)]],
     password: ['', [Validators.required, Validators.minLength(12), Validators.maxLength(128)]],
     confirmPassword: ['', [Validators.required, matchesPassword]]
   });
@@ -217,6 +291,53 @@ export class RegisterComponent {
       : 'Password must be 128 characters or fewer.';
   }
 
+  protected emailError(): string | null {
+    const control = this.form.controls.email;
+    if (control.valid || !(control.touched || this.submitted())) {
+      return null;
+    }
+    if (control.hasError('required')) {
+      return 'Enter an email address.';
+    }
+    if (control.hasError('maxlength')) {
+      return 'Email must be 254 characters or fewer.';
+    }
+    return 'Enter a valid email address.';
+  }
+
+  protected firstNameError(): string | null {
+    const control = this.form.controls.firstName;
+    if (control.valid || !(control.touched || this.submitted())) {
+      return null;
+    }
+    if (control.hasError('required')) {
+      return 'Enter your first name.';
+    }
+    return 'First name must be 80 characters or fewer.';
+  }
+
+  protected lastNameError(): string | null {
+    const control = this.form.controls.lastName;
+    if (control.valid || !(control.touched || this.submitted())) {
+      return null;
+    }
+    if (control.hasError('required')) {
+      return 'Enter your last name.';
+    }
+    return 'Last name must be 80 characters or fewer.';
+  }
+
+  protected phoneError(): string | null {
+    const control = this.form.controls.phone;
+    if (control.valid || !(control.touched || this.submitted())) {
+      return null;
+    }
+    if (control.hasError('required')) {
+      return 'Enter a phone number.';
+    }
+    return 'Enter a valid phone number in international format.';
+  }
+
   protected passwordLongEnough(): boolean {
     return this.form.controls.password.value.length >= 12;
   }
@@ -247,10 +368,10 @@ export class RegisterComponent {
     }
 
     this.isLoading.set(true);
-    const { username, password } = this.form.getRawValue();
+    const { username, email, firstName, lastName, phone, password } = this.form.getRawValue();
 
     this.authService
-      .register({ username, password })
+      .register({ username, email, firstName, lastName, phone, password })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (user) => {

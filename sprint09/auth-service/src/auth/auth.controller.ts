@@ -67,9 +67,9 @@ export class AuthController {
         userName: registerRequest.username,
         passwordHash,
         email: registerRequest.email,
-        phone: null,
-        firstName: "",
-        lastName: "",
+        phone: registerRequest.phone,
+        firstName: registerRequest.firstName,
+        lastName: registerRequest.lastName,
         status: "PENDING",
       });
       createdUserId = user.userId;
@@ -127,9 +127,9 @@ export class AuthController {
         userName: registerRequest.username,
         passwordHash,
         email: registerRequest.email,
-        phone: null,
-        firstName: "",
-        lastName: "",
+        phone: registerRequest.phone,
+        firstName: registerRequest.firstName,
+        lastName: registerRequest.lastName,
         status: "ACTIVE",
       });
       createdUserId = user.userId;
@@ -401,6 +401,26 @@ export class AuthController {
         message: "Unauthorised",
       };
       res.status(401).json(response);
+    }
+  }
+
+  @Post("logout")
+  @ApiTags("Auth")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: "Log out and revoke the provided refresh token" })
+  @ApiResponse({ status: 204, description: "Logged out." })
+  @ApiResponse({ status: 422, description: "Invalid input", type: ErrorResponse })
+  async logout(@Body() refreshRequest: RefreshRequest, @Res() res: Response): Promise<void> {
+    try {
+      await this.refreshTokenService.revokeRefreshToken(refreshRequest.refreshToken);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Logout error:", error);
+      const response: ErrorResponse = {
+        errorCode: "VAL-422",
+        message: "Invalid input",
+      };
+      res.status(422).json(response);
     }
   }
 

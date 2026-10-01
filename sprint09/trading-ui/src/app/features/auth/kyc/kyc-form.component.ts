@@ -6,6 +6,7 @@ import { MockAuthService } from '../../../shared/services/mock-auth.service';
 import { MockKycService } from '../../../shared/services/mock-kyc.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
 import { StatusBadgeComponent } from '../../../shared/ui/status-badge.component';
+import { KycSubmission } from '../../../shared/models/kyc.models';
 
 const DOCUMENT_TYPES = [
   { value: 'PASSPORT', label: 'Passport' },
@@ -29,29 +30,31 @@ const DOCUMENT_TYPES = [
       <div class="tp-grid tp-grid-main-side">
         <section class="tp-panel" aria-labelledby="kyc-heading">
           <div class="tp-panel-header">
-            <h2 id="kyc-heading">{{ isPending() ? 'Application under review' : 'Your details' }}</h2>
+            <h2 id="kyc-heading">Your details</h2>
             @if (kycStatus()) {
               <app-status-badge [status]="kycStatus()" />
             }
           </div>
 
           <div class="tp-panel-body">
-            @if (isPending()) {
-              <div class="tp-form">
-                <div class="tp-alert tp-alert-info" [attr.role]="justSubmitted() ? 'status' : null">
-                  <span>
-                    @if (justSubmitted()) {
-                      <strong>Thanks, your details were submitted.</strong>
-                    }
-                    An administrator will review your application. Trading unlocks as soon as it is approved.
-                  </span>
-                </div>
-                <div class="tp-actions">
-                  <button class="tp-btn tp-btn-secondary" type="button" (click)="goToDashboard()">Go to dashboard</button>
-                </div>
-              </div>
+            @if (isLoadingExistingKyc()) {
+              <div class="tp-empty">Loading your KYC details…</div>
             } @else {
-              <form class="tp-form" [formGroup]="form" (ngSubmit)="onSubmit()">
+              <div class="tp-form">
+                @if (isUpdateMode()) {
+                  <div class="tp-alert tp-alert-info" [attr.role]="justSubmitted() ? 'status' : null">
+                    <span>
+                      @if (justSubmitted()) {
+                        <strong>Your KYC details were updated.</strong>
+                      } @else {
+                        <strong>You already have a submitted KYC.</strong>
+                      }
+                      You can update these details and resubmit for review.
+                    </span>
+                  </div>
+                }
+
+                <form class="tp-form" [formGroup]="form" (ngSubmit)="onSubmit()">
                 @if (kycStatus() === 'REJECTED') {
                   <div class="tp-alert tp-alert-error">
                     <span>
@@ -125,14 +128,19 @@ const DOCUMENT_TYPES = [
                   <button class="tp-btn tp-btn-primary" type="submit" [attr.aria-disabled]="isLoading() ? 'true' : null">
                     @if (isLoading()) {
                       <span class="tp-spinner" aria-hidden="true"></span>
-                      Submitting…
+                      {{ isUpdateMode() ? 'Updating…' : 'Submitting…' }}
                     } @else {
-                      Submit for review
+                      {{ isUpdateMode() ? 'Update submission' : 'Submit for review' }}
                     }
                   </button>
                   <span class="sr-only" role="status">{{ isLoading() ? 'Submitting your details, please wait.' : '' }}</span>
                 </div>
               </form>
+
+              <div class="tp-actions">
+                <button class="tp-btn tp-btn-secondary" type="button" (click)="goToDashboard()">Go to dashboard</button>
+              </div>
+            </div>
             }
           </div>
         </section>
@@ -143,14 +151,14 @@ const DOCUMENT_TYPES = [
           </div>
           <ol class="steps tp-panel-body">
             <li
-              [class.is-done]="isPending()"
-              [class.is-current]="!isPending()"
-              [attr.aria-current]="isPending() ? null : 'step'"
+              [class.is-done]="kycStatus() === 'PENDING' || kycStatus() === 'APPROVED'"
+              [class.is-current]="!kycStatus()"
+              [attr.aria-current]="!kycStatus() ? 'step' : null"
             >
-              <strong>Submit your details @if (isPending()) {<span class="sr-only">(completed)</span>}</strong>
+              <strong>Submit your details @if (kycStatus() === 'PENDING' || kycStatus() === 'APPROVED') {<span class="sr-only">(completed)</span>}</strong>
               <span>Date of birth and one identity document.</span>
             </li>
-            <li [class.is-current]="isPending()" [attr.aria-current]="isPending() ? 'step' : null">
+            <li [class.is-current]="kycStatus() === 'PENDING'" [attr.aria-current]="kycStatus() === 'PENDING' ? 'step' : null">
               <strong>Administrator review</strong>
               <span>An administrator checks your document.</span>
             </li>
@@ -192,7 +200,9 @@ export class KycFormComponent implements OnInit {
   });
 
   protected readonly kycStatus = signal('');
-  protected readonly isPending = computed(() => this.kycStatus() === 'PENDING');
+  protected readonly existingKyc = signal<KycSubmission | null>(null);
+  protected readonly isUpdateMode = computed(() => this.existingKyc() !== null);
+  protected readonly isLoadingExistingKyc = signal(true);
   protected readonly justSubmitted = signal(false);
   protected readonly submitted = signal(false);
   protected readonly isLoading = signal(false);
@@ -200,8 +210,29 @@ export class KycFormComponent implements OnInit {
   protected rejectionReason = '';
 
   ngOnInit(): void {
-    // Check current KYC status
-    this.kycStatus.set(this.kycService.getCurrentUserKycStatus() ?? '');
+    this.kycService
+      .getCurrentUserKyc()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (kyc) => {
+          this.isLoadingExistingKyc.set(false);
+          this.existingKyc.set(kyc);
+          this.kycStatus.set(kyc?.status ?? '');
+          this.rejectionReason = kyc?.rejectionReason ?? '';
+
+          if (kyc) {
+            this.form.patchValue({
+              dateOfBirth: kyc.dateOfBirth,
+              documentType: kyc.documentType,
+              documentNumber: kyc.documentNumber,
+            });
+          }
+        },
+        error: () => {
+          this.isLoadingExistingKyc.set(false);
+          this.errorMessage.set('Unable to load your KYC details right now.');
+        },
+      });
   }
 
   protected showError(name: 'dateOfBirth' | 'documentType' | 'documentNumber'): boolean {
@@ -234,10 +265,12 @@ export class KycFormComponent implements OnInit {
       .submitKyc(user.id, this.form.getRawValue())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => {
+        next: (kyc) => {
           this.isLoading.set(false);
           this.justSubmitted.set(true);
-          this.kycStatus.set('PENDING');
+          this.existingKyc.set(kyc);
+          this.kycStatus.set(kyc.status);
+          this.rejectionReason = kyc.rejectionReason ?? '';
         },
         error: (err: { errorCode?: string }) => {
           this.isLoading.set(false);

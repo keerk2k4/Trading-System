@@ -55,8 +55,11 @@ function makeResponse() {
 function registerRequest(overrides: Partial<RegisterRequest> = {}): RegisterRequest {
   return {
     username: "new.trader",
-    password: "correct horse battery staple",
     email: "new.trader@example.com",
+    firstName: "New",
+    lastName: "Trader",
+    phone: "+919900112233",
+    password: "correct horse battery staple",
     ...overrides,
   };
 }
@@ -97,6 +100,7 @@ describe("AuthController", () => {
       generateRefreshToken: jest.fn(),
       hashRefreshToken: jest.fn(),
       storeRefreshToken: jest.fn(),
+      revokeRefreshToken: jest.fn(),
       revokeAllRefreshTokensForUser: jest.fn(),
     };
     tradeApiClient = {
@@ -163,9 +167,9 @@ describe("AuthController", () => {
         userName: "new.trader",
         passwordHash: "hashed-password",
         email: "new.trader@example.com",
-        phone: null,
-        firstName: "",
-        lastName: "",
+        phone: "+919900112233",
+        firstName: "New",
+        lastName: "Trader",
         status: "PENDING",
       });
       expect(userRepository.assignRole).toHaveBeenCalledWith(USER_ID, Role.CUSTOMER);
@@ -573,6 +577,38 @@ describe("AuthController", () => {
       );
 
       expect(state).toEqual({ status: 401, body: errorResponse });
+    });
+  });
+
+  describe("logout", () => {
+    it("revokes the supplied refresh token and returns 204", async () => {
+      refreshTokenService.revokeRefreshToken.mockResolvedValue(1);
+      const { res, state } = makeResponse();
+      (res as any).send = jest.fn(() => {
+        state.body = undefined;
+        return res;
+      });
+
+      await controller.logout({ refreshToken: "refresh-token" }, res);
+
+      expect(refreshTokenService.revokeRefreshToken).toHaveBeenCalledWith("refresh-token");
+      expect(state.status).toBe(204);
+    });
+
+    it("maps revocation failures to 422", async () => {
+      refreshTokenService.revokeRefreshToken.mockRejectedValue(new Error("db down"));
+      const { res, state } = makeResponse();
+      (res as any).send = jest.fn(() => res);
+
+      await controller.logout({ refreshToken: "refresh-token" }, res);
+
+      expect(state).toEqual({
+        status: 422,
+        body: {
+          errorCode: "VAL-422",
+          message: "Invalid input",
+        },
+      });
     });
   });
 });

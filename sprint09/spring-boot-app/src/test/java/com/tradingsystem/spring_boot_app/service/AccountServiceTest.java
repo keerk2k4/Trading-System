@@ -85,6 +85,29 @@ class AccountServiceTest {
     }
 
     @Test
+    void getAccountUsesFallbackHolderNameWhenHolderIsMissing() {
+        Account account = mock(Account.class);
+        when(account.getAccountId()).thenReturn(8L);
+        when(account.getAccountReference()).thenReturn("ACC-000008");
+        when(account.getHolder()).thenReturn(null);
+        when(account.getCashBalance()).thenReturn(new BigDecimal("1000.00"));
+        when(account.getTradingStatus()).thenReturn(TradingStatus.ACTIVE);
+        when(account.getLoadedVersion()).thenReturn(1L);
+        when(accounts.findAccountById(8L)).thenReturn(Optional.of(account));
+
+        AccountResponse response = service.getAccount(8L);
+
+        assertAll(
+                () -> assertEquals(8L, response.id()),
+                () -> assertEquals("ACC-000008", response.accountId()),
+                () -> assertEquals("Unknown holder", response.holderName()),
+                () -> assertEquals(new BigDecimal("1000.00"), response.cashBalance()),
+                () -> assertEquals(AccountStatus.ACTIVE, response.status()),
+                () -> assertEquals(1L, response.version())
+        );
+    }
+
+    @Test
     void getBalanceReturnsUsdBalanceForExistingAccount() {
         Account account = mock(Account.class);
         when(account.getAccountId()).thenReturn(7L);

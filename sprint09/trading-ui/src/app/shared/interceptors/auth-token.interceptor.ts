@@ -1,12 +1,15 @@
 import { inject } from '@angular/core';
-import { HttpInterceptorFn } from '@angular/common/http';
+import { HttpErrorResponse, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { throwError } from 'rxjs';
+import { catchError, switchMap } from 'rxjs/operators';
 import { MockAuthService } from '../services/mock-auth.service';
-import { TRADE_API_BASE_URL } from '../api/api-clients';
+import { AUTH_API_BASE_URL, TRADE_API_BASE_URL } from '../api/api-clients';
 
 // Auth-service endpoints that are called without a session. They must never
 // carry a bearer token, and a 401 from them is a real answer, not an expired
 // access token.
-const PUBLIC_AUTH_PATHS = ['/auth/login', '/auth/admin/login', '/auth/register', '/auth/refresh'];
+const PUBLIC_AUTH_PATHS = ['/auth/login', '/auth/admin/login', '/auth/register', '/auth/refresh', '/auth/logout'];
 
 function needsBearerToken(url: string): boolean {
   if (url.startsWith(`${TRADE_API_BASE_URL}/`)) {
@@ -60,7 +63,7 @@ export const authTokenInterceptor: HttpInterceptorFn = (req, next) => {
           }
           return throwError(() => err);
         }),
-        switchMap((newToken) => next(withBearer(req, newToken)))
+        switchMap((newToken: string) => next(withBearer(req, newToken)))
       );
     })
   );

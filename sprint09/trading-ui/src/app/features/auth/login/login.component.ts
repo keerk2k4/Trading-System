@@ -2,6 +2,7 @@ import { Component, DestroyRef, ElementRef, inject, signal } from '@angular/core
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { KycSubmission } from '../../../shared/models/kyc.models';
 import { AuthError } from '../../../shared/models/auth.models';
 import { MockAuthService } from '../../../shared/services/mock-auth.service';
 import { MockKycService } from '../../../shared/services/mock-kyc.service';
@@ -177,16 +178,29 @@ export class LoginComponent {
       return;
     }
 
-    // Customers can only trade once their KYC is approved.
-    const kycStatus = this.kycService.getCurrentUserKycStatus();
-
-    if (kycStatus === 'APPROVED') {
-      this.router.navigateByUrl(this.returnUrl());
-    } else if (kycStatus === 'REJECTED') {
-      this.errorMessage.set('Your KYC submission was rejected. Please contact support.');
-    } else {
+    const user = this.authService.getCurrentUser();
+    if (!user) {
       this.router.navigate(['/kyc-submission']);
+      return;
     }
+
+    // Always read KYC from backend after login so one user's cached status
+    // never leaks into another user's session.
+    this.kycService
+      .getKycStatus(user.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (kyc: KycSubmission | null) => {
+          if (kyc?.status === 'APPROVED') {
+            this.router.navigateByUrl(this.returnUrl());
+            return;
+          }
+          this.router.navigate(['/kyc-submission']);
+        },
+        error: () => {
+          this.router.navigate(['/kyc-submission']);
+        }
+      });
   }
 
   // Only in-app paths are honoured, so a crafted link cannot send a freshly

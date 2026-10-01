@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Patch,
   Post,
+  Put,
   Res,
   UseGuards,
 } from "@nestjs/common";
@@ -30,6 +32,50 @@ export class KycController {
     private tradeApiClient: TradeApiClient,
     private notificationService: NotificationService,
   ) {}
+
+  @Get()
+  @UseGuards(BearerGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Get KYC submission for the authenticated user" })
+  @ApiResponse({ status: 200, description: "KYC submission found.", type: KycResponse })
+  @ApiResponse({ status: 401, description: "Unauthorised", type: ErrorResponse })
+  @ApiResponse({ status: 403, description: "Forbidden", type: ErrorResponse })
+  @ApiResponse({ status: 404, description: "KYC not found", type: ErrorResponse })
+  async getMyKyc(@CurrentUser() claims: AuthenticatedUser, @Res() res: Response): Promise<void> {
+    try {
+      if (!claims) {
+        const response: ErrorResponse = { errorCode: "AUTH-401", message: "Unauthorised" };
+        res.status(401).json(response);
+        return;
+      }
+
+      const roles = claims.roles ?? [];
+      const hasCustomerRole = roles.some((role) => role?.toUpperCase() === "CUSTOMER");
+      const hasAdminRole = roles.some((role) => role?.toUpperCase() === "ADMIN");
+      if (!hasCustomerRole || hasAdminRole) {
+        const response: ErrorResponse = { errorCode: "AUTH-403", message: "Forbidden" };
+        res.status(403).json(response);
+        return;
+      }
+
+      const existing = await this.kycRepository.findByUserId(claims.sub);
+      if (!existing) {
+        const response: ErrorResponse = {
+          errorCode: "KYC-404",
+          message: "KYC record not found",
+        };
+        res.status(404).json(response);
+        return;
+      }
+
+      res.status(200).json(this.toKycResponse(existing));
+    } catch (error) {
+      console.error("Get my KYC error:", error);
+      const response: ErrorResponse = { errorCode: "VAL-422", message: "Invalid input" };
+      res.status(422).json(response);
+    }
+  }
 
   @Post()
   @UseGuards(BearerGuard)
@@ -86,25 +132,100 @@ export class KycController {
         documentNumber: request.documentNumber,
       });
 
-      const response: KycResponse = {
-        id: created.id,
-        userId: created.userId,
-        status: created.status,
-        dateOfBirth: created.dateOfBirth,
-        documentType: created.documentType,
-        documentNumber: created.documentNumber,
-        submittedAt: created.submittedAt,
-        reviewedAt: created.reviewedAt,
-        reviewedBy: created.reviewedBy,
-        rejectionReason: created.rejectionReason,
-      };
-
       // Fire and forget: a mail outage must not fail the KYC submission.
       void this.notificationService.sendKycSubmitted(user.userId, user.email, user.userName);
 
-      res.status(201).json(response);
+      res.status(201).json(this.toKycResponse(created));
     } catch (error) {
       console.error("Create KYC error:", error);
+      const response: ErrorResponse = { errorCode: "VAL-422", message: "Invalid input" };
+      res.status(422).json(response);
+    }
+  }
+
+  @Put()
+  @UseGuards(BearerGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Update KYC details for the authenticated user" })
+  @ApiResponse({ status: 200, description: "KYC updated.", type: KycResponse })
+  @ApiResponse({ status: 401, description: "Unauthorised", type: ErrorResponse })
+  @ApiResponse({ status: 403, description: "Forbidden", type: ErrorResponse })
+  @ApiResponse({ status: 404, description: "KYC not found", type: ErrorResponse })
+  @ApiResponse({ status: 422, description: "Invalid input", type: ErrorResponse })
+  async updateMyKyc(
+    @CurrentUser() claims: AuthenticatedUser,
+    @Body() request: CreateKycRequest,
+    @Res() res: Response,
+  ): Promise<void> {
+    try {
+      if (!claims) {
+        const response: ErrorResponse = { errorCode: "AUTH-401", message: "Unauthorised" };
+        res.status(401).json(response);
+        return;
+      }
+
+      const roles = claims.roles ?? [];
+      const hasCustomerRole = roles.some((role) => role?.toUpperCase() === "CUSTOMER");
+      const hasAdminRole = roles.some((role) => role?.toUpperCase() === "ADMIN");
+      if (!hasCustomerRole || hasAdminRole) {
+        const response: ErrorResponse = { errorCode: "AUTH-403", message: "Forbidden" };
+        res.status(403).json(response);
+        return;
+      }
+
+      const updated = await this.kycRepository.updateSubmissionByUserId({
+        userId: claims.sub,
+        dateOfBirth: request.dateOfBirth,
+        documentType: request.documentType,
+        documentNumber: request.documentNumber,
+      });
+
+      if (!updated) {
+        const response: ErrorResponse = {
+          errorCode: "KYC-404",
+          message: "KYC record not found",
+        };
+        res.status(404).json(response);
+        return;
+      }
+
+      res.status(200).json(this.toKycResponse(updated));
+    } catch (error) {
+      console.error("Update KYC error:", error);
+      const response: ErrorResponse = { errorCode: "VAL-422", message: "Invalid input" };
+      res.status(422).json(response);
+    }
+  }
+
+  @Get("pending")
+  @UseGuards(BearerGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Get all pending KYC submissions (admin only)" })
+  @ApiResponse({ status: 200, description: "Pending KYC submissions.", type: KycResponse, isArray: true })
+  @ApiResponse({ status: 401, description: "Unauthorised", type: ErrorResponse })
+  @ApiResponse({ status: 403, description: "Forbidden", type: ErrorResponse })
+  async getPendingKyc(@CurrentUser() claims: AuthenticatedUser, @Res() res: Response): Promise<void> {
+    try {
+      if (!claims) {
+        const response: ErrorResponse = { errorCode: "AUTH-401", message: "Unauthorised" };
+        res.status(401).json(response);
+        return;
+      }
+
+      const roles = claims.roles ?? [];
+      const isAdmin = roles.some((role) => role?.toUpperCase() === "ADMIN");
+      if (!isAdmin) {
+        const response: ErrorResponse = { errorCode: "AUTH-403", message: "Forbidden" };
+        res.status(403).json(response);
+        return;
+      }
+
+      const pending = await this.kycRepository.findAllPending();
+      res.status(200).json(pending.map((row) => this.toKycResponse(row)));
+    } catch (error) {
+      console.error("Get pending KYC error:", error);
       const response: ErrorResponse = { errorCode: "VAL-422", message: "Invalid input" };
       res.status(422).json(response);
     }
@@ -173,16 +294,7 @@ export class KycController {
       }
 
       const response: KycResponse = {
-        id: reviewed.id,
-        userId: reviewed.userId,
-        status: reviewed.status,
-        dateOfBirth: reviewed.dateOfBirth,
-        documentType: reviewed.documentType,
-        documentNumber: reviewed.documentNumber,
-        submittedAt: reviewed.submittedAt,
-        reviewedAt: reviewed.reviewedAt,
-        reviewedBy: reviewed.reviewedBy,
-        rejectionReason: reviewed.rejectionReason,
+        ...this.toKycResponse(reviewed),
         accountId,
       };
 
@@ -222,5 +334,31 @@ export class KycController {
     } catch (error) {
       console.error(`KYC review notification failed for user ${userId}:`, (error as Error)?.message);
     }
+  }
+
+  private toKycResponse(row: {
+    id: number;
+    userId: string;
+    status: string;
+    dateOfBirth: string;
+    documentType: string;
+    documentNumber: string;
+    submittedAt: string;
+    reviewedAt: string | null;
+    reviewedBy: string | null;
+    rejectionReason: string | null;
+  }): KycResponse {
+    return {
+      id: row.id,
+      userId: row.userId,
+      status: row.status,
+      dateOfBirth: row.dateOfBirth,
+      documentType: row.documentType,
+      documentNumber: row.documentNumber,
+      submittedAt: row.submittedAt,
+      reviewedAt: row.reviewedAt,
+      reviewedBy: row.reviewedBy,
+      rejectionReason: row.rejectionReason,
+    };
   }
 }

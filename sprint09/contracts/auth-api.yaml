@@ -65,6 +65,7 @@ info:
     |---|---|
     | `POST /auth/register` returns `201` | Registered; next step is KYC |
     | `POST /kyc` returns `201` | KYC submitted, awaiting approval |
+    | `PUT /kyc` returns `200` | KYC details updated and resubmitted for review |
     | `PATCH /kyc` returns `200` with `APPROVED` | KYC approved, trading account active |
     | `PATCH /kyc` returns `200` with `REJECTED` | KYC not approved, with the rejection reason |
 
@@ -309,6 +310,28 @@ paths:
         '422':
           $ref: '#/components/responses/InvalidInput'
 
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      security: []
+      summary: Log out and revoke the provided refresh token
+      description: |
+        Revokes the presented refresh token and ends the session on the client.
+        This operation is idempotent from the client's perspective: if the token
+        is already revoked or unknown, the endpoint still returns success.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '204':
+          description: Logged out.
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
   /auth/me:
     get:
       tags: [Profile]
@@ -331,14 +354,47 @@ paths:
           $ref: '#/components/responses/Unauthorised'
 
   /kyc:
+    get:
+      tags: [KYC]
+      operationId: getMyKyc
+      summary: Get KYC submission for the authenticated user
+      description: |
+        Requires a `CUSTOMER` token. Returns the signed-in user's submitted KYC
+        record. If no submission exists yet, returns `KYC-404`.
+      responses:
+        '200':
+          description: KYC submission found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No KYC submission exists for this user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  value:
+                    errorCode: KYC-404
+                    message: KYC record not found
+      security:
+        - bearerAuth: []
+
     post:
       tags: [KYC]
       operationId: submitKyc
       summary: Submit KYC details for the authenticated user
       description: |
         Requires a `CUSTOMER` token; an `ADMIN` token, or one that is not a customer, is refused
-        with `AUTH-403`. Exactly one submission is allowed per user — a second call while one
-        already exists (in any status) fails with `KYC-409`, even if the first was rejected.
+        with `AUTH-403`. Exactly one submission is allowed per user — a second `POST` call while
+        one already exists (in any status) fails with `KYC-409`. Existing submissions are edited
+        via `PUT /kyc`.
       requestBody:
         required: true
         content:
@@ -377,6 +433,46 @@ paths:
                   value:
                     errorCode: KYC-409
                     message: KYC already submitted
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+      security:
+        - bearerAuth: []
+
+    put:
+      tags: [KYC]
+      operationId: updateMyKyc
+      summary: Update KYC details for the authenticated user
+      description: |
+        Requires a `CUSTOMER` token. Updates an existing KYC submission for the
+        signed-in user and resets it to `PENDING` for re-review.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateKycRequest'
+      responses:
+        '200':
+          description: KYC updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No KYC submission exists yet for this user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  value:
+                    errorCode: KYC-404
+                    message: KYC record not found
         '422':
           $ref: '#/components/responses/InvalidInput'
       security:
@@ -452,6 +548,30 @@ paths:
       security:
         - bearerAuth: []
 
+  /kyc/pending:
+    get:
+      tags: [KYC]
+      operationId: getPendingKyc
+      summary: Get all pending KYC submissions (admin only)
+      description: |
+        Requires an `ADMIN` token. Returns all `PENDING` KYC records ordered by
+        oldest submission first.
+      responses:
+        '200':
+          description: Pending KYC submissions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/KycResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      security:
+        - bearerAuth: []
+
 components:
 
   securitySchemes:
@@ -506,7 +626,7 @@ components:
     RegisterRequest:
       type: object
       additionalProperties: false
-      required: [username, password, email]
+      required: [username, password, email, firstName, lastName, phone]
       properties:
         username:
           type: string
@@ -528,9 +648,23 @@ components:
           maxLength: 254
           description: |
             Address for notification emails (registration, KYC submitted, KYC approved or
-            rejected). PII: stored encrypted at rest, never returned in any response, never logged.
+            rejected). Never returned in any response and never logged.
           writeOnly: true
           example: priya.menon@example.com
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 80
+          example: Priya
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 80
+          example: Menon
+        phone:
+          type: string
+          pattern: '^\\+?[1-9]\\d{7,14}$'
+          example: +919876543210
         roles:
           type: array
           minItems: 1
@@ -545,6 +679,9 @@ components:
         username: priya.menon
         password: 'correct horse battery staple'
         email: priya.menon@example.com
+        firstName: Priya
+        lastName: Menon
+        phone: +919876543210
 
     LoginRequest:
       type: object

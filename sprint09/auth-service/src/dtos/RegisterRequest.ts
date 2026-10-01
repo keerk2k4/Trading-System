@@ -29,6 +29,23 @@ export class RegisterRequest {
   @MaxLength(254)
   email!: string;
 
+  @ApiProperty({ minLength: 1, maxLength: 80, example: 'Priya' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  firstName!: string;
+
+  @ApiProperty({ minLength: 1, maxLength: 80, example: 'Menon' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  lastName!: string;
+
+  @ApiProperty({ example: '+919876543210' })
+  @IsString()
+  @Matches(/^\+?[1-9]\d{7,14}$/)
+  phone!: string;
+
   // NOTE: accountId removed deliberately. The team decided registration
   // auto-creates a new trading account via Trade REST API, rather than
   // requiring the client to already own one -- see the security review

@@ -3,6 +3,7 @@ package com.tradingsystem.spring_boot_app.service;
 import com.tradingsystem.domain.entities.Account;
 import com.tradingsystem.domain.entities.Order;
 import com.tradingsystem.domain.entities.Position;
+import com.tradingsystem.domain.entities.User;
 import com.tradingsystem.domain.enums.OrderStatus;
 import com.tradingsystem.domain.enums.TradingStatus;
 import com.tradingsystem.spring_boot_app.dto.*;
@@ -30,8 +31,9 @@ public class AccountService {
 
     public AccountResponse getAccount(long id) {
         Account account = account(id);
+        String holderName = holderName(account.getHolder());
         return new AccountResponse(account.getAccountId(), account.getAccountReference(),
-                account.getHolder().getFirstName() + " " + account.getHolder().getLastName(),
+            holderName,
                 account.getCashBalance(), status(account.getTradingStatus()),
                 account.getLoadedVersion(), now());
     }
@@ -96,5 +98,17 @@ public class AccountService {
 
     private OffsetDateTime now() {
         return OffsetDateTime.now(ZoneOffset.UTC);
+    }
+
+    private String holderName(User holder) {
+        if (holder == null) {
+            return "Unknown holder";
+        }
+
+        String firstName = holder.getFirstName() == null ? "" : holder.getFirstName().trim();
+        String lastName = holder.getLastName() == null ? "" : holder.getLastName().trim();
+        String fullName = (firstName + " " + lastName).trim();
+
+        return fullName.isEmpty() ? "Unknown holder" : fullName;
     }
 }

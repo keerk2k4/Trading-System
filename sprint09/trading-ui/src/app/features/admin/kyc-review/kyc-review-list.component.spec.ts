@@ -24,7 +24,7 @@ describe('KycReviewListComponent', () => {
   beforeEach(() => {
     kyc = jasmine.createSpyObj<MockKycService>('MockKycService', ['getPendingKycSubmissions', 'reviewKyc']);
     kyc.getPendingKycSubmissions.and.returnValue(of([SUBMISSION]));
-    kyc.reviewKyc.and.returnValue(of({ success: true }));
+    kyc.reviewKyc.and.returnValue(of({ ...SUBMISSION, status: 'APPROVED' }));
 
     TestBed.configureTestingModule({ providers: [{ provide: MockKycService, useValue: kyc }] });
     fixture = TestBed.createComponent(KycReviewListComponent);
@@ -41,7 +41,7 @@ describe('KycReviewListComponent', () => {
     button('Approve').click();
     fixture.detectChanges();
 
-    expect(kyc.reviewKyc).toHaveBeenCalledOnceWith('KYC-1', true, undefined);
+    expect(kyc.reviewKyc).toHaveBeenCalledOnceWith('u-1', true, undefined);
     expect(page.querySelector('[role="status"]')?.textContent).toContain('KYC-1 approved');
   });
 
@@ -51,6 +51,6 @@ describe('KycReviewListComponent', () => {
     reason.dispatchEvent(new Event('input'));
     button('Reject').click();
 
-    expect(kyc.reviewKyc).toHaveBeenCalledOnceWith('KYC-1', false, 'Document expired');
+    expect(kyc.reviewKyc).toHaveBeenCalledOnceWith('u-1', false, 'Document expired');
   });
 });

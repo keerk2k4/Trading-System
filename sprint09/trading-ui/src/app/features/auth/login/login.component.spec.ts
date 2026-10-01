@@ -15,6 +15,7 @@ class BlankComponent {}
 describe('LoginComponent', () => {
   let auth: jasmine.SpyObj<MockAuthService>;
   let kycStatus: KycStatus | null;
+  let kyc: jasmine.SpyObj<MockKycService>;
   let harness: RouterTestingHarness;
   let page: HTMLElement;
 
@@ -38,9 +39,19 @@ describe('LoginComponent', () => {
 
   beforeEach(() => {
     kycStatus = 'APPROVED';
-    auth = jasmine.createSpyObj<MockAuthService>('MockAuthService', ['login', 'isAdmin']);
+    auth = jasmine.createSpyObj<MockAuthService>('MockAuthService', ['login', 'isAdmin', 'getCurrentUser']);
     auth.login.and.returnValue(of({} as AuthResponse));
     auth.isAdmin.and.returnValue(false);
+    auth.getCurrentUser.and.returnValue({ id: 'u-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] });
+    kyc = jasmine.createSpyObj<MockKycService>('MockKycService', ['getCurrentUserKycStatus', 'getKycStatus']);
+    kyc.getCurrentUserKycStatus.and.callFake(() => kycStatus);
+    kyc.getKycStatus.and.callFake(() =>
+      of(
+        kycStatus
+          ? { userId: 'u-1', dateOfBirth: '1990-05-15', documentType: 'PASSPORT', documentNumber: 'PS123', status: kycStatus }
+          : null
+      )
+    );
 
     TestBed.configureTestingModule({
       providers: [
@@ -50,7 +61,7 @@ describe('LoginComponent', () => {
           { path: '**', component: BlankComponent }
         ]),
         { provide: MockAuthService, useValue: auth },
-        { provide: MockKycService, useValue: { getCurrentUserKycStatus: () => kycStatus } }
+        { provide: MockKycService, useValue: kyc }
       ]
     });
   });
@@ -87,6 +98,7 @@ describe('LoginComponent', () => {
       { username: 'gaurang123', password: 'correct horse battery staple' },
       false
     );
+    expect(kyc.getKycStatus).toHaveBeenCalledOnceWith('u-1');
     expect(TestBed.inject(Router).url).toBe('/dashboard');
   });
 

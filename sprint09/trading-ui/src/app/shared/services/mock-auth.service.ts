@@ -52,8 +52,11 @@ export class MockAuthService {
     return this.http
       .post<UserResponseData>(`${AUTH_API_BASE_URL}/auth/register`, {
         username: data.username,
-        password: data.password,
         email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+        password: data.password,
       })
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
@@ -122,7 +125,7 @@ export class MockAuthService {
         map((tokens) => tokens.accessToken),
         catchError((err: HttpErrorResponse) => {
           if (err.status === 401) {
-            this.logout();
+            this.clearSession();
           }
           return this.rethrowServerError(err);
         }),
@@ -149,12 +152,19 @@ export class MockAuthService {
   }
 
   logout(): void {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(CURRENT_USER_KEY);
-    localStorage.removeItem(KYC_STATUS_KEY);
-    this.accessToken.set(null);
-    this.currentUser.set(null);
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) {
+      this.clearSession();
+      return;
+    }
+
+    this.http
+      .post<void>(`${AUTH_API_BASE_URL}/auth/logout`, { refreshToken })
+      .pipe(
+        catchError(() => of(void 0)),
+        finalize(() => this.clearSession())
+      )
+      .subscribe();
   }
 
   getCurrentUser(): User | null {
@@ -232,5 +242,14 @@ export class MockAuthService {
     } catch {
       return null;
     }
+  }
+
+  private clearSession(): void {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
+    localStorage.removeItem(CURRENT_USER_KEY);
+    localStorage.removeItem(KYC_STATUS_KEY);
+    this.accessToken.set(null);
+    this.currentUser.set(null);
   }
 }

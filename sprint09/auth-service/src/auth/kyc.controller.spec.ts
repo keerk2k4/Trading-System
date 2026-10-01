@@ -57,6 +57,8 @@ describe("KycController", () => {
       findByUserId: jest.fn(),
       createSubmission: jest.fn(),
       reviewSubmission: jest.fn(),
+      updateSubmissionByUserId: jest.fn(),
+      findAllPending: jest.fn(),
     } as unknown as jest.Mocked<KycRepository>;
 
     userRepository = {
@@ -107,6 +109,75 @@ describe("KycController", () => {
       "alice.trader@example.com",
       "alice.trader",
     );
+  });
+
+  it("gets the current customer's submitted KYC", async () => {
+    kycRepository.findByUserId.mockResolvedValue(kycRow);
+    const { res, state } = makeResponse();
+
+    await controller.getMyKyc({ sub: USER_ID, roles: ["CUSTOMER"] } as any, res);
+
+    expect(state.status).toBe(200);
+    expect(state.body.userId).toBe(USER_ID);
+    expect(state.body.status).toBe("PENDING");
+  });
+
+  it("returns 404 when current user has no KYC", async () => {
+    kycRepository.findByUserId.mockResolvedValue(null);
+    const { res, state } = makeResponse();
+
+    await controller.getMyKyc({ sub: USER_ID, roles: ["CUSTOMER"] } as any, res);
+
+    expect(state).toEqual({
+      status: 404,
+      body: {
+        errorCode: "KYC-404",
+        message: "KYC record not found",
+      },
+    });
+  });
+
+  it("updates an existing KYC submission for the current customer", async () => {
+    kycRepository.updateSubmissionByUserId.mockResolvedValue({
+      ...kycRow,
+      documentType: "AADHAR",
+      documentNumber: "123412341234",
+    });
+    const { res, state } = makeResponse();
+
+    await controller.updateMyKyc(
+      { sub: USER_ID, roles: ["CUSTOMER"] } as any,
+      { dateOfBirth: "1996-02-14", documentType: "AADHAR", documentNumber: "123412341234" },
+      res,
+    );
+
+    expect(state.status).toBe(200);
+    expect(state.body.documentType).toBe("AADHAR");
+    expect(kycRepository.updateSubmissionByUserId).toHaveBeenCalledWith({
+      userId: USER_ID,
+      dateOfBirth: "1996-02-14",
+      documentType: "AADHAR",
+      documentNumber: "123412341234",
+    });
+  });
+
+  it("returns 404 when updating KYC before first submission", async () => {
+    kycRepository.updateSubmissionByUserId.mockResolvedValue(null);
+    const { res, state } = makeResponse();
+
+    await controller.updateMyKyc(
+      { sub: USER_ID, roles: ["CUSTOMER"] } as any,
+      { dateOfBirth: "1996-02-14", documentType: "PASSPORT", documentNumber: "P1234567" },
+      res,
+    );
+
+    expect(state).toEqual({
+      status: 404,
+      body: {
+        errorCode: "KYC-404",
+        message: "KYC record not found",
+      },
+    });
   });
 
   it("does not send a KYC-submitted email when KYC already exists", async () => {
@@ -177,6 +248,32 @@ describe("KycController", () => {
       },
     });
     expect(kycRepository.reviewSubmission).not.toHaveBeenCalled();
+  });
+
+  it("returns pending KYC submissions for an admin", async () => {
+    kycRepository.findAllPending.mockResolvedValue([kycRow]);
+    const { res, state } = makeResponse();
+
+    await controller.getPendingKyc({ sub: ADMIN_ID, roles: ["ADMIN"] } as any, res);
+
+    expect(state.status).toBe(200);
+    expect(state.body).toHaveLength(1);
+    expect(state.body[0].status).toBe("PENDING");
+  });
+
+  it("rejects non-admin pending KYC requests", async () => {
+    const { res, state } = makeResponse();
+
+    await controller.getPendingKyc({ sub: USER_ID, roles: ["CUSTOMER"] } as any, res);
+
+    expect(state).toEqual({
+      status: 403,
+      body: {
+        errorCode: "AUTH-403",
+        message: "Forbidden",
+      },
+    });
+    expect(kycRepository.findAllPending).not.toHaveBeenCalled();
   });
 
   it("approves KYC and activates pending trading account when reviewed by admin", async () => {
