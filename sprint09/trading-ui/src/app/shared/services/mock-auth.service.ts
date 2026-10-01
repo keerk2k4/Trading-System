@@ -13,14 +13,16 @@ import {
 } from '../models/auth.models';
 import { Observable, of, throwError } from 'rxjs';
 import { catchError, finalize, map, shareReplay, switchMap, tap } from 'rxjs/operators';
+import { AUTH_API_BASE_URL } from '../api/api-clients';
 
-// Base URL of the real Sprint 8/9 auth-service. This service used to be
+// Base URL of the real Sprint 8/9 auth-service, set per build in
+// src/environments/ and re-exported for existing importers. This service used to be
 // fully in-memory ("Mock"); register/login/submitKyc now call the real
 // backend below. The name is kept as MockAuthService (rather than renamed)
 // because several other, out-of-scope screens (dashboard, admin-dashboard,
 // place-order) already inject it purely for getCurrentUser()/isAuthenticated(),
 // and changing the class/file name would touch those unrelated files too.
-export const AUTH_API_BASE_URL = 'http://localhost:3000';
+export { AUTH_API_BASE_URL };
 
 const ACCESS_TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';

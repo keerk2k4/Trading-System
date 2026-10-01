@@ -16,6 +16,12 @@ const STATUS_FILTERS: { value: OrderStatus | ''; label: string }[] = [
   { value: 'CANCELLED', label: 'Cancelled' }
 ];
 
+// While any order is still NEW the blotter re-reads the list so fills and
+// rejections show up without a manual refresh. Polling gives up after
+// POLL_MAX_DURATION_MS so a stuck order cannot keep it going forever.
+export const POLL_INTERVAL_MS = 5_000;
+export const POLL_MAX_DURATION_MS = 5 * 60_000;
+
 @Component({
   selector: 'app-view-orders',
   imports: [ReactiveFormsModule, RouterLink, CurrencyPipe, DatePipe, DecimalPipe, StatusBadgeComponent],
@@ -154,8 +160,14 @@ export class ViewOrdersComponent implements OnInit {
   protected readonly isRefreshing = signal(false);
   protected readonly errorMessage = signal('');
 
+  /** True while the blotter is re-reading the list every POLL_INTERVAL_MS. */
+  readonly isPolling = signal(false);
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private pollStartedAt = 0;
+
   constructor() {
     this.statusFilter.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.loadOrders());
+    this.destroyRef.onDestroy(() => this.stopPolling());
   }
 
   ngOnInit(): void {
@@ -168,10 +180,15 @@ export class ViewOrdersComponent implements OnInit {
     }
   }
 
-  private loadOrders(): void {
-    this.isRefreshing.set(true);
+  // A background poll leaves the loading state alone, so the table and its
+  // live status message do not flicker every few seconds.
+  private loadOrders(background = false): void {
+    if (!background) {
+      this.isRefreshing.set(true);
+    }
     this.errorMessage.set('');
 
+    // Read-only: polling only ever repeats this GET, never the order POST.
     this.orderService
       .getOrders({ status: this.statusFilter.value || undefined })
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -182,10 +199,12 @@ export class ViewOrdersComponent implements OnInit {
             [...orders].sort((a, b) => new Date(b.createdOn).getTime() - new Date(a.createdOn).getTime())
           );
           this.isRefreshing.set(false);
+          this.updatePolling(orders);
         },
         error: (err: TradeApiError) => {
           this.orders.set([]);
           this.isRefreshing.set(false);
+          this.stopPolling();
           this.errorMessage.set(
             this.errorMapping.isNetworkError(err.status)
               ? this.errorMapping.getNetworkErrorMessage()
@@ -193,5 +212,37 @@ export class ViewOrdersComponent implements OnInit {
           );
         }
       });
+  }
+
+  private updatePolling(orders: Order[]): void {
+    if (!orders.some((order) => order.status === 'NEW')) {
+      this.stopPolling();
+      return;
+    }
+    if (this.pollTimer !== null) {
+      return;
+    }
+    this.pollStartedAt = Date.now();
+    this.pollTimer = setInterval(() => this.poll(), POLL_INTERVAL_MS);
+    this.isPolling.set(true);
+  }
+
+  private poll(): void {
+    if (Date.now() - this.pollStartedAt >= POLL_MAX_DURATION_MS) {
+      this.stopPolling();
+      return;
+    }
+    // Skip a tick while a user-triggered load is still in flight.
+    if (!this.isRefreshing()) {
+      this.loadOrders(true);
+    }
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimer !== null) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
+    this.isPolling.set(false);
   }
 }

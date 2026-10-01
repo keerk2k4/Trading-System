@@ -1,7 +1,7 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { ViewOrdersComponent } from './view-orders.component';
+import { POLL_INTERVAL_MS, POLL_MAX_DURATION_MS, ViewOrdersComponent } from './view-orders.component';
 import { TradeApiService } from '../../../shared/services/trade-api.service';
 import { Order } from '../../../shared/models/order.models';
 
@@ -85,5 +85,91 @@ describe('ViewOrdersComponent', () => {
     create();
 
     expect(page.querySelector('[role="alert"]')?.textContent).toContain('not active');
+  });
+
+  describe('auto-polling', () => {
+    const newOrder = () => order('ORD-1', '2026-01-01T10:00:00Z');
+    const filledOrder = () => order('ORD-1', '2026-01-01T10:00:00Z', { status: 'FILLED', executedPrice: 150 });
+
+    it('re-reads the orders every 5 seconds while one is NEW', fakeAsync(() => {
+      tradeApi.getOrders.and.returnValue(of([newOrder()]));
+      create();
+
+      expect(fixture.componentInstance.isPolling()).toBe(true);
+      expect(tradeApi.getOrders).toHaveBeenCalledTimes(1);
+
+      tick(POLL_INTERVAL_MS);
+      expect(tradeApi.getOrders).toHaveBeenCalledTimes(2);
+      tick(POLL_INTERVAL_MS);
+      expect(tradeApi.getOrders).toHaveBeenCalledTimes(3);
+
+      fixture.destroy();
+    }));
+
+    it('only ever repeats the GET, never placing an order again', fakeAsync(() => {
+      tradeApi = jasmine.createSpyObj<TradeApiService>('TradeApiService', ['getOrders', 'placeOrder']);
+      tradeApi.getOrders.and.returnValue(of([newOrder()]));
+      create();
+
+      tick(POLL_INTERVAL_MS * 3);
+
+      expect(tradeApi.placeOrder).not.toHaveBeenCalled();
+      fixture.destroy();
+    }));
+
+    it('stops once every order has reached a final status', fakeAsync(() => {
+      tradeApi.getOrders.and.returnValue(of([newOrder()]));
+      create();
+
+      tradeApi.getOrders.and.returnValue(of([filledOrder()]));
+      tick(POLL_INTERVAL_MS);
+      expect(fixture.componentInstance.isPolling()).toBe(false);
+
+      tick(POLL_INTERVAL_MS * 3);
+      expect(tradeApi.getOrders).toHaveBeenCalledTimes(2);
+    }));
+
+    it('does not poll when there are no orders', fakeAsync(() => {
+      tradeApi.getOrders.and.returnValue(of([]));
+      create();
+
+      expect(fixture.componentInstance.isPolling()).toBe(false);
+      tick(POLL_INTERVAL_MS * 3);
+      expect(tradeApi.getOrders).toHaveBeenCalledTimes(1);
+    }));
+
+    it('stops when the list comes back empty', fakeAsync(() => {
+      tradeApi.getOrders.and.returnValue(of([newOrder()]));
+      create();
+
+      tradeApi.getOrders.and.returnValue(of([]));
+      tick(POLL_INTERVAL_MS);
+
+      expect(fixture.componentInstance.isPolling()).toBe(false);
+    }));
+
+    it('stops when the component is destroyed', fakeAsync(() => {
+      tradeApi.getOrders.and.returnValue(of([newOrder()]));
+      create();
+
+      fixture.destroy();
+      tick(POLL_INTERVAL_MS * 3);
+
+      expect(fixture.componentInstance.isPolling()).toBe(false);
+      expect(tradeApi.getOrders).toHaveBeenCalledTimes(1);
+    }));
+
+    it('gives up after 5 minutes even if an order stays NEW', fakeAsync(() => {
+      tradeApi.getOrders.and.returnValue(of([newOrder()]));
+      create();
+
+      tick(POLL_MAX_DURATION_MS);
+      expect(fixture.componentInstance.isPolling()).toBe(false);
+      const calls = tradeApi.getOrders.calls.count();
+      expect(calls).toBeLessThanOrEqual(POLL_MAX_DURATION_MS / POLL_INTERVAL_MS);
+
+      tick(POLL_INTERVAL_MS * 3);
+      expect(tradeApi.getOrders.calls.count()).toBe(calls);
+    }));
   });
 });

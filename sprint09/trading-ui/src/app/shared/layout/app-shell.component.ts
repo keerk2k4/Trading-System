@@ -77,7 +77,11 @@ const ADMIN_NAV: NavItem[] = [
               [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
               (click)="theme.toggle()"
             ></button>
-            <button type="button" class="tp-btn tp-btn-secondary" (click)="signOut()">Sign out</button>
+            @if (isAuthenticated()) {
+              <button type="button" class="tp-btn tp-btn-secondary" data-testid="nav-sign-out" (click)="signOut()">
+                Sign out
+              </button>
+            }
           </div>
         </header>
 
@@ -97,7 +101,11 @@ export class AppShellComponent {
   private readonly user = this.authService.currentUser$;
   private readonly isAdmin = computed(() => this.user()?.roles.includes('ADMIN') ?? false);
 
-  protected readonly navItems = computed(() => (this.isAdmin() ? ADMIN_NAV : CUSTOMER_NAV));
+  // Reads the session signal, so the sign-out button disappears as soon as
+  // the session is cleared.
+  protected readonly isAuthenticated = computed(() => this.authService.isAuthenticated());
+
+  protected readonly navItems =computed(() => (this.isAdmin() ? ADMIN_NAV : CUSTOMER_NAV));
   protected readonly username = computed(() => this.user()?.username ?? '');
   protected readonly initial = computed(() => this.username().charAt(0) || '?');
   protected readonly roleLabel = computed(() => {

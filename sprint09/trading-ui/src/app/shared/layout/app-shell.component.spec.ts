@@ -7,16 +7,24 @@ import { User } from '../models/auth.models';
 
 describe('AppShellComponent', () => {
   let user: ReturnType<typeof signal<User | null>>;
-  let auth: { currentUser$: typeof user; logout: jasmine.Spy };
+  let authenticated: ReturnType<typeof signal<boolean>>;
+  let auth: { currentUser$: typeof user; isAuthenticated: () => boolean; logout: jasmine.Spy };
   let fixture: ComponentFixture<AppShellComponent>;
   let page: HTMLElement;
 
   const navLabels = () =>
     Array.from(page.querySelectorAll('nav[aria-label="Main"] a')).map((a) => a.textContent?.trim());
+  const signOutButton = () => page.querySelector<HTMLButtonElement>('button[data-testid="nav-sign-out"]');
 
   function create(current: User): void {
     user = signal<User | null>(current);
-    auth = { currentUser$: user, logout: jasmine.createSpy('logout') };
+    authenticated = signal(true);
+    auth = {
+      currentUser$: user,
+      isAuthenticated: () => authenticated(),
+      // Like the real service, logging out clears the session.
+      logout: jasmine.createSpy('logout').and.callFake(() => authenticated.set(false))
+    };
     TestBed.configureTestingModule({
       providers: [provideRouter([]), { provide: MockAuthService, useValue: auth }]
     });
@@ -53,6 +61,19 @@ describe('AppShellComponent', () => {
 
     expect(auth.logout).toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith(['/login']);
+  });
+
+  it('offers sign-out as a button only while signed in', () => {
+    create({ id: 'u-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] });
+    spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+
+    expect(signOutButton()?.tagName).toBe('BUTTON');
+    expect(signOutButton()?.type).toBe('button');
+
+    signOutButton()!.click();
+    fixture.detectChanges();
+
+    expect(signOutButton()).toBeNull();
   });
 
   it('switches and remembers the colour theme', () => {

@@ -30,6 +30,7 @@ import { safeReturnUrl } from '../../../shared/guards/safe-return-url';
           <input
             class="tp-input"
             id="login-username"
+            data-testid="login-username"
             type="text"
             formControlName="username"
             autocomplete="username"
@@ -50,6 +51,7 @@ import { safeReturnUrl } from '../../../shared/guards/safe-return-url';
             <input
               class="tp-input"
               id="login-password"
+              data-testid="login-password"
               [type]="passwordVisible() ? 'text' : 'password'"
               formControlName="password"
               autocomplete="current-password"
@@ -70,7 +72,11 @@ import { safeReturnUrl } from '../../../shared/guards/safe-return-url';
           }
         </div>
 
-        <button class="tp-btn tp-btn-primary tp-btn-block" type="submit" [attr.aria-disabled]="isLoading() ? 'true' : null">
+        <button
+          class="tp-btn tp-btn-primary tp-btn-block"
+          data-testid="login-submit"
+          type="submit"
+          [attr.aria-disabled]="isLoading() ? 'true' : null">
           @if (isLoading()) {
             <span class="tp-spinner" aria-hidden="true"></span>
             Signing in…

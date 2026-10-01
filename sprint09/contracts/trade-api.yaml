@@ -63,10 +63,10 @@ info:
     name: Instructional use only
 
 servers:
-  - url: http://localhost:8080
-    description: Local development, run from Docker Compose
   - url: http://trade-api:8080
     description: Service name inside the Docker Compose network
+  - url: http://localhost:8080
+    description: Local development, run from Docker Compose
 
 tags:
   - name: Orders

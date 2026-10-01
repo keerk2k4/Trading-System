@@ -20,6 +20,8 @@ describe('TradeApiService', () => {
       providers: [
         provideHttpClient(withInterceptors([authTokenInterceptor])),
         provideHttpClientTesting(),
+        // Configure the generated clients exactly as app.config.ts does.
+        ...provideApiClients(),
         { provide: MockAuthService, useValue: { getToken: () => token } }
       ]
     });

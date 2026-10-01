@@ -1,13 +1,15 @@
 import { EnvironmentProviders } from '@angular/core';
 import { provideApi as provideAuthApi } from '../../../generated/auth-client';
 import { provideApi as provideTradeApi } from '../../../generated/trade-client';
+import { environment } from '../../../environments/environment';
 
 // The only place the app configures the generated OpenAPI clients
 // (src/generated/, never edited by hand). Services under shared/services/
 // wrap those clients; components never import from src/generated/ directly.
 
-export const AUTH_API_BASE_URL = 'http://localhost:3000';
-export const TRADE_API_BASE_URL = 'http://localhost:8080';
+// Set per build in src/environments/.
+export const AUTH_API_BASE_URL = environment.AUTH_API_BASE_URL;
+export const TRADE_API_BASE_URL = environment.TRADE_API_BASE_URL;
 
 // Read on every request, so a token stored after login is picked up
 // without re-creating the clients.
