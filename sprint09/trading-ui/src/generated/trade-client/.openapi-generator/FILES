@@ -12,6 +12,7 @@ index.ts
 model/account-response.ts
 model/account-status.ts
 model/balance-response.ts
+model/balance-update-request.ts
 model/error-response.ts
 model/models.ts
 model/order-history-entry.ts

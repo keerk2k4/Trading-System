@@ -17,9 +17,12 @@ export interface RegisterRequest {
      */
     password: string;
     /**
-     * Address for notification emails (registration, KYC submitted, KYC approved or rejected). PII: stored encrypted at rest, never returned in any response, never logged. 
+     * Address for notification emails (registration, KYC submitted, KYC approved or rejected). Never returned in any response and never logged. 
      */
     email: string;
+    firstName: string;
+    lastName: string;
+    phone: string;
     /**
      * Accepted by the schema but ignored by `/auth/register`, which always assigns `CUSTOMER`, and by `/auth/admin/register`, which always assigns `ADMIN`. Kept on the request shape only so both endpoints can share one DTO; do not rely on it changing the assigned role. 
      */

@@ -1,6 +1,7 @@
 export * from './account-response';
 export * from './account-status';
 export * from './balance-response';
+export * from './balance-update-request';
 export * from './error-response';
 export * from './order-history-entry';
 export * from './order-response';

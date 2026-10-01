@@ -42,6 +42,118 @@ export class KYCService extends BaseService {
     }
 
     /**
+     * Get KYC submission for the authenticated user
+     * Requires a &#x60;CUSTOMER&#x60; token. Returns the signed-in user\&#39;s submitted KYC record. If no submission exists yet, returns &#x60;KYC-404&#x60;. 
+     * @endpoint get /kyc
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public getMyKyc(observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<KycResponse>;
+    public getMyKyc(observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<KycResponse>>;
+    public getMyKyc(observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<KycResponse>>;
+    public getMyKyc(observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (bearerAuth) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('bearerAuth', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/kyc`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<KycResponse>('get', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Get all pending KYC submissions (admin only)
+     * Requires an &#x60;ADMIN&#x60; token. Returns all &#x60;PENDING&#x60; KYC records ordered by oldest submission first. 
+     * @endpoint get /kyc/pending
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public getPendingKyc(observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<KycResponse>>;
+    public getPendingKyc(observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<KycResponse>>>;
+    public getPendingKyc(observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<KycResponse>>>;
+    public getPendingKyc(observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (bearerAuth) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('bearerAuth', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/kyc/pending`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<Array<KycResponse>>('get', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
      * Review KYC status (admin only)
      * Requires an &#x60;ADMIN&#x60; token. Looks up the KYC submission by the &#x60;userId&#x60; in the request body, not by the caller\&#39;s own identity, since the caller here is the reviewing admin, not the applicant.  Approving (&#x60;status: APPROVED&#x60;) calls the Trade REST API to activate the linked trading account and returns the new &#x60;accountId&#x60; in the response. Rejecting does not touch the trading account. Reviewing an already-approved submission again fails with &#x60;KYC-409&#x60;; there is no such guard for re-rejecting a rejected one. 
      * @endpoint patch /kyc
@@ -113,7 +225,7 @@ export class KYCService extends BaseService {
 
     /**
      * Submit KYC details for the authenticated user
-     * Requires a &#x60;CUSTOMER&#x60; token; an &#x60;ADMIN&#x60; token, or one that is not a customer, is refused with &#x60;AUTH-403&#x60;. Exactly one submission is allowed per user — a second call while one already exists (in any status) fails with &#x60;KYC-409&#x60;, even if the first was rejected. 
+     * Requires a &#x60;CUSTOMER&#x60; token; an &#x60;ADMIN&#x60; token, or one that is not a customer, is refused with &#x60;AUTH-403&#x60;. Exactly one submission is allowed per user — a second &#x60;POST&#x60; call while one already exists (in any status) fails with &#x60;KYC-409&#x60;. Existing submissions are edited via &#x60;PUT /kyc&#x60;. 
      * @endpoint post /kyc
      * @param createKycRequest 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
@@ -168,6 +280,76 @@ export class KYCService extends BaseService {
         let localVarPath = `/kyc`;
         const { basePath, withCredentials } = this.configuration;
         return this.httpClient.request<KycResponse>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: createKycRequest,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Update KYC details for the authenticated user
+     * Requires a &#x60;CUSTOMER&#x60; token. Updates an existing KYC submission for the signed-in user and resets it to &#x60;PENDING&#x60; for re-review. 
+     * @endpoint put /kyc
+     * @param createKycRequest 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public updateMyKyc(createKycRequest: CreateKycRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<KycResponse>;
+    public updateMyKyc(createKycRequest: CreateKycRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<KycResponse>>;
+    public updateMyKyc(createKycRequest: CreateKycRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<KycResponse>>;
+    public updateMyKyc(createKycRequest: CreateKycRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (createKycRequest === null || createKycRequest === undefined) {
+            throw new Error('Required parameter createKycRequest was null or undefined when calling updateMyKyc.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (bearerAuth) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('bearerAuth', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/kyc`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<KycResponse>('put', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 body: createKycRequest,
