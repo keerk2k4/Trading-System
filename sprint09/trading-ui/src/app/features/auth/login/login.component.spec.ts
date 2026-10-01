@@ -112,6 +112,26 @@ describe('LoginComponent', () => {
     expect(TestBed.inject(Router).url).toBe('/orders/history');
   });
 
+  it('rejects off-origin returnUrl and falls back to dashboard', async () => {
+    await open('/login?returnUrl=https%3A%2F%2Fevil.example%2Flogin');
+    type('login-username', 'gaurang123');
+    type('login-password', 'pw');
+    submit();
+    await harness.fixture.whenStable();
+
+    expect(TestBed.inject(Router).url).toBe('/dashboard');
+  });
+
+  it('rejects protocol-relative returnUrl and falls back to dashboard', async () => {
+    await open('/login?returnUrl=%2F%2Fevil.example');
+    type('login-username', 'gaurang123');
+    type('login-password', 'pw');
+    submit();
+    await harness.fixture.whenStable();
+
+    expect(TestBed.inject(Router).url).toBe('/dashboard');
+  });
+
   it('sends a customer without approved KYC to the KYC form', async () => {
     kycStatus = null;
     await open('/login');

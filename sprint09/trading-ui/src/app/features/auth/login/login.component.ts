@@ -8,6 +8,7 @@ import { MockAuthService } from '../../../shared/services/mock-auth.service';
 import { MockKycService } from '../../../shared/services/mock-kyc.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
 import { AuthShellComponent } from '../auth-shell/auth-shell.component';
+import { safeReturnUrl } from '../../../shared/guards/safe-return-url';
 
 @Component({
   selector: 'app-login',
@@ -154,7 +155,6 @@ export class LoginComponent {
     }
 
     this.isLoading.set(true);
-
     this.authService
       .login(this.form.getRawValue(), this.isAdminLogin)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -192,7 +192,7 @@ export class LoginComponent {
       .subscribe({
         next: (kyc: KycSubmission | null) => {
           if (kyc?.status === 'APPROVED') {
-            this.router.navigateByUrl(this.returnUrl());
+            this.router.navigateByUrl(this.returnUrl('/dashboard'));
             return;
           }
           this.router.navigate(['/kyc-submission']);
@@ -205,13 +205,6 @@ export class LoginComponent {
 
   // Only in-app paths are honoured, so a crafted link cannot send a freshly
   // signed-in user to another site.
-  private returnUrl(): string {
-    const returnUrl: unknown = this.route.snapshot.queryParams['returnUrl'];
-    const isLocalPath =
-      typeof returnUrl === 'string' && returnUrl.startsWith('/') && !returnUrl.startsWith('//');
-    return isLocalPath ? returnUrl : '/dashboard';
-  }
-
   // The backend answers every failed sign-in with the same AUTH-401, and the
   // message here is equally silent about which half of the pair was wrong.
   private messageFor(err: AuthError): string {
@@ -226,5 +219,11 @@ export class LoginComponent {
       default:
         return this.errorMapping.getErrorMessage(err.errorCode);
     }
+  }
+
+  // The returnUrl query param is attacker-controllable (anyone can share a
+  // sign-in link), so only a path on this origin is honoured.
+  private returnUrl(fallback: string): string {
+    return safeReturnUrl(this.route.snapshot.queryParams['returnUrl'], fallback);
   }
 }
