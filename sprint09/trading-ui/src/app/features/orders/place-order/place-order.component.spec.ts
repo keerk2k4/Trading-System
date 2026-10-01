@@ -133,4 +133,84 @@ describe('PlaceOrderComponent', () => {
     expect(el<HTMLInputElement>('#symbol').value).toBe('');
     expect(el('#side-error' as string)).toBeNull();
   });
+
+  // --- Order ticket story: invalid quantity / price, read-only account,
+  // --- server result and business rejection.
+
+  it('blocks a negative or zero quantity with a friendly message', () => {
+    fillValidOrder();
+
+    for (const quantity of ['-50', '0']) {
+      type('quantity', quantity);
+      submit();
+
+      expect(tradeApi.placeOrder).not.toHaveBeenCalled();
+      expect(el('#quantity-error').textContent).toContain('Quantity must be a whole number greater than 0.');
+      expect(el<HTMLInputElement>('#quantity').getAttribute('aria-invalid')).toBe('true');
+    }
+  });
+
+  it('blocks a zero or negative price with a friendly message', () => {
+    fillValidOrder();
+
+    for (const price of ['0', '-5']) {
+      type('price', price);
+      submit();
+
+      expect(tradeApi.placeOrder).not.toHaveBeenCalled();
+      expect(el('#price-error').textContent).toContain('Price must be greater than 0.');
+    }
+  });
+
+  it('accepts a price with exactly two decimals', async () => {
+    fillValidOrder();
+    type('price', '123.45');
+    submit();
+    await fixture.whenStable();
+
+    expect(el('#price-error' as string)).toBeNull();
+    expect(sentOrder().price).toBe(123.45);
+  });
+
+  it('shows the account from the token as read-only text, not an editable field', () => {
+    const accountRow = Array.from(page.querySelectorAll('.tp-details > div')).find(
+      (row) => row.querySelector('dt')?.textContent?.trim() === 'Account'
+    )!;
+
+    expect(accountRow.querySelector('dd')!.textContent?.trim()).toBe('6');
+    expect(accountRow.querySelector('input, select, textarea')).toBeNull();
+    expect(page.querySelector('[formcontrolname="accountId"], #accountId')).toBeNull();
+  });
+
+  it('shows the status the server returned, including a REJECTED order', async () => {
+    tradeApi.placeOrder.and.returnValue(
+      of({ orderId: 'ORD-2', status: 'REJECTED', message: 'Order rejected', symbol: 'AAPL', side: 'BUY', quantity: 10, price: 150.25 })
+    );
+    fillValidOrder();
+    submit();
+    await fixture.whenStable();
+
+    const badge = el('app-status-badge');
+    expect(badge.textContent?.trim()).toBe('Rejected');
+    expect(badge.classList).toContain('tp-badge-negative');
+    expect(page.textContent).toContain('ORD-2');
+    expect(page.textContent).toContain('Order rejected');
+  });
+
+  it('shows a business rejection from the server and keeps the ticket for correction', () => {
+    tradeApi.placeOrder.and.returnValue(
+      throwError(() => ({ errorCode: 'ORD-409', message: 'Insufficient holdings', status: 409 }))
+    );
+    el<HTMLInputElement>('#side-sell').click();
+    type('symbol', 'AAPL');
+    type('quantity', '500');
+    type('price', '150.25');
+    fixture.detectChanges();
+    submit();
+
+    expect(tradeApi.placeOrder).toHaveBeenCalledTimes(1);
+    expect(el('[role="alert"]').textContent).toContain('not enough holdings to sell');
+    expect(el('h2').textContent).toContain('Order ticket');
+    expect(el<HTMLInputElement>('#quantity').value).toBe('500');
+  });
 });
