@@ -37,8 +37,15 @@ public class OrderController {
     public ResponseEntity<OrderResponse> placeOrder(
             @Valid @RequestBody PlaceOrderRequest body,
             HttpServletRequest request) {
-        authService.verifyAccountAccess(request, body.getAccountId());  // Verify access before processing
-        OrderResponse order = orders.placeOrder(body);                   // Throws 404 if account not found, other errors
+        long accountId = authService.authenticatedAccountId(request);
+        PlaceOrderRequest orderRequest = new PlaceOrderRequest(
+            accountId,
+            body.getSymbol(),
+            body.getSide(),
+            body.getQuantity(),
+            body.getPrice(),
+            body.getIdempotencyKey());
+        OrderResponse order = orders.placeOrder(orderRequest);            // Throws 404 if account not found, other errors
         return ResponseEntity.ok(order);
     }
 

@@ -51,6 +51,20 @@ class SecurityConfigCorsTest {
                         .toLowerCase().contains("authorization")));
     }
 
+            @Test
+            void patchPreflightFromUiOriginIsAnsweredWithoutReachingJwtFilter() throws Exception {
+            MockHttpServletRequest request = preflight(UI_ORIGIN, "PATCH");
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            run(request, response);
+
+            assertAll(
+                () -> assertEquals(200, response.getStatus()),
+                () -> assertEquals(UI_ORIGIN, response.getHeader("Access-Control-Allow-Origin")),
+                () -> assertTrue(response.getHeader("Access-Control-Allow-Methods")
+                    .toUpperCase().contains("PATCH")));
+            }
+
     @Test
     void preflightFromOtherOriginIsRejected() throws Exception {
         MockHttpServletRequest request = preflight("http://evil.example");
@@ -78,10 +92,14 @@ class SecurityConfigCorsTest {
     }
 
     private MockHttpServletRequest preflight(String origin) {
+        return preflight(origin, "POST");
+    }
+
+    private MockHttpServletRequest preflight(String origin, String method) {
         MockHttpServletRequest request = new MockHttpServletRequest("OPTIONS", "/api/v1/orders");
         request.setRequestURI("/api/v1/orders");
         request.addHeader("Origin", origin);
-        request.addHeader("Access-Control-Request-Method", "POST");
+        request.addHeader("Access-Control-Request-Method", method);
         request.addHeader("Access-Control-Request-Headers", "authorization,content-type");
         return request;
     }

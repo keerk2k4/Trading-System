@@ -17,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -28,9 +29,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -62,6 +65,17 @@ class AccountControllerTest {
             }
             return null;
         }).when(authService).verifyAccountAccess(any(HttpServletRequest.class), anyLong());
+
+                doAnswer(invocation -> {
+                        HttpServletRequest request = invocation.getArgument(0);
+                        String authorization = request.getHeader("Authorization");
+                        if (authorization == null || authorization.isBlank()
+                                        || !authorization.startsWith("Bearer ")
+                                        || authorization.substring("Bearer ".length()).isBlank()) {
+                                throw new UnauthorisedException();
+                        }
+                        return 1L;
+                }).when(authService).authenticatedAccountId(any(HttpServletRequest.class));
     }
 
     @Test
@@ -78,6 +92,11 @@ class AccountControllerTest {
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.version").value(7))
                 .andExpect(jsonPath("$.lastUpdated").value("2026-09-28T09:14:22Z"));
+
+        mvc.perform(get("/api/v1/accounts/me").header("Authorization", TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.accountId").value("ACC-000001"));
     }
 
     @Test
@@ -91,6 +110,35 @@ class AccountControllerTest {
                 .andExpect(jsonPath("$.cashBalance").value(24500.75))
                 .andExpect(jsonPath("$.currency").value("USD"))
                 .andExpect(jsonPath("$.asOf").value("2026-09-28T09:14:22Z"));
+
+        mvc.perform(get("/api/v1/accounts/me/balance").header("Authorization", TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accountId").value(1));
+    }
+
+    @Test
+    void updateBalanceUsesJwtAccountAndReturnsContractBody() throws Exception {
+        when(accounts.updateBalance(eq(1L), eq(new BigDecimal("2500.25"))))
+                .thenReturn(new BalanceResponse(1L, new BigDecimal("2500.25"), "USD", NOW));
+
+        mvc.perform(patch("/api/v1/accounts/balance")
+                        .header("Authorization", TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cashBalance\":2500.25}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accountId").value(1))
+                .andExpect(jsonPath("$.cashBalance").value(2500.25))
+                .andExpect(jsonPath("$.currency").value("USD"))
+                .andExpect(jsonPath("$.asOf").value("2026-09-28T09:14:22Z"));
+
+        verify(accounts).updateBalance(1L, new BigDecimal("2500.25"));
+
+        mvc.perform(patch("/api/v1/accounts/me/balance")
+                        .header("Authorization", TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cashBalance\":2500.25}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accountId").value(1));
     }
 
     @Test
@@ -106,6 +154,10 @@ class AccountControllerTest {
                 .andExpect(jsonPath("$[0].quantity").value(100))
                 .andExpect(jsonPath("$[0].averageCost").value(25.50))
                 .andExpect(jsonPath("$[1].symbol").value("INFY.NS"));
+
+        mvc.perform(get("/api/v1/accounts/me/positions").header("Authorization", TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].accountId").value(1));
     }
 
     @Test
@@ -131,6 +183,14 @@ class AccountControllerTest {
                 .andExpect(jsonPath("$[0].status").value("FILLED"))
                 .andExpect(jsonPath("$[0].idempotencyKey").value(UUID))
                 .andExpect(jsonPath("$[0].createdOn").value("2026-09-28T09:14:22Z"));
+
+        mvc.perform(get("/api/v1/accounts/me/orders")
+                        .header("Authorization", TOKEN)
+                        .queryParam("status", "FILLED")
+                        .queryParam("from", "2026-09-01T00:00:00Z")
+                        .queryParam("to", "2026-09-30T00:00:00Z"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].accountId").value(1));
     }
 
     @Test
@@ -148,12 +208,28 @@ class AccountControllerTest {
         mvc.perform(get("/api/v1/accounts/{id}/orders", 1))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.errorCode").value("AUTH-401"));
+        mvc.perform(patch("/api/v1/accounts/balance")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cashBalance\":123.45}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("AUTH-401"));
+        verifyNoInteractions(accounts);
+    }
+
+    @Test
+    void invalidBalancePayloadIsVal422Envelope() throws Exception {
+        mvc.perform(patch("/api/v1/accounts/balance")
+                        .header("Authorization", TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cashBalance\":-1}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("VAL-422"));
         verifyNoInteractions(accounts);
     }
 
     @Test
     void unknownAccountIsAcc404Envelope() throws Exception {
-        when(accounts.getAccount(eq(9L))).thenThrow(new AccountNotFoundException(9L));
+                when(accounts.getAccount(eq(1L))).thenThrow(new AccountNotFoundException(1L));
 
         mvc.perform(get("/api/v1/accounts/{id}", 9).header("Authorization", TOKEN))
                 .andExpect(status().isNotFound())

@@ -27,7 +27,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -62,8 +61,8 @@ class OrderControllerTest {
                     || authorization.substring("Bearer ".length()).isBlank()) {
                 throw new UnauthorisedException();
             }
-            return null;
-        }).when(authService).verifyAccountAccess(any(HttpServletRequest.class), anyLong());
+                        return 1L;
+                }).when(authService).authenticatedAccountId(any(HttpServletRequest.class));
 
         doAnswer(invocation -> {
             HttpServletRequest request = invocation.getArgument(0);
@@ -104,6 +103,13 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.side").value("BUY"))
                 .andExpect(jsonPath("$.quantity").value(100))
                 .andExpect(jsonPath("$.price").value(25.50));
+
+        mvc.perform(post("/api/v1/orders")
+                        .header("Authorization", TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validBody().replace("\"accountId\":1", "\"accountId\":999")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderId").value("ORD-" + UUID));
     }
 
     @Test

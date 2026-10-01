@@ -55,4 +55,13 @@ public class AuthService {
             throw new AccountNotActiveException(requestedAccountId);
         }
     }
+
+    public long authenticatedAccountId(HttpServletRequest request) {
+        requireBearerToken(request);
+        Long tokenAccountId = (Long) request.getAttribute(ACCOUNT_ID_ATTRIBUTE);
+        if (tokenAccountId == null) {
+            throw new UnauthorisedException();
+        }
+        return tokenAccountId;
+    }
 }

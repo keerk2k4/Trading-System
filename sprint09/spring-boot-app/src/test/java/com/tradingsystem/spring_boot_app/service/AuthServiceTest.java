@@ -90,6 +90,22 @@ class AuthServiceTest {
                 () -> authService.verifyAccountAccess(request, 91L));
     }
 
+    @Test
+    void authenticatedAccountIdReturnsJwtAccountIdClaim() {
+        MockHttpServletRequest request = requestWithAuthorization("Bearer opaque-token");
+        request.setAttribute(ACCOUNT_ID_ATTRIBUTE, 44L);
+
+        assertEquals(44L, authService.authenticatedAccountId(request));
+    }
+
+    @Test
+    void authenticatedAccountIdRejectsMissingAccountClaim() {
+        MockHttpServletRequest request = requestWithAuthorization("Bearer opaque-token");
+
+        assertThrows(UnauthorisedException.class,
+                () -> authService.authenticatedAccountId(request));
+    }
+
     private static MockHttpServletRequest requestWithAuthorization(String authorization) {
         MockHttpServletRequest request = new MockHttpServletRequest();
         if (authorization != null) {

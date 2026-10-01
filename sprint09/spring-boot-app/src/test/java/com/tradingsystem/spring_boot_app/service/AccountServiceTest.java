@@ -8,6 +8,7 @@ import com.tradingsystem.domain.enums.OrderSide;
 import com.tradingsystem.domain.enums.OrderStatus;
 import com.tradingsystem.domain.enums.TradingStatus;
 import com.tradingsystem.exception.AccountNotFoundException;
+import com.tradingsystem.exception.OptimisticLockException;
 import com.tradingsystem.spring_boot_app.dto.AccountResponse;
 import com.tradingsystem.spring_boot_app.dto.AccountStatus;
 import com.tradingsystem.spring_boot_app.dto.BalanceResponse;
@@ -122,6 +123,40 @@ class AccountServiceTest {
                 () -> assertEquals("USD", response.currency())
         );
         assertNotNull(response.asOf());
+    }
+
+    @Test
+    void updateBalancePersistsAndReturnsUsdBalanceForExistingAccount() {
+        Account account = mock(Account.class);
+        when(account.getLoadedVersion()).thenReturn(3L);
+        when(accounts.findAccountById(7L)).thenReturn(Optional.of(account));
+        when(accounts.updateAvailableBalanceOptimistic(7L, new BigDecimal("1500.25"), 3L)).thenReturn(1);
+
+        BalanceResponse response = service.updateBalance(7L, new BigDecimal("1500.25"));
+
+        assertAll(
+                () -> assertEquals(7L, response.accountId()),
+                () -> assertEquals(new BigDecimal("1500.25"), response.cashBalance()),
+                () -> assertEquals("USD", response.currency())
+        );
+        assertNotNull(response.asOf());
+    }
+
+    @Test
+    void updateBalanceThrowsConflictWhenVersionHasChanged() {
+        Account account = mock(Account.class);
+        when(account.getLoadedVersion()).thenReturn(9L);
+        when(accounts.findAccountById(7L)).thenReturn(Optional.of(account));
+        when(accounts.updateAvailableBalanceOptimistic(7L, new BigDecimal("250.00"), 9L)).thenReturn(0);
+
+        OptimisticLockException failure = assertThrows(OptimisticLockException.class,
+                () -> service.updateBalance(7L, new BigDecimal("250.00")));
+
+        assertAll(
+                () -> assertEquals("ORD-409", failure.getCode()),
+                () -> assertEquals("Concurrent update detected", failure.getMessage()),
+                () -> assertEquals(7L, failure.getAccountId())
+        );
     }
 
     @Test

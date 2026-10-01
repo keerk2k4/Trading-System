@@ -241,6 +241,9 @@ paths:
       tags: [Accounts]
       operationId: getAccount
       summary: Get account details
+      description: |
+        Legacy route. The backend resolves the effective account from JWT claims and does not trust
+        caller-supplied account identifiers.
       parameters:
         - $ref: '#/components/parameters/AccountIdPath'
       responses:
@@ -263,6 +266,9 @@ paths:
       operationId: getBalance
       summary: Get cash balance
       description: |
+        Legacy route. The backend resolves the effective account from JWT claims and does not trust
+        caller-supplied account identifiers.
+
         Returns available cash only. It does not include the market value of holdings. Portfolio
         valuation is the Sprint 10 Portfolio and P&L extension, contracted separately.
       parameters:
@@ -281,12 +287,91 @@ paths:
         '404':
           $ref: '#/components/responses/AccountNotFound'
 
+  /api/v1/accounts/me:
+    get:
+      tags: [Accounts]
+      operationId: getMyAccount
+      summary: Get account details for the signed-in user
+      responses:
+        '200':
+          description: Account details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+
+  /api/v1/accounts/me/balance:
+    get:
+      tags: [Accounts]
+      operationId: getMyBalance
+      summary: Get cash balance for the signed-in user
+      responses:
+        '200':
+          description: Cash balance.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+
+    patch:
+      tags: [Accounts]
+      operationId: updateMyBalance
+      summary: Update cash balance for the signed-in account
+      description: |
+        Sets the available cash balance for the account identified by the JWT `accountId` claim.
+        No account identifier is accepted from query or path.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BalanceUpdateRequest'
+            examples:
+              deposit:
+                value:
+                  cashBalance: 2500.25
+      responses:
+        '200':
+          description: Updated cash balance.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+        '409':
+          description: Concurrent account update conflict.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                conflict:
+                  value:
+                    errorCode: ORD-409
+                    message: Order conflict
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
   /api/v1/accounts/{id}/positions:
     get:
       tags: [Accounts]
       operationId: getPositions
       summary: Get holdings
       description: |
+        Legacy route. The backend resolves the effective account from JWT claims and does not trust
+        caller-supplied account identifiers.
+
         Net held quantity and average cost per instrument. Positions with a net quantity of zero are
         not returned. Market value is not calculated here; it needs a live quote and belongs to the
         Portfolio and P&L extension.
@@ -325,6 +410,9 @@ paths:
       operationId: getOrders
       summary: Get order history
       description: |
+        Legacy route. The backend resolves the effective account from JWT claims and does not trust
+        caller-supplied account identifiers.
+
         Every order recorded against the account, newest first, including rejected and cancelled
         ones. This is the audit trail and it is never filtered by default.
       parameters:
@@ -362,6 +450,65 @@ paths:
           $ref: '#/components/responses/Unauthorised'
         '403':
           $ref: '#/components/responses/AccountNotActive'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+
+  /api/v1/accounts/me/positions:
+    get:
+      tags: [Accounts]
+      operationId: getMyPositions
+      summary: Get holdings for the signed-in user
+      responses:
+        '200':
+          description: Holdings for the account.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PositionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+
+  /api/v1/accounts/me/orders:
+    get:
+      tags: [Accounts]
+      operationId: getMyOrders
+      summary: Get order history for the signed-in user
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Restrict to one order status.
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - name: from
+          in: query
+          required: false
+          description: Include orders created on or after this instant.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          description: Include orders created on or before this instant.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Order history for the account.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderHistoryEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
         '404':
           $ref: '#/components/responses/AccountNotFound'
 
@@ -646,6 +793,19 @@ components:
           type: string
           format: date-time
           example: '2026-09-28T09:14:22Z'
+
+    BalanceUpdateRequest:
+      type: object
+      additionalProperties: false
+      required: [cashBalance]
+      properties:
+        cashBalance:
+          type: number
+          format: double
+          minimum: 0
+          multipleOf: 0.01
+          description: New available cash balance to persist for the signed-in account.
+          example: 2500.25
 
     PositionResponse:
       type: object

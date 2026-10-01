@@ -6,6 +6,7 @@ import com.tradingsystem.domain.entities.Position;
 import com.tradingsystem.domain.entities.User;
 import com.tradingsystem.domain.enums.OrderStatus;
 import com.tradingsystem.domain.enums.TradingStatus;
+import com.tradingsystem.exception.OptimisticLockException;
 import com.tradingsystem.spring_boot_app.dto.*;
 import com.tradingsystem.spring_boot_app.mapper.AccountMapper;
 import com.tradingsystem.spring_boot_app.mapper.OrderMapper;
@@ -41,6 +42,15 @@ public class AccountService {
     public BalanceResponse getBalance(long id) {
         Account account = account(id);
         return new BalanceResponse(account.getAccountId(), account.getCashBalance(), "USD", now());
+    }
+
+    public BalanceResponse updateBalance(long id, java.math.BigDecimal cashBalance) {
+        Account account = account(id);
+        int updated = accounts.updateAvailableBalanceOptimistic(id, cashBalance, account.getLoadedVersion());
+        if (updated == 0) {
+            throw new OptimisticLockException(id);
+        }
+        return new BalanceResponse(id, cashBalance, "USD", now());
     }
 
     public List<PositionResponse> getPositions(long id) {
