@@ -1,7 +1,8 @@
-import { Injectable } from '@angular/core';
-import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { catchError } from 'rxjs/operators';
+import { AccountsService, OrdersService } from '../../../generated/trade-client';
 import {
   Account,
   Balance,
@@ -13,60 +14,60 @@ import {
   TradeApiError
 } from '../models/order.models';
 
-// Base URL of the Spring Boot trade API. The Authorization header is not
-// set here - authTokenInterceptor adds it to every request under this URL.
-export const TRADE_API_BASE_URL = 'http://localhost:8080';
+// Kept as a re-export so existing imports keep working; defined in api-clients.ts.
+export { TRADE_API_BASE_URL } from '../api/api-clients';
 
+/**
+ * Thin wrapper over the clients generated from contracts/trade-api.yaml.
+ * Request/response shapes come from the generated models, so a contract
+ * change that breaks a caller fails the build instead of failing at runtime.
+ * The Authorization header is added by authTokenInterceptor.
+ */
 @Injectable({
   providedIn: 'root'
 })
 export class TradeApiService {
-  constructor(private http: HttpClient) {}
+  private accounts = inject(AccountsService);
+  private orders = inject(OrdersService);
 
-  // GET /api/v1/accounts/{accountId}
+  // GET /api/v1/accounts/{id}
   getAccount(accountId: number): Observable<Account> {
-    return this.http
-      .get<Account>(`${TRADE_API_BASE_URL}/api/v1/accounts/${accountId}`)
+    return this.accounts
+      .getAccount(accountId)
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
-  // GET /api/v1/accounts/{accountId}/balance
+  // GET /api/v1/accounts/{id}/balance
   getBalance(accountId: number): Observable<Balance> {
-    return this.http
-      .get<Balance>(`${TRADE_API_BASE_URL}/api/v1/accounts/${accountId}/balance`)
+    return this.accounts
+      .getBalance(accountId)
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
-  // GET /api/v1/accounts/{accountId}/positions
+  // GET /api/v1/accounts/{id}/positions
   getPositions(accountId: number): Observable<Position[]> {
-    return this.http
-      .get<Position[]>(`${TRADE_API_BASE_URL}/api/v1/accounts/${accountId}/positions`)
+    return this.accounts
+      .getPositions(accountId)
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
-  // GET /api/v1/accounts/{accountId}/orders, optionally narrowed by status
+  // GET /api/v1/accounts/{id}/orders, optionally narrowed by status
   // and/or an ISO date-time range.
   getOrders(accountId: number, filter: OrderHistoryFilter = {}): Observable<Order[]> {
-    let params = new HttpParams();
-    if (filter.status) {
-      params = params.set('status', filter.status);
-    }
-    if (filter.from) {
-      params = params.set('from', new Date(filter.from).toISOString());
-    }
-    if (filter.to) {
-      params = params.set('to', new Date(filter.to).toISOString());
-    }
-
-    return this.http
-      .get<Order[]>(`${TRADE_API_BASE_URL}/api/v1/accounts/${accountId}/orders`, { params })
+    return this.accounts
+      .getOrders(
+        accountId,
+        filter.status || undefined,
+        filter.from ? new Date(filter.from).toISOString() : undefined,
+        filter.to ? new Date(filter.to).toISOString() : undefined
+      )
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
   // POST /api/v1/orders
   placeOrder(order: PlaceOrderRequest): Observable<PlaceOrderResponse> {
-    return this.http
-      .post<PlaceOrderResponse>(`${TRADE_API_BASE_URL}/api/v1/orders`, order)
+    return this.orders
+      .placeOrder(order)
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 

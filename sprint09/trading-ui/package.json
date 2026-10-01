@@ -9,7 +9,7 @@
     "test": "ng test",
     "lint": "ng lint",
     "e2e": "playwright test",
-    "generate:clients": "openapi-generator-cli generate -i ../contracts/auth-api.yaml -g typescript-angular -o src/api-clients/auth-api --skip-validate-spec && openapi-generator-cli generate -i ../contracts/trade-api.yaml -g typescript-angular -o src/api-clients/trade-api --skip-validate-spec"
+    "generate:clients": "openapi-generator-cli generate"
   },
   "private": true,
   "dependencies": {
@@ -29,7 +29,7 @@
     "@angular-devkit/build-angular": "^21.0.0",
     "@angular/cli": "^21.0.0",
     "@angular/compiler-cli": "^21.0.0",
-    "@openapitools/openapi-generator-cli": "^2.7.0",
+    "@openapitools/openapi-generator-cli": "2.41.0",
     "@types/jasmine": "~5.1.0",
     "@types/node": "^20.0.0",
     "jasmine-core": "~5.1.0",

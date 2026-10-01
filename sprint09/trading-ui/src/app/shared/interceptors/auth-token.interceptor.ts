@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { HttpInterceptorFn } from '@angular/common/http';
 import { MockAuthService } from '../services/mock-auth.service';
-import { TRADE_API_BASE_URL } from '../services/trade-api.service';
+import { TRADE_API_BASE_URL } from '../api/api-clients';
 
 /**
  * Adds `Authorization: Bearer <JWT>` to every request sent to the trade API.

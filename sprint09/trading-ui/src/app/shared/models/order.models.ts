@@ -1,83 +1,40 @@
-// Order models and interfaces
+// Order models and interfaces.
+//
+// Every wire type is an alias of the model generated from
+// contracts/trade-api.yaml (src/generated/trade-client), never a hand-written
+// copy: when the contract changes and the client is regenerated, every
+// component that no longer matches fails to compile.
+import type {
+  AccountResponse,
+  AccountStatus as ContractAccountStatus,
+  BalanceResponse,
+  OrderHistoryEntry,
+  OrderResponse,
+  OrderSide as ContractOrderSide,
+  OrderStatus as ContractOrderStatus,
+  PlaceOrderRequest as ContractPlaceOrderRequest,
+  PositionResponse
+} from '../../../generated/trade-client';
 
-// The UI only ever filters by the first four, but the trade API's order
-// history can also return the remaining lifecycle states.
-export type OrderStatus =
-  | 'NEW'
-  | 'FILLED'
-  | 'REJECTED'
-  | 'CANCELLED'
-  | 'OPEN'
-  | 'PARTIALLY_FILLED'
-  | 'EXPIRED';
-export type OrderSide = 'BUY' | 'SELL';
+export type OrderStatus = ContractOrderStatus;
+export type OrderSide = ContractOrderSide;
+export type AccountStatus = ContractAccountStatus;
 
-// Matches one entry of GET /api/v1/accounts/{accountId}/orders.
-export interface Order {
-  orderId: string;
-  accountId: number;
-  symbol: string;
-  side: OrderSide;
-  quantity: number;
-  price: number;
-  executedPrice: number | null;
-  status: OrderStatus;
-  idempotencyKey: string;
-  createdOn: string;
-}
+// One entry of GET /api/v1/accounts/{id}/orders.
+export type Order = OrderHistoryEntry;
+// POST /api/v1/orders request and response.
+export type PlaceOrderRequest = ContractPlaceOrderRequest;
+export type PlaceOrderResponse = OrderResponse;
+// GET /api/v1/accounts/{id}, /balance and /positions.
+export type Account = AccountResponse;
+export type Balance = BalanceResponse;
+export type Position = PositionResponse;
 
+// UI-only: filter form state for the order history screen.
 export interface OrderHistoryFilter {
   status?: OrderStatus;
   from?: Date | string;
   to?: Date | string;
-}
-
-export interface PlaceOrderRequest {
-  accountId: number;
-  symbol: string;
-  side: OrderSide;
-  quantity: number;
-  price: number;
-  idempotencyKey: string;
-}
-
-export interface PlaceOrderResponse {
-  orderId: string;
-  status: OrderStatus;
-  message: string;
-  symbol: string;
-  side: OrderSide;
-  quantity: number;
-  price: number;
-}
-
-export type AccountStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'CLOSED';
-
-// Matches GET /api/v1/accounts/{accountId}.
-export interface Account {
-  id: number;
-  accountId: string;
-  holderName: string;
-  cashBalance: number;
-  status: AccountStatus;
-  version: number;
-  lastUpdated: string;
-}
-
-// Matches GET /api/v1/accounts/{accountId}/balance.
-export interface Balance {
-  accountId: number;
-  cashBalance: number;
-  currency: string;
-  asOf: string;
-}
-
-// Matches one entry of GET /api/v1/accounts/{accountId}/positions.
-export interface Position {
-  accountId: number;
-  symbol: string;
-  quantity: number;
-  averageCost: number;
 }
 
 // What TradeApiService rethrows on a failed call. `status` is the HTTP

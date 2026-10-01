@@ -1,32 +1,31 @@
-import { Injectable, signal } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { User, AuthResponse, LoginRequest, RegisterRequest } from '../models/auth.models';
+import { Injectable, inject, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import { User, AuthResponse, LoginRequest, RegisterRequest, UserResponseData } from '../models/auth.models';
 import { Observable } from 'rxjs';
 import { catchError, map, tap } from 'rxjs/operators';
+import { AuthService as AuthApiClient } from '../../../generated/auth-client';
 
-// Base URL of the real Sprint 8/9 auth-service. This service used to be
-// fully in-memory ("Mock"); register/login/submitKyc now call the real
-// backend below. The name is kept as MockAuthService (rather than renamed)
-// because several other, out-of-scope screens (dashboard, admin-dashboard,
-// place-order) already inject it purely for getCurrentUser()/isAuthenticated(),
-// and changing the class/file name would touch those unrelated files too.
-const AUTH_API_BASE_URL = 'http://localhost:3000';
-
+// Wrapper over the client generated from contracts/auth-api.yaml (base URL and
+// credentials are configured in shared/api/api-clients.ts). This service used
+// to be fully in-memory ("Mock"); the name is kept as MockAuthService (rather
+// than renamed) because several other, out-of-scope screens (dashboard,
+// admin-dashboard, place-order) already inject it purely for
+// getCurrentUser()/isAuthenticated(), and changing the class/file name would
+// touch those unrelated files too.
 @Injectable({
   providedIn: 'root'
 })
 export class MockAuthService {
   private currentUser = signal<User | null>(this.loadFromStorage());
   public currentUser$ = this.currentUser.asReadonly();
-
-  constructor(private http: HttpClient) {}
+  private authApi = inject(AuthApiClient);
 
   // Real backend: POST /auth/register -> { id, username, roles }.
   // No tokens and no accountId come back here - registration only creates
   // the user; the trading account is provisioned asynchronously afterwards.
-  register(data: RegisterRequest): Observable<any> {
-    return this.http
-      .post(`${AUTH_API_BASE_URL}/auth/register`, {
+  register(data: RegisterRequest): Observable<UserResponseData> {
+    return this.authApi
+      .register({
         username: data.username,
         password: data.password,
         email: data.email,
@@ -40,12 +39,9 @@ export class MockAuthService {
   // reconstructed here from the JWT's own claims (sub/accountId/roles),
   // keeping the same AuthResponse shape the rest of the app already expects.
   login(data: LoginRequest, asAdmin = false): Observable<AuthResponse> {
-    const endpoint = asAdmin ? 'admin/login' : 'login';
-    return this.http
-      .post<Omit<AuthResponse, 'user'>>(`${AUTH_API_BASE_URL}/auth/${endpoint}`, {
-        username: data.username,
-        password: data.password,
-      })
+    const credentials = { username: data.username, password: data.password };
+    const tokens$ = asAdmin ? this.authApi.loginAdmin(credentials) : this.authApi.login(credentials);
+    return tokens$
       .pipe(
         map((tokens) => {
           const payload = this.decodeToken(tokens.accessToken);
