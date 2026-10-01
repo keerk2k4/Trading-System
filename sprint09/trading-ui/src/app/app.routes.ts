@@ -10,6 +10,10 @@ import { KycReviewListComponent } from './features/admin/kyc-review/kyc-review-l
 import { mockAuthGuard, mockAdminGuard } from './shared/guards/mock-auth.guard';
 import { kycApprovalGuard } from './shared/guards/kyc-approval.guard';
 
+// Every screen except sign-in/sign-up must have a canActivate guard, so a
+// signed-out visitor is redirected to sign-in (with a returnUrl) rather than
+// shown an empty screen. When adding a route, add mockAuthGuard or
+// mockAdminGuard to it.
 export const routes: Routes = [
   // Public routes
   { path: '', redirectTo: '/login', pathMatch: 'full' },

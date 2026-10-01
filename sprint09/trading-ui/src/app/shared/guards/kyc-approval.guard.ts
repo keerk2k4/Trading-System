@@ -17,10 +17,10 @@ export const kycApprovalGuard: CanActivateFn = (route, state) => {
     return true;
   }
 
-  // Redirect to KYC submission if not approved
-  router.navigate(['/kyc-submission'], {
+  // Redirect to KYC submission if not approved. Returned as a UrlTree (not
+  // router.navigate() + false) so the redirect can't be dropped, leaving the
+  // user on a blank screen.
+  return router.createUrlTree(['/kyc-submission'], {
     queryParams: { returnUrl: state.url }
   });
-
-  return false;
 };

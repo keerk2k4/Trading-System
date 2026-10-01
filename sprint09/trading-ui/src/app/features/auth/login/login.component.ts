@@ -5,6 +5,7 @@ import { RouterLink, Router, ActivatedRoute } from '@angular/router';
 import { MockAuthService } from '../../../shared/services/mock-auth.service';
 import { MockKycService } from '../../../shared/services/mock-kyc.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
+import { safeReturnUrl } from '../../../shared/guards/safe-return-url';
 
 @Component({
   selector: 'app-login',
@@ -52,7 +53,7 @@ import { ErrorMappingService } from '../../../shared/services/error-mapping.serv
 
         <div class="auth-links">
           <p>Don't have an account? <a routerLink="/register">Register here</a></p>
-          <p><a routerLink="/admin-login">Admin Login</a></p>
+          <p><a routerLink="/admin-login" queryParamsHandling="preserve">Admin Login</a></p>
         </div>
       </div>
     </div>
@@ -153,9 +154,9 @@ export class LoginComponent {
         // Check if user is admin by decoding token
         const isAdmin = this.authService.isAdmin();
         
-        // If admin, go straight to admin dashboard
+        // If admin, go where they were heading, else the admin dashboard
         if (isAdmin) {
-          this.router.navigate(['/admin/dashboard']);
+          this.router.navigateByUrl(this.returnUrl('/admin/dashboard'));
           return;
         }
 
@@ -166,9 +167,8 @@ export class LoginComponent {
           // Redirect to KYC if not approved
           this.router.navigate(['/kyc-submission']);
         } else if (kycStatus === 'APPROVED') {
-          // Redirect to dashboard if approved
-          const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
-          this.router.navigateByUrl(returnUrl);
+          // Go where they were heading, else the dashboard
+          this.router.navigateByUrl(this.returnUrl('/dashboard'));
         } else if (kycStatus === 'REJECTED') {
           // Show message if rejected
           this.errorMessage.set('Your KYC submission was rejected. Please contact support.');
@@ -179,5 +179,11 @@ export class LoginComponent {
         this.errorMessage.set(this.errorMapping.getErrorMessage(err.errorCode));
       }
     });
+  }
+
+  // The returnUrl query param is attacker-controllable (anyone can share a
+  // sign-in link), so only a path on this origin is honoured.
+  private returnUrl(fallback: string): string {
+    return safeReturnUrl(this.route.snapshot.queryParams['returnUrl'], fallback);
   }
 }
