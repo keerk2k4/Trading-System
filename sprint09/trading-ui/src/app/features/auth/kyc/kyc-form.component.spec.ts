@@ -54,6 +54,10 @@ describe('KycFormComponent', () => {
     fixture.detectChanges();
   }
 
+  function step(stepNumber: 1 | 2 | 3): HTMLLIElement {
+    return page.querySelectorAll<HTMLLIElement>('.steps li')[stepNumber - 1];
+  }
+
   it('requires every field before submitting', () => {
     create(null);
     submit();
@@ -61,6 +65,7 @@ describe('KycFormComponent', () => {
     expect(kyc.submitKyc).not.toHaveBeenCalled();
     expect(page.querySelectorAll('.tp-field-error').length).toBe(3);
     expect(document.activeElement?.id).toBe('dob');
+    expect(step(1).classList.contains('is-done')).toBeFalse();
   });
 
   it('submits the details and switches to the review state', () => {
@@ -78,6 +83,8 @@ describe('KycFormComponent', () => {
     expect(page.querySelector('form')).not.toBeNull();
     expect(page.querySelector('[role="status"]')?.textContent).toContain('updated');
     expect(page.querySelector('[aria-current="step"]')?.textContent).toContain('Administrator review');
+    expect(step(1).classList.contains('is-done')).toBeTrue();
+    expect(step(2).classList.contains('is-waiting')).toBeTrue();
   });
 
   it('shows existing pending KYC and keeps the form open for updates', () => {
@@ -87,6 +94,16 @@ describe('KycFormComponent', () => {
     expect(page.textContent).toContain('already have a submitted KYC');
     expect((page.querySelector('#dob') as HTMLInputElement).value).toBe('1990-05-15');
     expect(page.querySelector('button[type="submit"]')?.textContent).toContain('Update submission');
+    expect(step(1).classList.contains('is-done')).toBeTrue();
+    expect(step(2).classList.contains('is-waiting')).toBeTrue();
+  });
+
+  it('marks start trading complete when KYC is approved', () => {
+    create('APPROVED');
+
+    expect(step(1).classList.contains('is-done')).toBeTrue();
+    expect(step(2).classList.contains('is-waiting')).toBeFalse();
+    expect(step(3).classList.contains('is-done')).toBeTrue();
   });
 
   it('explains a rejection and offers the form again', () => {
@@ -94,5 +111,19 @@ describe('KycFormComponent', () => {
 
     expect(page.querySelector('form')).not.toBeNull();
     expect(page.textContent).toContain('previous application was rejected');
+    expect(step(1).classList.contains('is-done')).toBeTrue();
+    expect(step(3).classList.contains('is-rejected')).toBeTrue();
+  });
+
+  it('ticks step 1 again when user resubmits after rejection', () => {
+    create('REJECTED');
+    set('dob', '1990-05-15');
+    set('docType', 'PASSPORT', 'change');
+    set('docNum', 'PS123456789');
+    submit();
+
+    expect(step(1).classList.contains('is-done')).toBeTrue();
+    expect(step(2).classList.contains('is-waiting')).toBeTrue();
+    expect(step(3).classList.contains('is-rejected')).toBeFalse();
   });
 });

@@ -6,7 +6,7 @@ import { MockAuthService } from '../../../shared/services/mock-auth.service';
 import { MockKycService } from '../../../shared/services/mock-kyc.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
 import { StatusBadgeComponent } from '../../../shared/ui/status-badge.component';
-import { KycSubmission } from '../../../shared/models/kyc.models';
+import { KycStatus, KycSubmission } from '../../../shared/models/kyc.models';
 
 const DOCUMENT_TYPES = [
   { value: 'PASSPORT', label: 'Passport' },
@@ -151,19 +151,27 @@ const DOCUMENT_TYPES = [
           </div>
           <ol class="steps tp-panel-body">
             <li
-              [class.is-done]="kycStatus() === 'PENDING' || kycStatus() === 'APPROVED'"
-              [class.is-current]="!kycStatus()"
-              [attr.aria-current]="!kycStatus() ? 'step' : null"
+              [class.is-done]="isStepOneDone()"
+              [class.is-current]="!isStepOneDone()"
+              [attr.aria-current]="!isStepOneDone() ? 'step' : null"
             >
-              <strong>Submit your details @if (kycStatus() === 'PENDING' || kycStatus() === 'APPROVED') {<span class="sr-only">(completed)</span>}</strong>
+              <strong>Submit your details @if (isStepOneDone()) {<span class="sr-only">(completed)</span>}</strong>
               <span>Date of birth and one identity document.</span>
             </li>
-            <li [class.is-current]="kycStatus() === 'PENDING'" [attr.aria-current]="kycStatus() === 'PENDING' ? 'step' : null">
+            <li
+              [class.is-waiting]="isStepTwoWaiting()"
+              [class.is-current]="isStepTwoWaiting()"
+              [attr.aria-current]="isStepTwoWaiting() ? 'step' : null"
+            >
               <strong>Administrator review</strong>
               <span>An administrator checks your document.</span>
             </li>
-            <li>
-              <strong>Start trading</strong>
+            <li [class.is-done]="isStepThreeDone()" [class.is-rejected]="isRejected()">
+              <strong>
+                Start trading
+                @if (isStepThreeDone()) {<span class="sr-only">(completed)</span>}
+                @if (isRejected()) {<span class="sr-only">(rejected)</span>}
+              </strong>
               <span>Your dashboard and order ticket unlock.</span>
             </li>
           </ol>
@@ -181,6 +189,8 @@ const DOCUMENT_TYPES = [
     }
     .steps li.is-current::before { color: var(--tp-on-accent); background: var(--tp-accent); border-color: var(--tp-accent); }
     .steps li.is-done::before { content: '✓'; color: var(--tp-positive); border-color: currentColor; }
+    .steps li.is-waiting::before { content: '…'; color: var(--tp-accent); border-color: var(--tp-accent); }
+    .steps li.is-rejected::before { content: '✕'; color: var(--tp-danger); border-color: currentColor; }
     .steps span { color: var(--tp-text-muted); }
   `]
 })
@@ -200,8 +210,17 @@ export class KycFormComponent implements OnInit {
   });
 
   protected readonly kycStatus = signal('');
+  protected readonly normalizedKycStatus = computed<KycStatus | null>(() => {
+    const status = this.kycStatus() as KycStatus | '';
+    return status || null;
+  });
   protected readonly existingKyc = signal<KycSubmission | null>(null);
   protected readonly isUpdateMode = computed(() => this.existingKyc() !== null);
+  protected readonly hasUploadedKyc = computed(() => this.existingKyc() !== null);
+  protected readonly isRejected = computed(() => this.normalizedKycStatus() === 'REJECTED');
+  protected readonly isStepOneDone = computed(() => this.hasUploadedKyc());
+  protected readonly isStepTwoWaiting = computed(() => this.normalizedKycStatus() === 'PENDING');
+  protected readonly isStepThreeDone = computed(() => this.normalizedKycStatus() === 'APPROVED');
   protected readonly isLoadingExistingKyc = signal(true);
   protected readonly justSubmitted = signal(false);
   protected readonly submitted = signal(false);
