@@ -1,16 +1,15 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { ThemeService } from './shared/services/theme.service';
 
 @Component({
   selector: 'app-root',
-  standalone: true,
-  imports: [CommonModule, RouterOutlet],
-  template: `
-    <router-outlet></router-outlet>
-  `,
-  styles: []
+  imports: [RouterOutlet],
+  template: `<router-outlet />`
 })
 export class AppComponent {
   title = 'trading-ui';
+
+  // Created here so a remembered theme applies before the first screen renders.
+  private readonly theme = inject(ThemeService);
 }

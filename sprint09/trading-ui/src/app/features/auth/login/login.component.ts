@@ -1,183 +1,216 @@
-import { Component, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { RouterLink, Router, ActivatedRoute } from '@angular/router';
+import { Component, DestroyRef, ElementRef, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { AuthError } from '../../../shared/models/auth.models';
 import { MockAuthService } from '../../../shared/services/mock-auth.service';
 import { MockKycService } from '../../../shared/services/mock-kyc.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
+import { AuthShellComponent } from '../auth-shell/auth-shell.component';
 
 @Component({
   selector: 'app-login',
-  standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, AuthShellComponent],
   template: `
-    <div class="auth-container">
-      <div class="auth-card card">
-        <h1>Sign In</h1>
-        <p class="subtitle">Welcome back to the Trading Platform</p>
+    <app-auth-shell
+      [heading]="isAdminLogin ? 'Admin sign in' : 'Welcome back'"
+      [subtitle]="isAdminLogin ? 'Sign in with your administrator account.' : 'Sign in to your trading account.'"
+    >
+      <form class="tp-form" [formGroup]="form" (ngSubmit)="onSubmit()">
+        @if (errorMessage(); as message) {
+          <div class="tp-alert tp-alert-error" role="alert">
+            <span>{{ message }}</span>
+          </div>
+        }
 
-        <div *ngIf="errorMessage()" class="alert alert-error">
-          {{ errorMessage() }}
+        <div>
+          <label class="tp-label" for="login-username">Username</label>
+          <input
+            class="tp-input"
+            id="login-username"
+            type="text"
+            formControlName="username"
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
+            aria-required="true"
+            [attr.aria-invalid]="usernameError() ? 'true' : null"
+            [attr.aria-describedby]="usernameError() ? 'login-username-error' : null"
+          />
+          @if (usernameError(); as message) {
+            <p class="tp-field-error" id="login-username-error">{{ message }}</p>
+          }
         </div>
 
-        <form (ngSubmit)="onLogin()" #loginForm="ngForm">
-          <div class="form-group">
-            <label for="username">Username</label>
+        <div>
+          <label class="tp-label" for="login-password">Password</label>
+          <div class="tp-input-wrap">
             <input
-              type="text"
-              id="username"
-              name="username"
-              [(ngModel)]="username"
-              required
-              placeholder="Enter your username"
+              class="tp-input"
+              id="login-password"
+              [type]="passwordVisible() ? 'text' : 'password'"
+              formControlName="password"
+              autocomplete="current-password"
+              aria-required="true"
+              [attr.aria-invalid]="passwordError() ? 'true' : null"
+              [attr.aria-describedby]="passwordError() ? 'login-password-error' : null"
             />
+            <button
+              class="tp-input-action"
+              type="button"
+              [class.is-active]="passwordVisible()"
+              [attr.aria-label]="passwordVisible() ? 'Hide password' : 'Show password'"
+              (click)="togglePasswordVisibility()"
+            ></button>
           </div>
-
-          <div class="form-group">
-            <label for="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              [(ngModel)]="password"
-              required
-              placeholder="Enter your password"
-            />
-          </div>
-
-          <button type="submit" class="btn-primary" [disabled]="isLoading()">
-            {{ isLoading() ? 'Signing in...' : 'Sign In' }}
-          </button>
-        </form>
-
-        <div class="auth-links">
-          <p>Don't have an account? <a routerLink="/register">Register here</a></p>
-          <p><a routerLink="/admin-login">Admin Login</a></p>
+          @if (passwordError(); as message) {
+            <p class="tp-field-error" id="login-password-error">{{ message }}</p>
+          }
         </div>
-      </div>
-    </div>
-  `,
-  styles: [`
-    .auth-container {
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: linear-gradient(135deg, var(--azure-mist), var(--light));
-      padding: var(--spacing-lg);
-    }
 
-    .auth-card {
-      max-width: 400px;
-      width: 100%;
-    }
+        <button class="tp-btn tp-btn-primary tp-btn-block" type="submit" [attr.aria-disabled]="isLoading() ? 'true' : null">
+          @if (isLoading()) {
+            <span class="tp-spinner" aria-hidden="true"></span>
+            Signing in…
+          } @else {
+            Sign in
+          }
+        </button>
+        <span class="sr-only" role="status">{{ isLoading() ? 'Signing in, please wait.' : '' }}</span>
+      </form>
 
-    h1 {
-      color: var(--prussian-blue);
-      margin-bottom: var(--spacing-sm);
-      text-align: center;
-    }
-
-    .subtitle {
-      text-align: center;
-      color: var(--steel-blue);
-      margin-bottom: var(--spacing-lg);
-    }
-
-    .alert {
-      margin-bottom: var(--spacing-md);
-      font-size: var(--font-size-sm);
-    }
-
-    code {
-      background-color: #f5f5f5;
-      padding: 2px 6px;
-      border-radius: 3px;
-      font-family: monospace;
-      color: var(--rosy-copper);
-    }
-
-    .auth-links {
-      text-align: center;
-      margin-top: var(--spacing-lg);
-    }
-
-    .auth-links p {
-      margin-bottom: var(--spacing-sm);
-    }
-
-    .auth-links a {
-      color: var(--primary);
-      font-weight: 600;
-    }
-
-    button[disabled] {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-  `]
+      @if (isAdminLogin) {
+        <p class="tp-form-footer">
+          Not an administrator? <a class="tp-link" routerLink="/login">Customer sign in</a>
+        </p>
+      } @else {
+        <p class="tp-form-footer">
+          Don't have an account? <a class="tp-link" routerLink="/register">Create one</a>
+        </p>
+        <p class="tp-form-footer"><a class="tp-link" routerLink="/admin-login">Admin sign in</a></p>
+      }
+    </app-auth-shell>
+  `
 })
 export class LoginComponent {
-  username = '';
-  password = '';
-  
-  errorMessage = signal<string>('');
-  isLoading = signal<boolean>(false);
+  private readonly authService = inject(MockAuthService);
+  private readonly kycService = inject(MockKycService);
+  private readonly errorMapping = inject(ErrorMappingService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  constructor(
-    private authService: MockAuthService,
-    private kycService: MockKycService,
-    private errorMapping: ErrorMappingService,
-    private router: Router,
-    private route: ActivatedRoute
-  ) {}
+  // The /admin-login route reuses this screen but signs in through
+  // POST /auth/admin/login instead of POST /auth/login.
+  protected readonly isAdminLogin = this.route.snapshot.data['isAdmin'] === true;
 
-  onLogin(): void {
-    if (!this.username || !this.password) {
-      this.errorMessage.set('Username and password are required');
+  protected readonly form = inject(NonNullableFormBuilder).group({
+    username: ['', [Validators.required, Validators.maxLength(64)]],
+    password: ['', [Validators.required, Validators.maxLength(128)]]
+  });
+
+  protected readonly submitted = signal(false);
+  protected readonly isLoading = signal(false);
+  protected readonly errorMessage = signal('');
+  protected readonly passwordVisible = signal(false);
+
+  protected usernameError(): string | null {
+    const control = this.form.controls.username;
+    if (control.valid || !(control.touched || this.submitted())) {
+      return null;
+    }
+    return control.hasError('required')
+      ? 'Enter your username.'
+      : 'Username must be 64 characters or fewer.';
+  }
+
+  protected passwordError(): string | null {
+    const control = this.form.controls.password;
+    if (control.valid || !(control.touched || this.submitted())) {
+      return null;
+    }
+    return control.hasError('required')
+      ? 'Enter your password.'
+      : 'Password must be 128 characters or fewer.';
+  }
+
+  protected togglePasswordVisibility(): void {
+    this.passwordVisible.update((visible) => !visible);
+  }
+
+  protected onSubmit(): void {
+    if (this.isLoading()) {
+      return;
+    }
+
+    this.submitted.set(true);
+    this.errorMessage.set('');
+
+    if (this.form.invalid) {
+      this.host.nativeElement.querySelector<HTMLElement>('input.ng-invalid')?.focus();
       return;
     }
 
     this.isLoading.set(true);
-    this.errorMessage.set('');
 
-    const isAdminRoute = this.route.snapshot.data['isAdmin'] === true;
-
-    this.authService.login({
-      username: this.username,
-      password: this.password
-    }, isAdminRoute).subscribe({
-      next: (response) => {
-        this.isLoading.set(false);
-        
-        // Check if user is admin by decoding token
-        const isAdmin = this.authService.isAdmin();
-        
-        // If admin, go straight to admin dashboard
-        if (isAdmin) {
-          this.router.navigate(['/admin/dashboard']);
-          return;
+    this.authService
+      .login(this.form.getRawValue(), this.isAdminLogin)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.isLoading.set(false);
+          this.enterApplication();
+        },
+        error: (err: AuthError) => {
+          this.isLoading.set(false);
+          this.errorMessage.set(this.messageFor(err));
+          this.host.nativeElement.querySelector<HTMLElement>('#login-password')?.focus();
         }
+      });
+  }
 
-        // For customers, check KYC status
-        const kycStatus = this.kycService.getKycStatusSignal()();
-        
-        if (!kycStatus || kycStatus === 'PENDING') {
-          // Redirect to KYC if not approved
-          this.router.navigate(['/kyc-submission']);
-        } else if (kycStatus === 'APPROVED') {
-          // Redirect to dashboard if approved
-          const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
-          this.router.navigateByUrl(returnUrl);
-        } else if (kycStatus === 'REJECTED') {
-          // Show message if rejected
-          this.errorMessage.set('Your KYC submission was rejected. Please contact support.');
-        }
-      },
-      error: (err) => {
-        this.isLoading.set(false);
-        this.errorMessage.set(this.errorMapping.getErrorMessage(err.errorCode));
-      }
-    });
+  private enterApplication(): void {
+    // Admins go straight to the admin dashboard.
+    if (this.authService.isAdmin()) {
+      this.router.navigate(['/admin/dashboard']);
+      return;
+    }
+
+    // Customers can only trade once their KYC is approved.
+    const kycStatus = this.kycService.getCurrentUserKycStatus();
+
+    if (kycStatus === 'APPROVED') {
+      this.router.navigateByUrl(this.returnUrl());
+    } else if (kycStatus === 'REJECTED') {
+      this.errorMessage.set('Your KYC submission was rejected. Please contact support.');
+    } else {
+      this.router.navigate(['/kyc-submission']);
+    }
+  }
+
+  // Only in-app paths are honoured, so a crafted link cannot send a freshly
+  // signed-in user to another site.
+  private returnUrl(): string {
+    const returnUrl: unknown = this.route.snapshot.queryParams['returnUrl'];
+    const isLocalPath =
+      typeof returnUrl === 'string' && returnUrl.startsWith('/') && !returnUrl.startsWith('//');
+    return isLocalPath ? returnUrl : '/dashboard';
+  }
+
+  // The backend answers every failed sign-in with the same AUTH-401, and the
+  // message here is equally silent about which half of the pair was wrong.
+  private messageFor(err: AuthError): string {
+    if (this.errorMapping.isNetworkError(err.status)) {
+      return this.errorMapping.getNetworkErrorMessage();
+    }
+    switch (err.errorCode) {
+      case 'AUTH-401':
+        return 'Incorrect username or password. Check your details and try again.';
+      case 'VAL-422':
+        return 'Those details were not accepted. Check your username and password and try again.';
+      default:
+        return this.errorMapping.getErrorMessage(err.errorCode);
+    }
   }
 }

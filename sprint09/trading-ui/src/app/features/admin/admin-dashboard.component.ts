@@ -1,210 +1,104 @@
-import { Component, signal, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { NavbarComponent } from '../../shared/navbar/navbar.component';
 import { MockAuthService } from '../../shared/services/mock-auth.service';
+import { MockKycService } from '../../shared/services/mock-kyc.service';
+import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
+import { KycSubmission } from '../../shared/models/kyc.models';
 
 @Component({
   selector: 'app-admin-dashboard',
-  standalone: true,
-  imports: [CommonModule, RouterLink, NavbarComponent],
+  imports: [RouterLink, DatePipe, StatusBadgeComponent],
   template: `
-    <app-navbar></app-navbar>
-
-    <div class="admin-dashboard">
-      <div class="dashboard-header card">
-        <h1>Admin Dashboard</h1>
-        <p class="subtitle">Administration Panel for {{ currentUser()?.username }}</p>
-        <div class="admin-info">
-          <span class="badge badge-approved">ADMIN</span>
-          <p>Manage KYC submissions and user accounts</p>
+    <div class="tp-page">
+      <header class="tp-page-header">
+        <div>
+          <h1>Admin overview</h1>
+          <p>Signed in as {{ user()?.username }}. Review customer verification requests.</p>
         </div>
-      </div>
-
-      <div class="admin-actions grid grid-2">
-        <div class="action-card card">
-          <h3>📋 Review KYC Submissions</h3>
-          <p>Review and approve/reject pending KYC submissions from users</p>
-          <button routerLink="/admin/kyc-review" class="btn-primary">Go to KYC Review</button>
+        <div class="tp-actions">
+          <a class="tp-btn tp-btn-primary" routerLink="/admin/kyc-review">Open KYC review</a>
         </div>
+      </header>
 
-        <div class="action-card card">
-          <h3>📊 User Statistics</h3>
-          <p>View platform usage and user statistics</p>
-          <div class="stats">
-            <div class="stat">
-              <div class="stat-value">{{ totalUsers }}</div>
-              <div class="stat-label">Total Users</div>
-            </div>
-            <div class="stat">
-              <div class="stat-value">{{ pendingKyc }}</div>
-              <div class="stat-label">Pending KYC</div>
-            </div>
-          </div>
+      <section class="tp-grid tp-grid-3" aria-label="Summary" [attr.aria-busy]="isLoading()">
+        <div class="tp-panel tp-stat tp-stat-primary">
+          <p class="tp-stat-label">Pending KYC</p>
+          <p class="tp-stat-value">{{ isLoading() ? '—' : pending().length }}</p>
+          <p class="tp-stat-meta">Waiting for a decision</p>
         </div>
-      </div>
+        <div class="tp-panel tp-stat">
+          <p class="tp-stat-label">Your role</p>
+          <p class="tp-stat-value role">Administrator</p>
+          <p class="tp-stat-meta">Can approve or reject verification</p>
+        </div>
+      </section>
 
-      <div class="status-section card">
-        <h2>System Status</h2>
-        <div class="status-grid">
-          <div class="status-item">
-            <label>Auth Service:</label>
-            <span class="status-badge status-active">Active</span>
-          </div>
-          <div class="status-item">
-            <label>Trade API:</label>
-            <span class="status-badge status-active">Active</span>
-          </div>
-          <div class="status-item">
-            <label>Database:</label>
-            <span class="status-badge status-active">Connected</span>
-          </div>
-          <div class="status-item">
-            <label>Executor:</label>
-            <span class="status-badge status-active">Running</span>
-          </div>
+      <section class="tp-panel" aria-labelledby="queue-heading">
+        <div class="tp-panel-header">
+          <h2 id="queue-heading">Review queue</h2>
+          <a class="tp-link" routerLink="/admin/kyc-review">View all</a>
         </div>
-      </div>
+        @if (isLoading()) {
+          <p class="tp-empty">Loading submissions…</p>
+        } @else if (pending().length === 0) {
+          <div class="tp-empty">
+            <strong>All caught up</strong>
+            There are no submissions waiting for review.
+          </div>
+        } @else {
+          <div class="tp-table-wrap" tabindex="0" role="region" aria-label="Review queue table">
+            <table class="tp-table">
+              <thead>
+                <tr>
+                  <th scope="col">Submission</th>
+                  <th scope="col">User ID</th>
+                  <th scope="col">Document</th>
+                  <th scope="col">Submitted</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (kyc of pending(); track kyc.id) {
+                  <tr>
+                    <td class="tp-mono">{{ kyc.id }}</td>
+                    <td class="tp-mono">{{ kyc.userId }}</td>
+                    <td>{{ kyc.documentType }}</td>
+                    <td class="tp-muted">{{ kyc.submittedAt | date: 'MMM d, y, h:mm a' }}</td>
+                    <td><app-status-badge [status]="kyc.status" /></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
     </div>
   `,
   styles: [`
-    .admin-dashboard {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: var(--spacing-2xl) var(--spacing-lg);
-    }
-
-    .dashboard-header {
-      margin-bottom: var(--spacing-2xl);
-      text-align: center;
-    }
-
-    .dashboard-header h1 {
-      color: var(--prussian-blue);
-      margin-bottom: var(--spacing-sm);
-    }
-
-    .subtitle {
-      color: var(--steel-blue);
-      font-size: var(--font-size-lg);
-      margin-bottom: var(--spacing-md);
-    }
-
-    .admin-info {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: var(--spacing-lg);
-      flex-wrap: wrap;
-    }
-
-    .admin-info p {
-      margin: 0;
-      color: var(--steel-blue);
-    }
-
-    .admin-actions {
-      margin-bottom: var(--spacing-2xl);
-    }
-
-    .action-card h3 {
-      color: var(--prussian-blue);
-      margin-bottom: var(--spacing-sm);
-    }
-
-    .action-card p {
-      color: var(--steel-blue);
-      margin-bottom: var(--spacing-lg);
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--spacing-md);
-      padding: var(--spacing-md);
-      background-color: var(--azure-mist);
-      border-radius: var(--radius-md);
-      margin-top: var(--spacing-md);
-    }
-
-    .stat {
-      text-align: center;
-    }
-
-    .stat-value {
-      font-size: var(--font-size-2xl);
-      font-weight: bold;
-      color: var(--primary);
-    }
-
-    .stat-label {
-      font-size: var(--font-size-sm);
-      color: var(--steel-blue);
-      margin-top: var(--spacing-xs);
-    }
-
-    .status-section {
-      margin-top: var(--spacing-2xl);
-    }
-
-    .status-section h2 {
-      color: var(--prussian-blue);
-      margin-bottom: var(--spacing-lg);
-    }
-
-    .status-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: var(--spacing-lg);
-    }
-
-    .status-item {
-      padding: var(--spacing-md);
-      background-color: var(--azure-mist);
-      border-radius: var(--radius-md);
-      border-left: 4px solid var(--success);
-    }
-
-    .status-item label {
-      display: block;
-      font-weight: 600;
-      color: var(--prussian-blue);
-      margin: 0 0 var(--spacing-sm) 0;
-    }
-
-    .status-badge {
-      display: inline-block;
-      padding: var(--spacing-xs) var(--spacing-md);
-      border-radius: var(--radius-md);
-      font-size: var(--font-size-sm);
-      font-weight: 600;
-    }
-
-    .status-active {
-      background-color: var(--success);
-      color: white;
-    }
-
-    @media (max-width: 768px) {
-      .admin-actions {
-        grid-template-columns: 1fr;
-      }
-
-      .status-grid {
-        grid-template-columns: 1fr;
-      }
-    }
+    .role { font-size: 1.25rem; }
   `]
 })
 export class AdminDashboardComponent implements OnInit {
-  currentUser = signal<any>(null);
-  totalUsers = 3;
-  pendingKyc = 1;
+  private readonly authService = inject(MockAuthService);
+  private readonly kycService = inject(MockKycService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  constructor(private authService: MockAuthService) {}
+  protected readonly user = this.authService.currentUser$;
+  protected readonly pending = signal<KycSubmission[]>([]);
+  protected readonly isLoading = signal(true);
 
   ngOnInit(): void {
-    const user = this.authService.getCurrentUser();
-    this.currentUser.set(user);
+    this.kycService
+      .getPendingKycSubmissions()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (submissions) => {
+          this.pending.set(submissions);
+          this.isLoading.set(false);
+        },
+        error: () => this.isLoading.set(false)
+      });
   }
 }

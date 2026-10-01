@@ -1,281 +1,289 @@
-import { Component, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { RouterLink, Router } from '@angular/router';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+  viewChild
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import {
+  AbstractControl,
+  NonNullableFormBuilder,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators
+} from '@angular/forms';
+import { RouterLink } from '@angular/router';
+import { AuthError } from '../../../shared/models/auth.models';
 import { MockAuthService } from '../../../shared/services/mock-auth.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
+import { AuthShellComponent } from '../auth-shell/auth-shell.component';
+
+// Validates the confirm-password control against its sibling password control.
+function matchesPassword(control: AbstractControl): ValidationErrors | null {
+  const password: unknown = control.parent?.get('password')?.value;
+  return control.value === password ? null : { mismatch: true };
+}
 
 @Component({
   selector: 'app-register',
-  standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, AuthShellComponent],
   template: `
-    <div class="auth-container">
-      <div class="auth-card card">
-        <h1>Create Account</h1>
-        <p class="subtitle">Register to start trading</p>
-
-        <div *ngIf="errorMessage()" class="alert alert-error">
-          {{ errorMessage() }}
+    <app-auth-shell [heading]="heading()" [subtitle]="subtitle()">
+      @if (registeredUsername(); as username) {
+        <div class="tp-form">
+          <div class="tp-alert tp-alert-success" role="status">
+            <span>
+              The account <strong>{{ username }}</strong> is ready. Sign in with your new username and
+              password to continue.
+            </span>
+          </div>
+          <a class="tp-btn tp-btn-primary tp-btn-block" routerLink="/login">Continue to sign in</a>
         </div>
+      } @else {
+        <form class="tp-form" [formGroup]="form" (ngSubmit)="onSubmit()">
+          @if (errorMessage(); as message) {
+            <div class="tp-alert tp-alert-error" role="alert">
+              <span>{{ message }}</span>
+            </div>
+          }
 
-        <div *ngIf="successMessage()" class="alert alert-success">
-          {{ successMessage() }}
-        </div>
-
-        <form (ngSubmit)="onRegister()" #registerForm="ngForm">
-          <div class="form-group">
-            <label for="username">Username</label>
+          <div>
+            <label class="tp-label" for="register-username">Username</label>
             <input
+              class="tp-input"
+              id="register-username"
               type="text"
-              id="username"
-              name="username"
-              [(ngModel)]="username"
-              required
-              minlength="3"
-              maxlength="64"
-              placeholder="Enter your username"
+              formControlName="username"
+              autocomplete="username"
+              autocapitalize="none"
+              spellcheck="false"
+              aria-required="true"
+              [attr.aria-invalid]="usernameError() ? 'true' : null"
+              [attr.aria-describedby]="usernameError() ? 'register-username-error' : 'register-username-hint'"
             />
-            <small>3-64 characters (alphanumeric, dots, dashes, underscores)</small>
+            @if (usernameError(); as message) {
+              <p class="tp-field-error" id="register-username-error">{{ message }}</p>
+            } @else {
+              <p class="tp-hint" id="register-username-hint">
+                3–64 characters: letters, numbers, dots, dashes and underscores.
+              </p>
+            }
           </div>
 
-          <div class="validation-summary" *ngIf="getUsernameValidationErrors().length > 0">
-            <strong>Username requirements:</strong>
-            <ul>
-              <li *ngFor="let error of getUsernameValidationErrors()">{{ error }}</li>
-            </ul>
+          <div>
+            <label class="tp-label" for="register-password">Password</label>
+            <div class="tp-input-wrap">
+              <input
+                class="tp-input"
+                id="register-password"
+                [type]="passwordsVisible() ? 'text' : 'password'"
+                formControlName="password"
+                autocomplete="new-password"
+                aria-required="true"
+                [attr.aria-invalid]="passwordError() ? 'true' : null"
+                [attr.aria-describedby]="passwordError() ? 'register-password-error' : 'register-password-hint'"
+              />
+              <button
+                class="tp-input-action"
+                type="button"
+                [class.is-active]="passwordsVisible()"
+                [attr.aria-label]="passwordsVisible() ? 'Hide passwords' : 'Show passwords'"
+                (click)="togglePasswordVisibility()"
+              ></button>
+            </div>
+            @if (passwordError(); as message) {
+              <p class="tp-field-error" id="register-password-error">{{ message }}</p>
+            } @else {
+              <p class="tp-hint" [class.is-met]="passwordLongEnough()" id="register-password-hint">
+                At least 12 characters.
+              </p>
+            }
           </div>
 
-          <div class="form-group">
-            <label for="password">Password</label>
+          <div>
+            <label class="tp-label" for="register-confirm-password">Confirm password</label>
             <input
-              type="password"
-              id="password"
-              name="password"
-              [(ngModel)]="password"
-              required
-              minlength="12"
-              maxlength="128"
-              placeholder="Minimum 12 characters"
+              class="tp-input"
+              id="register-confirm-password"
+              [type]="passwordsVisible() ? 'text' : 'password'"
+              formControlName="confirmPassword"
+              autocomplete="new-password"
+              aria-required="true"
+              [attr.aria-invalid]="confirmPasswordError() ? 'true' : null"
+              [attr.aria-describedby]="confirmPasswordError() ? 'register-confirm-password-error' : null"
             />
-            <small>12-128 characters required</small>
+            @if (confirmPasswordError(); as message) {
+              <p class="tp-field-error" id="register-confirm-password-error">{{ message }}</p>
+            }
           </div>
 
-          <div class="form-group">
-            <label for="confirmPassword">Confirm Password</label>
-            <input
-              type="password"
-              id="confirmPassword"
-              name="confirmPassword"
-              [(ngModel)]="confirmPassword"
-              required
-              minlength="12"
-              maxlength="128"
-              placeholder="Re-enter your password"
-            />
-          </div>
-
-          <div class="validation-summary" *ngIf="getPasswordValidationErrors().length > 0">
-            <strong>Password requirements:</strong>
-            <ul>
-              <li *ngFor="let error of getPasswordValidationErrors()">{{ error }}</li>
-            </ul>
-          </div>
-
-          <button type="submit" class="btn-primary" [disabled]="isLoading() || !isFormValid()">
-            {{ isLoading() ? 'Creating Account...' : 'Register' }}
+          <button class="tp-btn tp-btn-primary tp-btn-block" type="submit" [attr.aria-disabled]="isLoading() ? 'true' : null">
+            @if (isLoading()) {
+              <span class="tp-spinner" aria-hidden="true"></span>
+              Creating account…
+            } @else {
+              Create account
+            }
           </button>
+          <span class="sr-only" role="status">{{ isLoading() ? 'Creating your account, please wait.' : '' }}</span>
         </form>
 
-        <p class="auth-link">
-          Already have an account? <a routerLink="/login">Sign in here</a>
+        <p class="tp-form-footer">
+          Already have an account? <a class="tp-link" routerLink="/login">Sign in</a>
         </p>
-      </div>
-    </div>
-  `,
-  styles: [`
-    .auth-container {
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: linear-gradient(135deg, var(--azure-mist), var(--light));
-      padding: var(--spacing-lg);
-    }
-
-    .auth-card {
-      max-width: 400px;
-      width: 100%;
-    }
-
-    h1 {
-      color: var(--prussian-blue);
-      margin-bottom: var(--spacing-sm);
-      text-align: center;
-    }
-
-    .subtitle {
-      text-align: center;
-      color: var(--steel-blue);
-      margin-bottom: var(--spacing-lg);
-    }
-
-    .alert {
-      margin-bottom: var(--spacing-md);
-    }
-
-    .auth-link {
-      text-align: center;
-      margin-top: var(--spacing-lg);
-    }
-
-    .auth-link a {
-      color: var(--primary);
-      font-weight: 600;
-    }
-
-    button[disabled] {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .validation-summary {
-      background-color: #fff3cd;
-      border: 1px solid #ffc107;
-      border-radius: var(--radius-md);
-      padding: var(--spacing-md);
-      margin-bottom: var(--spacing-md);
-      color: #856404;
-    }
-
-    .validation-summary strong {
-      display: block;
-      margin-bottom: var(--spacing-sm);
-      font-weight: 600;
-    }
-
-    .validation-summary ul {
-      margin: 0;
-      padding-left: var(--spacing-lg);
-    }
-
-    .validation-summary li {
-      margin-bottom: var(--spacing-xs);
-      font-size: var(--font-size-sm);
-    }
-
-    small {
-      display: block;
-      font-size: var(--font-size-sm);
-      color: var(--steel-blue);
-      margin-top: var(--spacing-xs);
-    }
-  `]
+      }
+    </app-auth-shell>
+  `
 })
 export class RegisterComponent {
-  username = '';
-  password = '';
-  confirmPassword = '';
-  
-  errorMessage = signal<string>('');
-  successMessage = signal<string>('');
-  isLoading = signal<boolean>(false);
+  private readonly authService = inject(MockAuthService);
+  private readonly errorMapping = inject(ErrorMappingService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly shell = viewChild.required(AuthShellComponent);
 
-  constructor(
-    private authService: MockAuthService,
-    private errorMapping: ErrorMappingService,
-    private router: Router
-  ) {}
+  // Mirrors the backend's RegisterRequest rules. confirmPassword exists only
+  // in this form and is never sent.
+  protected readonly form = inject(NonNullableFormBuilder).group({
+    username: [
+      '',
+      [
+        Validators.required,
+        Validators.minLength(3),
+        Validators.maxLength(64),
+        Validators.pattern(/^[a-zA-Z0-9._-]+$/)
+      ]
+    ],
+    password: ['', [Validators.required, Validators.minLength(12), Validators.maxLength(128)]],
+    confirmPassword: ['', [Validators.required, matchesPassword]]
+  });
 
-  getPasswordValidationErrors(): string[] {
-    const errors: string[] = [];
+  protected readonly submitted = signal(false);
+  protected readonly isLoading = signal(false);
+  protected readonly errorMessage = signal('');
+  protected readonly passwordsVisible = signal(false);
+  protected readonly registeredUsername = signal<string | null>(null);
 
-    if (this.password.length > 0) {
-      if (this.password.length < 12) {
-        errors.push('Password must be at least 12 characters');
-      }
-      if (this.password.length > 128) {
-        errors.push('Password cannot exceed 128 characters');
-      }
-    }
+  protected readonly heading = computed(() =>
+    this.registeredUsername() ? 'Account created' : 'Create your account'
+  );
+  protected readonly subtitle = computed(() =>
+    this.registeredUsername() ? '' : 'Register to start trading.'
+  );
 
-    if (this.password && this.confirmPassword && this.password !== this.confirmPassword) {
-      errors.push('Passwords do not match');
-    }
-
-    return errors;
+  constructor() {
+    // Editing the password can make an untouched confirmation stale.
+    this.form.controls.password.valueChanges
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => this.form.controls.confirmPassword.updateValueAndValidity());
   }
 
-  getUsernameValidationErrors(): string[] {
-    const errors: string[] = [];
-
-    if (this.username.length > 0) {
-      if (this.username.length < 3) {
-        errors.push('Username must be at least 3 characters');
-      }
-      if (this.username.length > 64) {
-        errors.push('Username cannot exceed 64 characters');
-      }
-      if (!/^[a-zA-Z0-9._-]+$/.test(this.username)) {
-        errors.push('Username can only contain letters, numbers, dots, dashes, and underscores');
-      }
+  protected usernameError(): string | null {
+    const control = this.form.controls.username;
+    if (control.valid || !(control.touched || this.submitted())) {
+      return null;
     }
-
-    return errors;
+    if (control.hasError('required')) {
+      return 'Enter a username.';
+    }
+    if (control.hasError('taken')) {
+      return this.errorMapping.getErrorMessage('AUTH-409');
+    }
+    if (control.hasError('minlength')) {
+      return 'Username must be at least 3 characters.';
+    }
+    if (control.hasError('maxlength')) {
+      return 'Username must be 64 characters or fewer.';
+    }
+    return 'Use only letters, numbers, dots, dashes and underscores.';
   }
 
-  isFormValid(): boolean {
-    return (
-      this.username.length >= 3 &&
-      this.username.length <= 64 &&
-      /^[a-zA-Z0-9._-]+$/.test(this.username) &&
-      this.password.length >= 12 &&
-      this.password.length <= 128 &&
-      this.confirmPassword.length >= 12 &&
-      this.password === this.confirmPassword
-    );
+  protected passwordError(): string | null {
+    const control = this.form.controls.password;
+    if (control.valid || !(control.touched || this.submitted())) {
+      return null;
+    }
+    if (control.hasError('required')) {
+      return 'Enter a password.';
+    }
+    return control.hasError('minlength')
+      ? 'Password must be at least 12 characters.'
+      : 'Password must be 128 characters or fewer.';
   }
 
-  onRegister(): void {
-    if (!this.username || !this.password || !this.confirmPassword) {
-      this.errorMessage.set('All fields are required');
+  protected passwordLongEnough(): boolean {
+    return this.form.controls.password.value.length >= 12;
+  }
+
+  protected confirmPasswordError(): string | null {
+    const control = this.form.controls.confirmPassword;
+    if (control.valid || !(control.touched || this.submitted())) {
+      return null;
+    }
+    return control.hasError('required') ? 'Confirm your password.' : 'Passwords do not match.';
+  }
+
+  protected togglePasswordVisibility(): void {
+    this.passwordsVisible.update((visible) => !visible);
+  }
+
+  protected onSubmit(): void {
+    if (this.isLoading()) {
       return;
     }
 
-    const usernameErrors = this.getUsernameValidationErrors();
-    if (usernameErrors.length > 0) {
-      this.errorMessage.set('Please fix username requirements before submitting');
-      return;
-    }
+    this.submitted.set(true);
+    this.errorMessage.set('');
 
-    const validationErrors = this.getPasswordValidationErrors();
-    if (validationErrors.length > 0) {
-      this.errorMessage.set('Please fix password requirements before submitting');
+    if (this.form.invalid) {
+      this.host.nativeElement.querySelector<HTMLElement>('input.ng-invalid')?.focus();
       return;
     }
 
     this.isLoading.set(true);
-    this.errorMessage.set('');
+    const { username, password } = this.form.getRawValue();
 
-    this.authService.register({
-      username: this.username,
-      password: this.password,
-      confirmPassword: this.confirmPassword
-    }).subscribe({
-      next: (response) => {
-        // The real endpoint only returns { id, username, roles } - the
-        // trading account itself is provisioned asynchronously afterwards,
-        // so there's no accountId to show yet at this point.
-        this.successMessage.set(`Account created for ${response.username}. Redirecting to login...`);
-        this.isLoading.set(false);
-        setTimeout(() => {
-          this.router.navigate(['/login']);
-        }, 2000);
-      },
-      error: (err) => {
-        this.isLoading.set(false);
-        this.errorMessage.set(this.errorMapping.getErrorMessage(err.errorCode));
-      }
-    });
+    this.authService
+      .register({ username, password })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (user) => {
+          // The response is only { id, username, roles } - no tokens - so the
+          // user is not signed in yet and has to go through the login screen.
+          this.isLoading.set(false);
+          this.registeredUsername.set(user.username || username);
+          afterNextRender(() => this.shell().focusHeading(), { injector: this.injector });
+        },
+        error: (err: AuthError) => {
+          this.isLoading.set(false);
+          this.showError(err);
+        }
+      });
+  }
+
+  private showError(err: AuthError): void {
+    if (err.errorCode === 'AUTH-409') {
+      // Reported on the field itself; it clears as soon as the username is edited.
+      const username = this.form.controls.username;
+      username.setErrors({ taken: true });
+      this.host.nativeElement.querySelector<HTMLElement>('#register-username')?.focus();
+      return;
+    }
+
+    if (this.errorMapping.isNetworkError(err.status)) {
+      this.errorMessage.set(this.errorMapping.getNetworkErrorMessage());
+    } else if (err.errorCode === 'VAL-422') {
+      this.errorMessage.set(
+        'Those details were not accepted. Check the username and password requirements and try again.'
+      );
+    } else {
+      this.errorMessage.set(this.errorMapping.getErrorMessage(err.errorCode));
+    }
   }
 }

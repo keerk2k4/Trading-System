@@ -1,275 +1,317 @@
-import { Component, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
-import { NavbarComponent } from '../../../shared/navbar/navbar.component';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+  viewChild
+} from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { CurrencyPipe, DecimalPipe } from '@angular/common';
+import {
+  AbstractControl,
+  NonNullableFormBuilder,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators
+} from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { MockAuthService } from '../../../shared/services/mock-auth.service';
 import { TradeApiService } from '../../../shared/services/trade-api.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
-import { OrderSide, OrderStatus, TradeApiError } from '../../../shared/models/order.models';
+import { StatusBadgeComponent } from '../../../shared/ui/status-badge.component';
+import { OrderSide, PlaceOrderResponse, TradeApiError } from '../../../shared/models/order.models';
+
+function wholeNumber(control: AbstractControl<number | null>): ValidationErrors | null {
+  const value = control.value;
+  return value === null || Number.isInteger(value) ? null : { wholeNumber: true };
+}
+
+function positive(control: AbstractControl<number | null>): ValidationErrors | null {
+  const value = control.value;
+  return value === null || value > 0 ? null : { positive: true };
+}
+
+function twoDecimals(control: AbstractControl<number | null>): ValidationErrors | null {
+  const value = control.value;
+  if (value === null) {
+    return null;
+  }
+  const decimals = String(value).split('.')[1] ?? '';
+  return decimals.length <= 2 ? null : { decimals: true };
+}
 
 @Component({
   selector: 'app-place-order',
-  standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, NavbarComponent],
+  imports: [ReactiveFormsModule, RouterLink, CurrencyPipe, DecimalPipe, StatusBadgeComponent],
   template: `
-    <app-navbar></app-navbar>
-
-    <div class="order-container">
-      <div class="order-card card">
-        <h1>Place a New Order</h1>
-        <p class="subtitle">Create a buy or sell order</p>
-
-        <div *ngIf="errorMessage()" class="alert alert-error">
-          {{ errorMessage() }}
+    <div class="tp-page">
+      <header class="tp-page-header">
+        <div>
+          <h1>Place order</h1>
+          <p>Submit a limit order to buy or sell an instrument.</p>
         </div>
-
-        <div *ngIf="successMessage()" class="alert alert-success">
-          <strong>Order Placed Successfully!</strong>
-          <p>Order ID: <strong>{{ orderId() }}</strong></p>
-          <p>
-            Status:
-            <span [ngClass]="'badge badge-' + orderStatus().toLowerCase()">{{ orderStatus() }}</span>
-          </p>
-          <p>{{ successMessage() }}</p>
+        <div class="tp-actions">
+          <a class="tp-btn tp-btn-secondary" routerLink="/orders/history">Order history</a>
         </div>
+      </header>
 
-        <form (ngSubmit)="onPlaceOrder()" #orderForm="ngForm" *ngIf="!successMessage()">
-          <div class="form-group">
-            <label for="account">Account ID</label>
-            <input
-              type="text"
-              id="account"
-              [(ngModel)]="accountId"
-              name="account"
-              disabled
-              readonly
-            />
-            <small>Read-only: linked to your authenticated session</small>
+      <div class="tp-grid tp-grid-main-side">
+        <section class="tp-panel" aria-labelledby="ticket-heading">
+          <div class="tp-panel-header">
+            <h2 id="ticket-heading" #resultHeading tabindex="-1">
+              {{ placedOrder() ? 'Order submitted' : 'Order ticket' }}
+            </h2>
           </div>
 
-          <div class="form-group">
-            <label for="symbol">Symbol</label>
-            <input
-              type="text"
-              id="symbol"
-              name="symbol"
-              [(ngModel)]="symbol"
-              required
-              placeholder="e.g., AAPL, GOOGL, MSFT"
-              maxlength="10"
-            />
-          </div>
+          <div class="tp-panel-body">
+            @if (placedOrder(); as order) {
+              <div class="tp-form">
+                <div class="tp-alert tp-alert-success" role="status">
+                  <span>{{ order.message || 'Your order has been submitted.' }}</span>
+                </div>
+                <dl class="tp-details">
+                  <div><dt>Order ID</dt><dd class="tp-mono">{{ order.orderId }}</dd></div>
+                  <div><dt>Status</dt><dd><app-status-badge [status]="order.status" /></dd></div>
+                </dl>
+                <div class="tp-actions">
+                  <a class="tp-btn tp-btn-primary" routerLink="/orders/history">View orders</a>
+                  <button class="tp-btn tp-btn-secondary" type="button" (click)="resetForm()">Place another order</button>
+                </div>
+              </div>
+            } @else {
+              <form class="tp-form" [formGroup]="form" (ngSubmit)="onPlaceOrder()">
+                @if (errorMessage(); as message) {
+                  <div class="tp-alert tp-alert-error" role="alert"><span>{{ message }}</span></div>
+                }
 
-          <div class="form-row">
-            <div class="form-group">
-              <label for="side">Buy/Sell</label>
-              <select id="side" name="side" [(ngModel)]="side" required>
-                <option value="" disabled>Select</option>
-                <option value="BUY">BUY</option>
-                <option value="SELL">SELL</option>
-              </select>
+                <fieldset class="tp-segmented">
+                  <legend class="tp-label">Side</legend>
+                  <div class="tp-segmented-options is-full">
+                    <input
+                      type="radio"
+                      id="side-buy"
+                      name="side"
+                      value="BUY"
+                      formControlName="side"
+                      [attr.aria-describedby]="sideError() ? 'side-error' : null"
+                    />
+                    <label for="side-buy" class="is-buy">Buy</label>
+                    <input
+                      type="radio"
+                      id="side-sell"
+                      name="side"
+                      value="SELL"
+                      formControlName="side"
+                      [attr.aria-describedby]="sideError() ? 'side-error' : null"
+                    />
+                    <label for="side-sell" class="is-sell">Sell</label>
+                  </div>
+                  @if (sideError(); as message) {
+                    <p class="tp-field-error" id="side-error">{{ message }}</p>
+                  }
+                </fieldset>
+
+                <div>
+                  <label class="tp-label" for="symbol">Symbol</label>
+                  <input
+                    class="tp-input symbol"
+                    id="symbol"
+                    type="text"
+                    formControlName="symbol"
+                    autocomplete="off"
+                    autocapitalize="characters"
+                    spellcheck="false"
+                    aria-required="true"
+                    [attr.aria-invalid]="symbolError() ? 'true' : null"
+                    [attr.aria-describedby]="symbolError() ? 'symbol-error' : 'symbol-hint'"
+                  />
+                  @if (symbolError(); as message) {
+                    <p class="tp-field-error" id="symbol-error">{{ message }}</p>
+                  } @else {
+                    <p class="tp-hint" id="symbol-hint">For example AAPL, MSFT or GOOGL.</p>
+                  }
+                </div>
+
+                <div class="tp-form-row">
+                  <div>
+                    <label class="tp-label" for="quantity">Quantity</label>
+                    <input
+                      class="tp-input tp-num"
+                      id="quantity"
+                      type="number"
+                      inputmode="numeric"
+                      min="1"
+                      step="1"
+                      formControlName="quantity"
+                      aria-required="true"
+                      [attr.aria-invalid]="quantityError() ? 'true' : null"
+                      [attr.aria-describedby]="quantityError() ? 'quantity-error' : null"
+                    />
+                    @if (quantityError(); as message) {
+                      <p class="tp-field-error" id="quantity-error">{{ message }}</p>
+                    }
+                  </div>
+                  <div>
+                    <label class="tp-label" for="price">Limit price</label>
+                    <input
+                      class="tp-input tp-num"
+                      id="price"
+                      type="number"
+                      inputmode="decimal"
+                      min="0.01"
+                      step="0.01"
+                      formControlName="price"
+                      aria-required="true"
+                      [attr.aria-invalid]="priceError() ? 'true' : null"
+                      [attr.aria-describedby]="priceError() ? 'price-error' : null"
+                    />
+                    @if (priceError(); as message) {
+                      <p class="tp-field-error" id="price-error">{{ message }}</p>
+                    }
+                  </div>
+                </div>
+
+                <button
+                  class="tp-btn tp-btn-primary tp-btn-block"
+                  type="submit"
+                  [attr.aria-disabled]="isLoading() ? 'true' : null"
+                >
+                  @if (isLoading()) {
+                    <span class="tp-spinner" aria-hidden="true"></span>
+                    Placing order…
+                  } @else {
+                    {{ submitLabel() }}
+                  }
+                </button>
+                <span class="sr-only" role="status">{{ isLoading() ? 'Placing your order, please wait.' : '' }}</span>
+              </form>
+            }
+          </div>
+        </section>
+
+        <section class="tp-panel" aria-labelledby="summary-heading">
+          <div class="tp-panel-header">
+            <h2 id="summary-heading">Summary</h2>
+          </div>
+          <div class="tp-panel-body">
+            <dl class="tp-details">
+              <div><dt>Account</dt><dd class="tp-num">{{ accountId() || '—' }}</dd></div>
+              <div><dt>Symbol</dt><dd>{{ summarySymbol() || '—' }}</dd></div>
+              <div>
+                <dt>Side</dt>
+                <dd [class.tp-positive]="values().side === 'BUY'" [class.tp-negative]="values().side === 'SELL'">
+                  {{ values().side === 'BUY' ? 'Buy' : values().side === 'SELL' ? 'Sell' : '—' }}
+                </dd>
+              </div>
+              <div><dt>Quantity</dt><dd class="tp-num">{{ (values().quantity | number) ?? '—' }}</dd></div>
+              <div><dt>Limit price</dt><dd class="tp-num">{{ (values().price | currency) ?? '—' }}</dd></div>
+            </dl>
+            <div class="estimate">
+              <p class="tp-stat-label">Estimated value</p>
+              <p class="tp-stat-value">{{ (estimate() | currency) ?? '—' }}</p>
             </div>
-
-            <div class="form-group">
-              <label for="quantity">Quantity</label>
-              <input
-                type="number"
-                id="quantity"
-                name="quantity"
-                [(ngModel)]="quantity"
-                required
-                min="1"
-                step="1"
-                placeholder="Whole numbers only"
-              />
-            </div>
           </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="price">Price</label>
-              <input
-                type="number"
-                id="price"
-                name="price"
-                [(ngModel)]="price"
-                required
-                min="0.01"
-                step="0.01"
-                placeholder="Max 2 decimal places"
-              />
-            </div>
-          </div>
-
-          <div class="validation-summary" *ngIf="getValidationErrors().length > 0">
-            <strong>Please fix the following:</strong>
-            <ul>
-              <li *ngFor="let error of getValidationErrors()">{{ error }}</li>
-            </ul>
-          </div>
-
-          <button type="submit" class="btn-primary" [disabled]="isLoading() || getValidationErrors().length > 0">
-            {{ isLoading() ? 'Placing Order...' : 'Place Order' }}
-          </button>
-        </form>
-
-        <div class="order-success-actions" *ngIf="successMessage()">
-          <button class="btn-primary" routerLink="/orders/history">View All Orders</button>
-          <button class="btn-secondary" (click)="resetForm()">Place Another Order</button>
-        </div>
+        </section>
       </div>
     </div>
   `,
   styles: [`
-    .order-container {
-      max-width: 600px;
-      margin: var(--spacing-2xl) auto;
-      padding: var(--spacing-lg);
-    }
-
-    .order-card {
-      background-color: white;
-    }
-
-    h1 {
-      color: var(--prussian-blue);
-      margin-bottom: var(--spacing-sm);
-      text-align: center;
-    }
-
-    .subtitle {
-      text-align: center;
-      color: var(--steel-blue);
-      margin-bottom: var(--spacing-lg);
-    }
-
-    .alert {
-      margin-bottom: var(--spacing-md);
-    }
-
-    small {
-      display: block;
-      font-size: var(--font-size-sm);
-      color: var(--steel-blue);
-      margin-top: var(--spacing-xs);
-    }
-
-    .form-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--spacing-md);
-    }
-
-    .validation-summary {
-      background-color: #fadbd8ff;
-      border-left: 4px solid var(--danger);
-      padding: var(--spacing-md);
-      border-radius: var(--radius-md);
-      margin-bottom: var(--spacing-md);
-      color: #922b21ff;
-    }
-
-    .validation-summary strong {
-      display: block;
-      margin-bottom: var(--spacing-sm);
-    }
-
-    .validation-summary ul {
-      margin-left: var(--spacing-lg);
-      margin-bottom: 0;
-    }
-
-    .order-success-actions {
-      display: flex;
-      gap: var(--spacing-md);
-      margin-top: var(--spacing-lg);
-    }
-
-    .order-success-actions button {
-      flex: 1;
-    }
-
-    @media (max-width: 768px) {
-      .form-row {
-        grid-template-columns: 1fr;
-      }
-    }
+    .symbol { text-transform: uppercase; }
+    h2:focus-visible { outline: 2px solid var(--tp-focus); outline-offset: 4px; border-radius: 0.125rem; }
+    .estimate { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--tp-border); }
   `]
 })
 export class PlaceOrderComponent {
-  accountId = '';
-  symbol = '';
-  side = '';
-  quantity: any = '';
-  price: any = '';
+  private readonly authService = inject(MockAuthService);
+  private readonly orderService = inject(TradeApiService);
+  private readonly errorMapping = inject(ErrorMappingService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly resultHeading = viewChild.required<ElementRef<HTMLElement>>('resultHeading');
 
-  errorMessage = signal<string>('');
-  successMessage = signal<string>('');
-  orderId = signal<string>('');
-  orderStatus = signal<OrderStatus>('NEW');
-  isLoading = signal<boolean>(false);
+  protected readonly form = inject(NonNullableFormBuilder).group({
+    side: ['' as OrderSide | '', Validators.required],
+    symbol: ['', [Validators.required, Validators.maxLength(10)]],
+    quantity: [null as number | null, [Validators.required, wholeNumber, positive]],
+    price: [null as number | null, [Validators.required, positive, twoDecimals]]
+  });
+
+  protected readonly values = toSignal(this.form.valueChanges, { initialValue: this.form.getRawValue() });
+  protected readonly accountId = computed(() => this.authService.currentUser$()?.accountId ?? 0);
+  protected readonly summarySymbol = computed(() => (this.values().symbol ?? '').trim().toUpperCase());
+  protected readonly estimate = computed(() => {
+    const { quantity, price } = this.values();
+    return quantity && price && quantity > 0 && price > 0 ? quantity * price : null;
+  });
+  protected readonly submitLabel = computed(() => {
+    const side = this.values().side;
+    return side === 'BUY' ? 'Place buy order' : side === 'SELL' ? 'Place sell order' : 'Place order';
+  });
+
+  protected readonly submitted = signal(false);
+  protected readonly isLoading = signal(false);
+  protected readonly errorMessage = signal('');
+  protected readonly placedOrder = signal<PlaceOrderResponse | null>(null);
 
   // Kept across a retry of the same submission (see onPlaceOrder).
   private idempotencyKey = '';
 
-  constructor(
-    private authService: MockAuthService,
-    private orderService: TradeApiService,
-    private errorMapping: ErrorMappingService,
-    private router: Router
-  ) {
-    const user = this.authService.getCurrentUser();
-    this.accountId = user?.accountId.toString() || '';
+  protected sideError(): string | null {
+    return this.shows('side') ? 'Choose buy or sell.' : null;
   }
 
-  getValidationErrors(): string[] {
-    const errors: string[] = [];
-
-    if (this.symbol && this.symbol.length < 1) {
-      errors.push('Symbol is required');
+  protected symbolError(): string | null {
+    if (!this.shows('symbol')) {
+      return null;
     }
-
-    if (this.side && !['BUY', 'SELL'].includes(this.side)) {
-      errors.push('Valid Buy/Sell selection required');
-    }
-
-    if (this.quantity) {
-      const qty = parseInt(this.quantity);
-      if (!Number.isInteger(qty) || qty <= 0) {
-        errors.push('Quantity must be a whole number greater than 0');
-      }
-    }
-
-    if (this.price) {
-      const p = parseFloat(String(this.price));
-      if (p <= 0) {
-        errors.push('Price must be greater than 0');
-      }
-      const priceStr = String(this.price);
-      if (priceStr.includes('.') && priceStr.split('.')[1].length > 2) {
-        errors.push('Price can have at most 2 decimal places');
-      }
-    }
-
-    return errors;
+    return this.form.controls.symbol.hasError('required')
+      ? 'Enter a symbol.'
+      : 'Symbols are at most 10 characters.';
   }
 
-  onPlaceOrder(): void {
-    if (!this.symbol || !this.side || !this.quantity || !this.price) {
-      this.errorMessage.set('All fields are required');
+  protected quantityError(): string | null {
+    if (!this.shows('quantity')) {
+      return null;
+    }
+    return this.form.controls.quantity.hasError('required')
+      ? 'Enter a quantity.'
+      : 'Quantity must be a whole number greater than 0.';
+  }
+
+  protected priceError(): string | null {
+    if (!this.shows('price')) {
+      return null;
+    }
+    const control = this.form.controls.price;
+    if (control.hasError('required')) {
+      return 'Enter a price.';
+    }
+    return control.hasError('positive')
+      ? 'Price must be greater than 0.'
+      : 'Price can have at most 2 decimal places.';
+  }
+
+  protected onPlaceOrder(): void {
+    if (this.isLoading()) {
       return;
     }
 
-    const validationErrors = this.getValidationErrors();
-    if (validationErrors.length > 0) {
-      this.errorMessage.set('Please fix validation errors before submitting');
+    this.submitted.set(true);
+    this.errorMessage.set('');
+
+    if (this.form.invalid) {
+      this.host.nativeElement.querySelector<HTMLElement>('input.ng-invalid')?.focus();
       return;
     }
 
     // accountId is 0 until the trading account has been provisioned and the
     // user has signed in again to pick it up in a fresh token.
-    const accountId = parseInt(this.accountId);
+    const accountId = this.accountId();
     if (!accountId) {
       this.errorMessage.set(this.errorMapping.getErrorMessage('ACC-404'));
       return;
@@ -280,50 +322,57 @@ export class PlaceOrderComponent {
       this.idempotencyKey = crypto.randomUUID();
     }
 
+    const { side, symbol, quantity, price } = this.form.getRawValue();
     this.isLoading.set(true);
-    this.errorMessage.set('');
 
-    this.orderService.placeOrder({
-      accountId,
-      symbol: this.symbol.trim().toUpperCase(),
-      side: this.side as OrderSide,
-      quantity: parseInt(this.quantity),
-      price: parseFloat(this.price),
-      idempotencyKey: this.idempotencyKey
-    }).subscribe({
-      next: (response) => {
-        this.isLoading.set(false);
-        this.idempotencyKey = '';
-        this.successMessage.set(response.message || 'Your order has been submitted.');
-        this.orderId.set(response.orderId);
-        this.orderStatus.set(response.status);
-      },
-      error: (err: TradeApiError) => {
-        this.isLoading.set(false);
-        if (this.errorMapping.isNetworkError(err.status)) {
-          // No answer from the backend, so the order may or may not have
-          // been recorded. The key is kept so that pressing submit again
-          // retries the same order instead of placing a second one.
-          this.errorMessage.set(this.errorMapping.getNetworkErrorMessage());
-          return;
+    this.orderService
+      .placeOrder({
+        accountId,
+        symbol: symbol.trim().toUpperCase(),
+        side: side as OrderSide,
+        quantity: quantity ?? 0,
+        price: price ?? 0,
+        idempotencyKey: this.idempotencyKey
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (response) => {
+          this.isLoading.set(false);
+          this.idempotencyKey = '';
+          this.placedOrder.set(response);
+          afterNextRender(() => this.resultHeading().nativeElement.focus(), { injector: this.injector });
+        },
+        error: (err: TradeApiError) => {
+          this.isLoading.set(false);
+          if (this.errorMapping.isNetworkError(err.status)) {
+            // No answer from the backend, so the order may or may not have
+            // been recorded. The key is kept so that pressing submit again
+            // retries the same order instead of placing a second one.
+            this.errorMessage.set(this.errorMapping.getNetworkErrorMessage());
+            return;
+          }
+          // The backend answered, so this attempt is settled; a corrected
+          // resubmission is a new order and needs a new key.
+          this.idempotencyKey = '';
+          this.errorMessage.set(this.errorMapping.getErrorMessage(err.errorCode));
         }
-        // The backend answered, so this attempt is settled; a corrected
-        // resubmission is a new order and needs a new key.
-        this.idempotencyKey = '';
-        this.errorMessage.set(this.errorMapping.getErrorMessage(err.errorCode));
-      }
+      });
+  }
+
+  protected resetForm(): void {
+    this.form.reset();
+    this.submitted.set(false);
+    this.errorMessage.set('');
+    this.placedOrder.set(null);
+    this.idempotencyKey = '';
+    // The button that was pressed has been replaced by the empty ticket.
+    afterNextRender(() => this.host.nativeElement.querySelector<HTMLElement>('#side-buy')?.focus(), {
+      injector: this.injector
     });
   }
 
-  resetForm(): void {
-    this.symbol = '';
-    this.side = '';
-    this.quantity = '';
-    this.price = '';
-    this.errorMessage.set('');
-    this.successMessage.set('');
-    this.orderId.set('');
-    this.orderStatus.set('NEW');
-    this.idempotencyKey = '';
+  private shows(name: 'side' | 'symbol' | 'quantity' | 'price'): boolean {
+    const control = this.form.controls[name];
+    return control.invalid && (control.touched || this.submitted());
   }
 }

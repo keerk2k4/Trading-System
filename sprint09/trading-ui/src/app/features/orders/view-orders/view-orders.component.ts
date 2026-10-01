@@ -1,260 +1,176 @@
-import { Component, signal, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { NavbarComponent } from '../../../shared/navbar/navbar.component';
 import { MockAuthService } from '../../../shared/services/mock-auth.service';
 import { TradeApiService } from '../../../shared/services/trade-api.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
+import { StatusBadgeComponent } from '../../../shared/ui/status-badge.component';
 import { Order, OrderStatus, TradeApiError } from '../../../shared/models/order.models';
+
+const STATUS_FILTERS: { value: OrderStatus | ''; label: string }[] = [
+  { value: '', label: 'All' },
+  { value: 'NEW', label: 'New' },
+  { value: 'FILLED', label: 'Filled' },
+  { value: 'REJECTED', label: 'Rejected' },
+  { value: 'CANCELLED', label: 'Cancelled' }
+];
 
 @Component({
   selector: 'app-view-orders',
-  standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, NavbarComponent],
+  imports: [ReactiveFormsModule, RouterLink, CurrencyPipe, DatePipe, DecimalPipe, StatusBadgeComponent],
   template: `
-    <app-navbar></app-navbar>
-
-    <div class="orders-container">
-      <div class="orders-header">
-        <h1>Order Blotter</h1>
-        <p class="subtitle">View your trading orders and status</p>
-        <button class="btn-primary" (click)="refreshOrders()">
-          {{ isRefreshing() ? 'Refreshing...' : 'Refresh Orders' }}
-        </button>
-      </div>
-
-      <div class="orders-filter">
-        <label for="statusFilter">Status</label>
-        <select id="statusFilter" name="statusFilter" [(ngModel)]="statusFilter" (ngModelChange)="loadOrders()">
-          <option value="">All</option>
-          <option value="NEW">NEW</option>
-          <option value="FILLED">FILLED</option>
-          <option value="REJECTED">REJECTED</option>
-          <option value="CANCELLED">CANCELLED</option>
-        </select>
-      </div>
-
-      <div *ngIf="errorMessage()" class="alert alert-error">
-        {{ errorMessage() }}
-      </div>
-
-      <div *ngIf="!errorMessage() && !isRefreshing() && orders().length === 0" class="empty-state">
-        <p *ngIf="!statusFilter">No orders yet. <a routerLink="/orders/new">Place your first order</a></p>
-        <p *ngIf="statusFilter">No {{ statusFilter }} orders found.</p>
-      </div>
-
-      <div *ngIf="orders().length > 0" class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Order ID</th>
-              <th>Symbol</th>
-              <th>Side</th>
-              <th>Quantity</th>
-              <th>Price</th>
-              <th>Status</th>
-              <th>Created At</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let order of orders()">
-              <td><strong>{{ order.orderId }}</strong></td>
-              <td>{{ order.symbol }}</td>
-              <td>
-                <span [ngClass]="order.side === 'BUY' ? 'side-buy' : 'side-sell'">
-                  {{ order.side }}
-                </span>
-              </td>
-              <td class="text-right">{{ order.quantity }}</td>
-              <td class="text-right">$ {{ order.price | number:'1.2-2' }}</td>
-              <td>
-                <span [ngClass]="'badge badge-' + order.status.toLowerCase()">
-                  {{ order.status }}
-                </span>
-              </td>
-              <td>{{ formatDate(order.createdOn) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="status-legend">
-        <h3>Status Guide</h3>
-        <div class="legend-items">
-          <div class="legend-item">
-            <span class="badge badge-new">NEW</span>
-            <span>Order submitted and waiting for execution (normal state)</span>
-          </div>
-          <div class="legend-item">
-            <span class="badge badge-filled">FILLED</span>
-            <span>Order executed successfully</span>
-          </div>
-          <div class="legend-item">
-            <span class="badge badge-rejected">REJECTED</span>
-            <span>Order rejected by the system</span>
-          </div>
-          <div class="legend-item">
-            <span class="badge badge-cancelled">CANCELLED</span>
-            <span>Order cancelled by user or system</span>
-          </div>
+    <div class="tp-page">
+      <header class="tp-page-header">
+        <div>
+          <h1>Orders</h1>
+          <p>Every order on your account, newest first.</p>
         </div>
-      </div>
+        <div class="tp-actions">
+          <button
+            class="tp-btn tp-btn-secondary tp-btn-icon-refresh"
+            data-icon
+            type="button"
+            [attr.aria-disabled]="isRefreshing() ? 'true' : null"
+            (click)="refreshOrders()"
+          >
+            {{ isRefreshing() ? 'Refreshing…' : 'Refresh' }}
+          </button>
+          <a class="tp-btn tp-btn-primary tp-btn-icon-plus" data-icon routerLink="/orders/new">New order</a>
+        </div>
+      </header>
+
+      <section class="tp-panel" aria-labelledby="orders-heading" [attr.aria-busy]="isRefreshing()">
+        <div class="tp-panel-header">
+          <div>
+            <h2 id="orders-heading">Order blotter</h2>
+            <p class="tp-num" role="status">
+              {{ isRefreshing() ? 'Loading orders…' : orders().length + (orders().length === 1 ? ' order' : ' orders') }}
+            </p>
+          </div>
+          <fieldset class="tp-segmented">
+            <legend class="sr-only">Filter by status</legend>
+            <div class="tp-segmented-options">
+              @for (filter of statusFilters; track filter.value) {
+                <input
+                  type="radio"
+                  name="status-filter"
+                  [id]="'status-' + (filter.value || 'all')"
+                  [value]="filter.value"
+                  [formControl]="statusFilter"
+                />
+                <label [for]="'status-' + (filter.value || 'all')">{{ filter.label }}</label>
+              }
+            </div>
+          </fieldset>
+        </div>
+
+        @if (errorMessage(); as message) {
+          <div class="tp-panel-body">
+            <div class="tp-alert tp-alert-error" role="alert"><span>{{ message }}</span></div>
+          </div>
+        } @else if (orders().length === 0) {
+          @if (!isRefreshing()) {
+            <div class="tp-empty">
+              @if (statusFilter.value) {
+                <strong>No {{ statusFilter.value.toLowerCase() }} orders</strong>
+                Try another status filter.
+              } @else {
+                <strong>No orders yet</strong>
+                <a class="tp-link" routerLink="/orders/new">Place your first order</a>
+              }
+            </div>
+          }
+        } @else {
+          <div class="tp-table-wrap" tabindex="0" role="region" aria-label="Orders table">
+            <table class="tp-table">
+              <thead>
+                <tr>
+                  <th scope="col">Order ID</th>
+                  <th scope="col">Created</th>
+                  <th scope="col">Symbol</th>
+                  <th scope="col">Side</th>
+                  <th scope="col" class="num">Quantity</th>
+                  <th scope="col" class="num">Limit price</th>
+                  <th scope="col" class="num">Fill price</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (order of orders(); track order.orderId) {
+                  <tr>
+                    <td class="tp-mono">{{ order.orderId }}</td>
+                    <td class="tp-muted">{{ order.createdOn | date: 'MMM d, y, h:mm a' }}</td>
+                    <td><strong>{{ order.symbol }}</strong></td>
+                    <td>
+                      <span [class.tp-positive]="order.side === 'BUY'" [class.tp-negative]="order.side === 'SELL'">
+                        <strong>{{ order.side === 'BUY' ? 'Buy' : 'Sell' }}</strong>
+                      </span>
+                    </td>
+                    <td class="num">{{ order.quantity | number }}</td>
+                    <td class="num">{{ order.price | currency }}</td>
+                    <td class="num">{{ (order.executedPrice | currency) ?? '—' }}</td>
+                    <td><app-status-badge [status]="order.status" /></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <details class="guide">
+          <summary>What do the statuses mean?</summary>
+          <dl>
+            <div><dt><app-status-badge status="NEW" /></dt><dd>Submitted and waiting for execution. This is the normal state.</dd></div>
+            <div><dt><app-status-badge status="FILLED" /></dt><dd>Executed successfully.</dd></div>
+            <div><dt><app-status-badge status="REJECTED" /></dt><dd>Rejected by the system.</dd></div>
+            <div><dt><app-status-badge status="CANCELLED" /></dt><dd>Cancelled by you or the system.</dd></div>
+          </dl>
+        </details>
+      </section>
     </div>
   `,
   styles: [`
-    .orders-container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: var(--spacing-2xl) var(--spacing-lg);
+    .guide { border-top: 1px solid var(--tp-border); font-size: 0.875rem; }
+    .guide summary {
+      padding: 0.75rem 1.25rem; font-weight: 500; color: var(--tp-text-muted); cursor: pointer;
     }
-
-    .orders-header {
-      margin-bottom: var(--spacing-2xl);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: var(--spacing-lg);
-    }
-
-    .orders-header h1 {
-      color: var(--prussian-blue);
-      margin: 0;
-      flex: 1;
-      min-width: 200px;
-    }
-
-    .subtitle {
-      color: var(--steel-blue);
-      margin: 0;
-    }
-
-    .orders-filter {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-md);
-      margin-bottom: var(--spacing-lg);
-    }
-
-    .orders-filter label {
-      margin: 0;
-      font-weight: 600;
-      color: var(--prussian-blue);
-    }
-
-    .orders-filter select {
-      width: auto;
-      min-width: 160px;
-    }
-
-    .alert {
-      margin-bottom: var(--spacing-lg);
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: var(--spacing-2xl);
-      background-color: white;
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-md);
-      color: var(--steel-blue);
-    }
-
-    .table-container {
-      background-color: white;
-      border-radius: var(--radius-lg);
-      padding: var(--spacing-lg);
-      box-shadow: var(--shadow-md);
-      overflow-x: auto;
-    }
-
-    .side-buy {
-      color: var(--success);
-      font-weight: 600;
-    }
-
-    .side-sell {
-      color: var(--danger);
-      font-weight: 600;
-    }
-
-    .status-legend {
-      margin-top: var(--spacing-2xl);
-      padding: var(--spacing-lg);
-      background-color: white;
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-md);
-    }
-
-    .status-legend h3 {
-      color: var(--prussian-blue);
-      margin-bottom: var(--spacing-lg);
-    }
-
-    .legend-items {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: var(--spacing-lg);
-    }
-
-    .legend-item {
-      display: flex;
-      gap: var(--spacing-md);
-      align-items: center;
-    }
-
-    .legend-item .badge {
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .legend-item span:last-child {
-      color: var(--steel-blue);
-      font-size: var(--font-size-sm);
-    }
-
-    @media (max-width: 768px) {
-      .orders-header {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-
-      .orders-header button {
-        width: 100%;
-      }
-
-      .table-container {
-        padding: var(--spacing-md);
-      }
-
-      table {
-        font-size: var(--font-size-sm);
-      }
-
-      th, td {
-        padding: var(--spacing-sm);
-      }
-    }
+    .guide summary:hover { color: var(--tp-text); }
+    .guide summary:focus-visible { outline: 2px solid var(--tp-focus); outline-offset: -2px; }
+    .guide dl { display: grid; gap: 0.625rem; padding: 0 1.25rem 1rem; }
+    .guide dl > div { display: grid; grid-template-columns: 6.5rem 1fr; align-items: center; gap: 0.75rem; }
+    .guide dd { color: var(--tp-text-muted); }
   `]
 })
 export class ViewOrdersComponent implements OnInit {
-  orders = signal<Order[]>([]);
-  isRefreshing = signal<boolean>(false);
-  errorMessage = signal<string>('');
-  statusFilter: OrderStatus | '' = '';
+  private readonly authService = inject(MockAuthService);
+  private readonly orderService = inject(TradeApiService);
+  private readonly errorMapping = inject(ErrorMappingService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  constructor(
-    private authService: MockAuthService,
-    private orderService: TradeApiService,
-    private errorMapping: ErrorMappingService
-  ) {}
+  protected readonly statusFilters = STATUS_FILTERS;
+  protected readonly statusFilter = new FormControl<OrderStatus | ''>('', { nonNullable: true });
+
+  protected readonly orders = signal<Order[]>([]);
+  protected readonly isRefreshing = signal(false);
+  protected readonly errorMessage = signal('');
+
+  constructor() {
+    this.statusFilter.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.loadOrders());
+  }
 
   ngOnInit(): void {
     this.loadOrders();
   }
 
-  loadOrders(): void {
+  protected refreshOrders(): void {
+    if (!this.isRefreshing()) {
+      this.loadOrders();
+    }
+  }
+
+  private loadOrders(): void {
     // accountId is 0 until the trading account has been provisioned and the
     // user has signed in again to pick it up in a fresh token.
     const accountId = this.authService.getCurrentUser()?.accountId;
@@ -267,37 +183,26 @@ export class ViewOrdersComponent implements OnInit {
     this.isRefreshing.set(true);
     this.errorMessage.set('');
 
-    this.orderService.getOrders(accountId, { status: this.statusFilter || undefined }).subscribe({
-      next: (orders) => {
-        // Sort by createdOn descending (newest first)
-        this.orders.set([...orders].sort((a, b) =>
-          new Date(b.createdOn).getTime() - new Date(a.createdOn).getTime()
-        ));
-        this.isRefreshing.set(false);
-      },
-      error: (err: TradeApiError) => {
-        this.orders.set([]);
-        this.isRefreshing.set(false);
-        this.errorMessage.set(
-          this.errorMapping.isNetworkError(err.status)
-            ? this.errorMapping.getNetworkErrorMessage()
-            : this.errorMapping.getErrorMessage(err.errorCode)
-        );
-      }
-    });
-  }
-
-  refreshOrders(): void {
-    this.loadOrders();
-  }
-
-  formatDate(date: string): string {
-    return new Date(date).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    this.orderService
+      .getOrders(accountId, { status: this.statusFilter.value || undefined })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (orders) => {
+          // Sort by createdOn descending (newest first)
+          this.orders.set(
+            [...orders].sort((a, b) => new Date(b.createdOn).getTime() - new Date(a.createdOn).getTime())
+          );
+          this.isRefreshing.set(false);
+        },
+        error: (err: TradeApiError) => {
+          this.orders.set([]);
+          this.isRefreshing.set(false);
+          this.errorMessage.set(
+            this.errorMapping.isNetworkError(err.status)
+              ? this.errorMapping.getNetworkErrorMessage()
+              : this.errorMapping.getErrorMessage(err.errorCode)
+          );
+        }
+      });
   }
 }

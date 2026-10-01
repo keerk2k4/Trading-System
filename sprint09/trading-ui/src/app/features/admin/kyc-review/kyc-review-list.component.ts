@@ -1,317 +1,174 @@
-import { Component, signal, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { NavbarComponent } from '../../../shared/navbar/navbar.component';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DatePipe } from '@angular/common';
 import { MockKycService } from '../../../shared/services/mock-kyc.service';
+import { StatusBadgeComponent } from '../../../shared/ui/status-badge.component';
 import { KycSubmission } from '../../../shared/models/kyc.models';
 
 @Component({
   selector: 'app-kyc-review-list',
-  standalone: true,
-  imports: [CommonModule, FormsModule, NavbarComponent],
+  imports: [DatePipe, StatusBadgeComponent],
   template: `
-    <app-navbar></app-navbar>
-
-    <div class="admin-container">
-      <div class="admin-header">
-        <h1>KYC Review Dashboard</h1>
-        <p class="subtitle">Review pending KYC submissions</p>
-        <button class="btn-primary" (click)="refreshSubmissions()">
-          {{ isRefreshing() ? 'Refreshing...' : 'Refresh' }}
-        </button>
-      </div>
-
-      <div *ngIf="pendingSubmissions().length === 0" class="empty-state card">
-        <p>No pending KYC submissions</p>
-      </div>
-
-      <div *ngIf="pendingSubmissions().length > 0">
-        <div *ngFor="let kyc of pendingSubmissions()" class="kyc-review-card card">
-          <div class="kyc-header">
-            <div class="kyc-info">
-              <h3>User ID: <span class="user-id">{{ kyc.userId }}</span></h3>
-              <p>Submitted: {{ formatDate(kyc.submittedAt) }}</p>
-            </div>
-            <span class="badge badge-pending">{{ kyc.status }}</span>
-          </div>
-
-          <div class="kyc-details">
-            <div class="detail-row">
-              <label>Document Type:</label>
-              <span>{{ kyc.documentType }}</span>
-            </div>
-            <div class="detail-row">
-              <label>Document Number:</label>
-              <span class="doc-number">{{ kyc.documentNumber }}</span>
-            </div>
-            <div class="detail-row">
-              <label>Date of Birth:</label>
-              <span>{{ formatDateOnly(kyc.dateOfBirth) }}</span>
-            </div>
-          </div>
-
-          <div class="review-actions">
-            <div class="form-group">
-              <label for="reason-{{kyc.id}}">Rejection Reason (if rejecting)</label>
-              <textarea
-                [id]="'reason-' + kyc.id"
-                [(ngModel)]="rejectionReasons[kyc.id || '']"
-                placeholder="Optional: Explain why KYC is rejected"
-                rows="3"
-              ></textarea>
-            </div>
-
-            <div class="action-buttons">
-              <button class="btn-success" (click)="approveKyc(kyc)" [disabled]="isProcessing()">
-                {{ isProcessing() ? 'Processing...' : 'Approve' }}
-              </button>
-              <button class="btn-danger" (click)="rejectKyc(kyc)" [disabled]="isProcessing()">
-                {{ isProcessing() ? 'Processing...' : 'Reject' }}
-              </button>
-            </div>
-          </div>
+    <div class="tp-page">
+      <header class="tp-page-header">
+        <div>
+          <h1>KYC review</h1>
+          <p>Approve or reject pending identity verification requests.</p>
         </div>
-      </div>
+        <div class="tp-actions">
+          <button
+            class="tp-btn tp-btn-secondary tp-btn-icon-refresh"
+            data-icon
+            type="button"
+            [attr.aria-disabled]="isRefreshing() ? 'true' : null"
+            (click)="refreshSubmissions()"
+          >
+            {{ isRefreshing() ? 'Refreshing…' : 'Refresh' }}
+          </button>
+        </div>
+      </header>
+
+      <p class="sr-only" role="status">{{ statusMessage() }}</p>
+
+      @if (pendingSubmissions().length === 0) {
+        <div class="tp-panel tp-empty">
+          @if (isRefreshing()) {
+            Loading submissions…
+          } @else {
+            <strong>All caught up</strong>
+            There are no pending KYC submissions.
+          }
+        </div>
+      }
+
+      @for (kyc of pendingSubmissions(); track kyc.id) {
+        <section class="tp-panel" [attr.aria-labelledby]="'kyc-' + kyc.id">
+          <div class="tp-panel-header">
+            <div>
+              <h2 [id]="'kyc-' + kyc.id">Submission {{ kyc.id }}</h2>
+              <p>Submitted {{ kyc.submittedAt | date: 'MMM d, y, h:mm a' }}</p>
+            </div>
+            <app-status-badge [status]="kyc.status" />
+          </div>
+
+          <div class="tp-panel-body review">
+            <dl class="tp-details">
+              <div><dt>User ID</dt><dd class="tp-mono">{{ kyc.userId }}</dd></div>
+              <div><dt>Document type</dt><dd>{{ kyc.documentType }}</dd></div>
+              <div><dt>Document number</dt><dd class="tp-mono">{{ kyc.documentNumber }}</dd></div>
+              <div><dt>Date of birth</dt><dd>{{ kyc.dateOfBirth | date: 'longDate' }}</dd></div>
+            </dl>
+
+            <div class="decision">
+              <label class="tp-label" [for]="'reason-' + kyc.id">Rejection reason <span class="tp-muted">(optional)</span></label>
+              <textarea
+                class="tp-input"
+                rows="3"
+                [id]="'reason-' + kyc.id"
+                [value]="rejectionReasons[kyc.id || ''] || ''"
+                (input)="setReason(kyc, $event)"
+              ></textarea>
+              <div class="tp-actions">
+                <button
+                  class="tp-btn tp-btn-primary"
+                  type="button"
+                  [attr.aria-disabled]="isProcessing() ? 'true' : null"
+                  (click)="approveKyc(kyc)"
+                >
+                  {{ processingId() === kyc.id ? 'Processing…' : 'Approve' }}
+                </button>
+                <button
+                  class="tp-btn tp-btn-danger"
+                  type="button"
+                  [attr.aria-disabled]="isProcessing() ? 'true' : null"
+                  (click)="rejectKyc(kyc)"
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      }
     </div>
   `,
   styles: [`
-    .admin-container {
-      max-width: 1000px;
-      margin: 0 auto;
-      padding: var(--spacing-2xl) var(--spacing-lg);
-    }
-
-    .admin-header {
-      margin-bottom: var(--spacing-2xl);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: var(--spacing-lg);
-    }
-
-    .admin-header h1 {
-      color: var(--prussian-blue);
-      margin: 0;
-    }
-
-    .admin-header .subtitle {
-      color: var(--steel-blue);
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: var(--spacing-2xl);
-      color: var(--steel-blue);
-    }
-
-    .kyc-review-card {
-      margin-bottom: var(--spacing-lg);
-    }
-
-    .kyc-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: var(--spacing-lg);
-      border-bottom: 2px solid var(--azure-mist);
-      padding-bottom: var(--spacing-md);
-    }
-
-    .kyc-info h3 {
-      color: var(--prussian-blue);
-      margin: 0 0 var(--spacing-sm) 0;
-    }
-
-    .user-id {
-      font-family: monospace;
-      font-size: var(--font-size-sm);
-      color: var(--steel-blue);
-    }
-
-    .kyc-info p {
-      margin: 0;
-      color: var(--steel-blue);
-      font-size: var(--font-size-sm);
-    }
-
-    .kyc-details {
-      background-color: var(--azure-mist);
-      padding: var(--spacing-md);
-      border-radius: var(--radius-md);
-      margin-bottom: var(--spacing-md);
-    }
-
-    .detail-row {
-      display: flex;
-      justify-content: space-between;
-      padding: var(--spacing-sm) 0;
-    }
-
-    .detail-row label {
-      font-weight: 600;
-      color: var(--prussian-blue);
-      margin: 0;
-    }
-
-    .detail-row span {
-      color: var(--steel-blue);
-    }
-
-    .doc-number {
-      font-family: monospace;
-      font-weight: 600;
-    }
-
-    .review-actions {
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-md);
-    }
-
-    textarea {
-      font-family: inherit;
-      padding: var(--spacing-sm) var(--spacing-md);
-      border: 2px solid var(--steel-blue);
-      border-radius: var(--radius-md);
-      color: var(--prussian-blue);
-      resize: vertical;
-    }
-
-    textarea:focus {
-      outline: none;
-      border-color: var(--amber-glow);
-    }
-
-    .action-buttons {
-      display: flex;
-      gap: var(--spacing-md);
-    }
-
-    .btn-success {
-      background-color: var(--success);
-      color: white;
-      padding: var(--spacing-sm) var(--spacing-lg);
-      border: none;
-      border-radius: var(--radius-md);
-      cursor: pointer;
-      font-weight: 600;
-      flex: 1;
-    }
-
-    .btn-success:hover:not([disabled]) {
-      background-color: #27ae60ff;
-    }
-
-    .btn-danger {
-      background-color: var(--danger);
-      color: white;
-      padding: var(--spacing-sm) var(--spacing-lg);
-      border: none;
-      border-radius: var(--radius-md);
-      cursor: pointer;
-      font-weight: 600;
-      flex: 1;
-    }
-
-    .btn-danger:hover:not([disabled]) {
-      background-color: #c0392bff;
-    }
-
-    button[disabled] {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    @media (max-width: 768px) {
-      .kyc-header {
-        flex-direction: column;
-      }
-
-      .action-buttons {
-        flex-direction: column;
-      }
-    }
+    .review { display: grid; gap: 1.5rem; }
+    .decision { display: grid; gap: 0.75rem; align-content: start; }
+    .decision .tp-label { margin: 0; }
+    @media (min-width: 56rem) { .review { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
   `]
 })
 export class KycReviewListComponent implements OnInit {
-  pendingSubmissions = signal<KycSubmission[]>([]);
-  isRefreshing = signal<boolean>(false);
-  isProcessing = signal<boolean>(false);
-  rejectionReasons: { [key: string]: string } = {};
+  private readonly kycService = inject(MockKycService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  constructor(private kycService: MockKycService) {}
+  protected readonly pendingSubmissions = signal<KycSubmission[]>([]);
+  protected readonly isRefreshing = signal(false);
+  protected readonly processingId = signal<string | null>(null);
+  protected readonly isProcessing = computed(() => this.processingId() !== null);
+  protected readonly statusMessage = signal('');
+  protected readonly rejectionReasons: Record<string, string> = {};
 
   ngOnInit(): void {
     this.loadSubmissions();
   }
 
-  loadSubmissions(): void {
+  protected refreshSubmissions(): void {
+    if (!this.isRefreshing()) {
+      this.loadSubmissions();
+    }
+  }
+
+  protected setReason(kyc: KycSubmission, event: Event): void {
+    if (kyc.id) {
+      this.rejectionReasons[kyc.id] = (event.target as HTMLTextAreaElement).value;
+    }
+  }
+
+  protected approveKyc(kyc: KycSubmission): void {
+    this.review(kyc, true);
+  }
+
+  protected rejectKyc(kyc: KycSubmission): void {
+    this.review(kyc, false, (kyc.id && this.rejectionReasons[kyc.id]) || 'No reason provided');
+  }
+
+  private review(kyc: KycSubmission, approved: boolean, reason?: string): void {
+    if (!kyc.id || this.isProcessing()) {
+      return;
+    }
+
+    this.processingId.set(kyc.id);
+    this.kycService
+      .reviewKyc(kyc.id, approved, reason)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.processingId.set(null);
+          this.statusMessage.set(`Submission ${kyc.id} ${approved ? 'approved' : 'rejected'}.`);
+          this.loadSubmissions(); // Refresh the list
+        },
+        error: () => {
+          this.processingId.set(null);
+          this.statusMessage.set(`Submission ${kyc.id} could not be updated. Try again.`);
+        }
+      });
+  }
+
+  private loadSubmissions(): void {
     this.isRefreshing.set(true);
-    this.kycService.getPendingKycSubmissions().subscribe({
-      next: (submissions: KycSubmission[]) => {
-        this.pendingSubmissions.set(submissions);
-        this.isRefreshing.set(false);
-      },
-      error: () => {
-        this.isRefreshing.set(false);
-      }
-    });
-  }
-
-  refreshSubmissions(): void {
-    this.loadSubmissions();
-  }
-
-  approveKyc(kyc: KycSubmission): void {
-    if (!kyc.id) return;
-
-    this.isProcessing.set(true);
-    this.kycService.reviewKyc(kyc.id, true).subscribe({
-      next: () => {
-        this.isProcessing.set(false);
-        this.loadSubmissions(); // Refresh the list
-      },
-      error: () => {
-        this.isProcessing.set(false);
-      }
-    });
-  }
-
-  rejectKyc(kyc: KycSubmission): void {
-    if (!kyc.id) return;
-
-    const reason = this.rejectionReasons[kyc.id] || 'No reason provided';
-
-    this.isProcessing.set(true);
-    this.kycService.reviewKyc(kyc.id, false, reason).subscribe({
-      next: () => {
-        this.isProcessing.set(false);
-        this.loadSubmissions(); // Refresh the list
-      },
-      error: () => {
-        this.isProcessing.set(false);
-      }
-    });
-  }
-
-  formatDate(date: Date | undefined): string {
-    if (!date) return '';
-    return new Date(date).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  }
-
-  formatDateOnly(date: string | undefined): string {
-    if (!date) return '';
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    this.kycService
+      .getPendingKycSubmissions()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (submissions: KycSubmission[]) => {
+          this.pendingSubmissions.set(submissions);
+          this.isRefreshing.set(false);
+        },
+        error: () => {
+          this.isRefreshing.set(false);
+        }
+      });
   }
 }

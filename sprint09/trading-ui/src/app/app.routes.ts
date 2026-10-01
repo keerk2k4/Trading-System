@@ -1,33 +1,87 @@
 import { Routes } from '@angular/router';
-import { RegisterComponent } from './features/auth/register/register.component';
-import { LoginComponent } from './features/auth/login/login.component';
-import { KycFormComponent } from './features/auth/kyc/kyc-form.component';
-import { DashboardComponent } from './features/dashboard/dashboard.component';
-import { PlaceOrderComponent } from './features/orders/place-order/place-order.component';
-import { ViewOrdersComponent } from './features/orders/view-orders/view-orders.component';
-import { AdminDashboardComponent } from './features/admin/admin-dashboard.component';
-import { KycReviewListComponent } from './features/admin/kyc-review/kyc-review-list.component';
+import { AppShellComponent } from './shared/layout/app-shell.component';
 import { mockAuthGuard, mockAdminGuard } from './shared/guards/mock-auth.guard';
 import { kycApprovalGuard } from './shared/guards/kyc-approval.guard';
 
 export const routes: Routes = [
   // Public routes
   { path: '', redirectTo: '/login', pathMatch: 'full' },
-  { path: 'register', component: RegisterComponent },
-  { path: 'login', component: LoginComponent },
+  {
+    path: 'register',
+    title: 'Create account · Trading Platform',
+    loadComponent: () =>
+      import('./features/auth/register/register.component').then((m) => m.RegisterComponent)
+  },
+  {
+    path: 'login',
+    title: 'Sign in · Trading Platform',
+    loadComponent: () => import('./features/auth/login/login.component').then((m) => m.LoginComponent)
+  },
   // isAdmin tells LoginComponent to call POST /auth/admin/login instead of
   // POST /auth/login - the real backend treats these as separate endpoints.
-  { path: 'admin-login', component: LoginComponent, data: { isAdmin: true } },
+  {
+    path: 'admin-login',
+    title: 'Admin sign in · Trading Platform',
+    loadComponent: () => import('./features/auth/login/login.component').then((m) => m.LoginComponent),
+    data: { isAdmin: true }
+  },
 
-  // Authenticated routes (user flow)
-  { path: 'kyc-submission', component: KycFormComponent, canActivate: [mockAuthGuard] },
-  { path: 'dashboard', component: DashboardComponent, canActivate: [mockAuthGuard, kycApprovalGuard] },
-  { path: 'orders/new', component: PlaceOrderComponent, canActivate: [mockAuthGuard, kycApprovalGuard] },
-  { path: 'orders/history', component: ViewOrdersComponent, canActivate: [mockAuthGuard, kycApprovalGuard] },
+  // Authenticated routes (user flow), inside the application shell
+  {
+    path: '',
+    component: AppShellComponent,
+    canActivate: [mockAuthGuard],
+    children: [
+      {
+        path: 'kyc-submission',
+        title: 'Verification · Trading Platform',
+        loadComponent: () =>
+          import('./features/auth/kyc/kyc-form.component').then((m) => m.KycFormComponent)
+      },
+      {
+        path: 'dashboard',
+        title: 'Dashboard · Trading Platform',
+        canActivate: [kycApprovalGuard],
+        loadComponent: () =>
+          import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent)
+      },
+      {
+        path: 'orders/new',
+        title: 'Place order · Trading Platform',
+        canActivate: [kycApprovalGuard],
+        loadComponent: () =>
+          import('./features/orders/place-order/place-order.component').then((m) => m.PlaceOrderComponent)
+      },
+      {
+        path: 'orders/history',
+        title: 'Orders · Trading Platform',
+        canActivate: [kycApprovalGuard],
+        loadComponent: () =>
+          import('./features/orders/view-orders/view-orders.component').then((m) => m.ViewOrdersComponent)
+      }
+    ]
+  },
 
-  // Admin routes
-  { path: 'admin/dashboard', component: AdminDashboardComponent, canActivate: [mockAdminGuard] },
-  { path: 'admin/kyc-review', component: KycReviewListComponent, canActivate: [mockAdminGuard] },
+  // Admin routes, inside the same shell
+  {
+    path: 'admin',
+    component: AppShellComponent,
+    canActivate: [mockAdminGuard],
+    children: [
+      {
+        path: 'dashboard',
+        title: 'Admin overview · Trading Platform',
+        loadComponent: () =>
+          import('./features/admin/admin-dashboard.component').then((m) => m.AdminDashboardComponent)
+      },
+      {
+        path: 'kyc-review',
+        title: 'KYC review · Trading Platform',
+        loadComponent: () =>
+          import('./features/admin/kyc-review/kyc-review-list.component').then((m) => m.KycReviewListComponent)
+      }
+    ]
+  },
 
   // Fallback
   { path: '**', redirectTo: '/login' }

@@ -123,7 +123,7 @@ describe('TradeApiService', () => {
 });
 
 describe('authTokenInterceptor', () => {
-  it('leaves requests to other origins (auth-service) untouched', () => {
+  it('leaves the public auth-service endpoints untouched', () => {
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([authTokenInterceptor])),
@@ -134,7 +134,7 @@ describe('authTokenInterceptor', () => {
     const auth = TestBed.inject(MockAuthService);
     const http = TestBed.inject(HttpTestingController);
 
-    auth.register({ username: 'new.user', password: 'secret', confirmPassword: 'secret' }).subscribe();
+    auth.register({ username: 'new.user', password: 'secret' }).subscribe();
 
     const req = http.expectOne('http://localhost:3000/auth/register');
     expect(req.request.headers.has('Authorization')).toBe(false);

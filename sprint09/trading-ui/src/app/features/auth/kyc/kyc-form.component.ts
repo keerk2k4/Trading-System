@@ -1,167 +1,226 @@
-import { Component, signal, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { Component, DestroyRef, ElementRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { NavbarComponent } from '../../../shared/navbar/navbar.component';
 import { MockAuthService } from '../../../shared/services/mock-auth.service';
 import { MockKycService } from '../../../shared/services/mock-kyc.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
+import { StatusBadgeComponent } from '../../../shared/ui/status-badge.component';
+
+const DOCUMENT_TYPES = [
+  { value: 'PASSPORT', label: 'Passport' },
+  { value: 'AADHAR', label: 'Aadhar' },
+  { value: 'DRIVER_LICENSE', label: 'Driver licence' },
+  { value: 'PAN', label: 'PAN card' }
+];
 
 @Component({
   selector: 'app-kyc-form',
-  standalone: true,
-  imports: [CommonModule, FormsModule, NavbarComponent],
+  imports: [ReactiveFormsModule, StatusBadgeComponent],
   template: `
-    <app-navbar></app-navbar>
-    
-    <div class="kyc-container">
-      <div class="kyc-card card">
-        <h1>KYC Verification</h1>
-        <p class="subtitle">Complete your Know Your Customer verification to start trading</p>
-
-        <div *ngIf="kycStatus() === 'PENDING'" class="alert alert-info">
-          <strong>Application Under Review</strong>
-          <p>Your KYC application has been submitted and is awaiting admin approval. You will be notified once your application is reviewed.</p>
-          <p><strong>Status:</strong> <span class="badge badge-pending">PENDING</span></p>
+    <div class="tp-page">
+      <header class="tp-page-header">
+        <div>
+          <h1>Identity verification</h1>
+          <p>Verify your identity once to unlock trading on your account.</p>
         </div>
+      </header>
 
-        <div *ngIf="kycStatus() === 'REJECTED'" class="alert alert-error">
-          <strong>Application Rejected</strong>
-          <p>{{ rejectionReason }}</p>
-          <p>Please contact support or resubmit your application with correct information.</p>
-        </div>
-
-        <div *ngIf="errorMessage()" class="alert alert-error">
-          {{ errorMessage() }}
-        </div>
-
-        <div *ngIf="successMessage()" class="alert alert-success">
-          {{ successMessage() }}
-          <p><strong>Status:</strong> <span class="badge badge-pending">PENDING</span></p>
-          <p>Your application has been submitted for review. An admin will review it shortly.</p>
-        </div>
-
-        <form (ngSubmit)="onSubmit()" #kycForm="ngForm" *ngIf="kycStatus() !== 'PENDING' && !successMessage()">
-          <div class="form-group">
-            <label for="dob">Date of Birth</label>
-            <input
-              type="date"
-              id="dob"
-              name="dateOfBirth"
-              [(ngModel)]="dateOfBirth"
-              required
-            />
+      <div class="tp-grid tp-grid-main-side">
+        <section class="tp-panel" aria-labelledby="kyc-heading">
+          <div class="tp-panel-header">
+            <h2 id="kyc-heading">{{ isPending() ? 'Application under review' : 'Your details' }}</h2>
+            @if (kycStatus()) {
+              <app-status-badge [status]="kycStatus()" />
+            }
           </div>
 
-          <div class="form-group">
-            <label for="docType">Document Type</label>
-            <select id="docType" name="documentType" [(ngModel)]="documentType" required>
-              <option value="" disabled>Select document type</option>
-              <option value="PASSPORT">Passport</option>
-              <option value="AADHAR">Aadhar</option>
-              <option value="DRIVER_LICENSE">Driver License</option>
-              <option value="PAN">PAN Card</option>
-            </select>
+          <div class="tp-panel-body">
+            @if (isPending()) {
+              <div class="tp-form">
+                <div class="tp-alert tp-alert-info" [attr.role]="justSubmitted() ? 'status' : null">
+                  <span>
+                    @if (justSubmitted()) {
+                      <strong>Thanks, your details were submitted.</strong>
+                    }
+                    An administrator will review your application. Trading unlocks as soon as it is approved.
+                  </span>
+                </div>
+                <div class="tp-actions">
+                  <button class="tp-btn tp-btn-secondary" type="button" (click)="goToDashboard()">Go to dashboard</button>
+                </div>
+              </div>
+            } @else {
+              <form class="tp-form" [formGroup]="form" (ngSubmit)="onSubmit()">
+                @if (kycStatus() === 'REJECTED') {
+                  <div class="tp-alert tp-alert-error">
+                    <span>
+                      <strong>Your previous application was rejected.</strong>
+                      {{ rejectionReason || 'Check your details and submit again, or contact support.' }}
+                    </span>
+                  </div>
+                }
+                @if (errorMessage(); as message) {
+                  <div class="tp-alert tp-alert-error" role="alert"><span>{{ message }}</span></div>
+                }
+
+                <div>
+                  <label class="tp-label" for="dob">Date of birth</label>
+                  <input
+                    class="tp-input"
+                    id="dob"
+                    type="date"
+                    formControlName="dateOfBirth"
+                    autocomplete="bday"
+                    aria-required="true"
+                    [attr.aria-invalid]="showError('dateOfBirth') ? 'true' : null"
+                    [attr.aria-describedby]="showError('dateOfBirth') ? 'dob-error' : null"
+                  />
+                  @if (showError('dateOfBirth')) {
+                    <p class="tp-field-error" id="dob-error">Enter your date of birth.</p>
+                  }
+                </div>
+
+                <div class="tp-form-row">
+                  <div>
+                    <label class="tp-label" for="docType">Document type</label>
+                    <select
+                      class="tp-input"
+                      id="docType"
+                      formControlName="documentType"
+                      aria-required="true"
+                      [attr.aria-invalid]="showError('documentType') ? 'true' : null"
+                      [attr.aria-describedby]="showError('documentType') ? 'docType-error' : null"
+                    >
+                      <option value="" disabled>Select a document</option>
+                      @for (type of documentTypes; track type.value) {
+                        <option [value]="type.value">{{ type.label }}</option>
+                      }
+                    </select>
+                    @if (showError('documentType')) {
+                      <p class="tp-field-error" id="docType-error">Choose a document type.</p>
+                    }
+                  </div>
+
+                  <div>
+                    <label class="tp-label" for="docNum">Document number</label>
+                    <input
+                      class="tp-input"
+                      id="docNum"
+                      type="text"
+                      formControlName="documentNumber"
+                      autocomplete="off"
+                      spellcheck="false"
+                      aria-required="true"
+                      [attr.aria-invalid]="showError('documentNumber') ? 'true' : null"
+                      [attr.aria-describedby]="showError('documentNumber') ? 'docNum-error' : null"
+                    />
+                    @if (showError('documentNumber')) {
+                      <p class="tp-field-error" id="docNum-error">Enter the document number.</p>
+                    }
+                  </div>
+                </div>
+
+                <div>
+                  <button class="tp-btn tp-btn-primary" type="submit" [attr.aria-disabled]="isLoading() ? 'true' : null">
+                    @if (isLoading()) {
+                      <span class="tp-spinner" aria-hidden="true"></span>
+                      Submitting…
+                    } @else {
+                      Submit for review
+                    }
+                  </button>
+                  <span class="sr-only" role="status">{{ isLoading() ? 'Submitting your details, please wait.' : '' }}</span>
+                </div>
+              </form>
+            }
           </div>
+        </section>
 
-          <div class="form-group">
-            <label for="docNum">Document Number</label>
-            <input
-              type="text"
-              id="docNum"
-              name="documentNumber"
-              [(ngModel)]="documentNumber"
-              required
-              placeholder="Enter your document number"
-            />
+        <section class="tp-panel" aria-labelledby="steps-heading">
+          <div class="tp-panel-header">
+            <h2 id="steps-heading">How it works</h2>
           </div>
-
-          <button type="submit" class="btn-primary" [disabled]="isLoading()">
-            {{ isLoading() ? 'Submitting...' : 'Submit KYC' }}
-          </button>
-        </form>
-
-        <div class="kyc-info" *ngIf="successMessage()">
-          <button class="btn-primary" (click)="goToDashboard()">
-            Go to Dashboard
-          </button>
-        </div>
+          <ol class="steps tp-panel-body">
+            <li
+              [class.is-done]="isPending()"
+              [class.is-current]="!isPending()"
+              [attr.aria-current]="isPending() ? null : 'step'"
+            >
+              <strong>Submit your details @if (isPending()) {<span class="sr-only">(completed)</span>}</strong>
+              <span>Date of birth and one identity document.</span>
+            </li>
+            <li [class.is-current]="isPending()" [attr.aria-current]="isPending() ? 'step' : null">
+              <strong>Administrator review</strong>
+              <span>An administrator checks your document.</span>
+            </li>
+            <li>
+              <strong>Start trading</strong>
+              <span>Your dashboard and order ticket unlock.</span>
+            </li>
+          </ol>
+        </section>
       </div>
     </div>
   `,
   styles: [`
-    .kyc-container {
-      max-width: 500px;
-      margin: var(--spacing-2xl) auto;
-      padding: var(--spacing-lg);
+    .steps { display: grid; gap: 1rem; list-style: none; counter-reset: step; }
+    .steps li { position: relative; display: grid; gap: 0.125rem; padding-left: 2.5rem; font-size: 0.875rem; counter-increment: step; }
+    .steps li::before {
+      content: counter(step); position: absolute; left: 0; top: 0; display: grid; place-items: center;
+      width: 1.75rem; height: 1.75rem; font-size: 0.8125rem; font-weight: 600; color: var(--tp-text-muted);
+      border: 1px solid var(--tp-border-strong); border-radius: 50%;
     }
-
-    .kyc-card {
-      background-color: white;
-    }
-
-    h1 {
-      color: var(--prussian-blue);
-      margin-bottom: var(--spacing-sm);
-      text-align: center;
-    }
-
-    .subtitle {
-      text-align: center;
-      color: var(--steel-blue);
-      margin-bottom: var(--spacing-lg);
-    }
-
-    .alert {
-      margin-bottom: var(--spacing-md);
-    }
-
-    .alert p {
-      margin: var(--spacing-sm) 0 0 0;
-    }
-
-    .kyc-info {
-      text-align: center;
-      margin-top: var(--spacing-lg);
-    }
-
-    .badge {
-      margin-left: var(--spacing-sm);
-    }
+    .steps li.is-current::before { color: var(--tp-on-accent); background: var(--tp-accent); border-color: var(--tp-accent); }
+    .steps li.is-done::before { content: '✓'; color: var(--tp-positive); border-color: currentColor; }
+    .steps span { color: var(--tp-text-muted); }
   `]
 })
 export class KycFormComponent implements OnInit {
-  dateOfBirth = '';
-  documentType = '';
-  documentNumber = '';
+  private readonly kycService = inject(MockKycService);
+  private readonly authService = inject(MockAuthService);
+  private readonly errorMapping = inject(ErrorMappingService);
+  private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  errorMessage = signal<string>('');
-  successMessage = signal<string>('');
-  isLoading = signal<boolean>(false);
-  kycStatus = signal<string>('');
-  rejectionReason = '';
+  protected readonly documentTypes = DOCUMENT_TYPES;
+  protected readonly form = inject(NonNullableFormBuilder).group({
+    dateOfBirth: ['', Validators.required],
+    documentType: ['', Validators.required],
+    documentNumber: ['', Validators.required]
+  });
 
-  constructor(
-    private kycService: MockKycService,
-    private authService: MockAuthService,
-    private errorMapping: ErrorMappingService,
-    private router: Router
-  ) {}
+  protected readonly kycStatus = signal('');
+  protected readonly isPending = computed(() => this.kycStatus() === 'PENDING');
+  protected readonly justSubmitted = signal(false);
+  protected readonly submitted = signal(false);
+  protected readonly isLoading = signal(false);
+  protected readonly errorMessage = signal('');
+  protected rejectionReason = '';
 
   ngOnInit(): void {
     // Check current KYC status
-    const currentStatus = this.kycService.getCurrentUserKycStatus();
-    this.kycStatus.set(currentStatus || '');
+    this.kycStatus.set(this.kycService.getCurrentUserKycStatus() ?? '');
   }
 
-  onSubmit(): void {
-    if (!this.dateOfBirth || !this.documentType || !this.documentNumber) {
-      this.errorMessage.set('All fields are required');
+  protected showError(name: 'dateOfBirth' | 'documentType' | 'documentNumber'): boolean {
+    const control = this.form.controls[name];
+    return control.invalid && (control.touched || this.submitted());
+  }
+
+  protected onSubmit(): void {
+    if (this.isLoading()) {
       return;
     }
 
-    this.isLoading.set(true);
+    this.submitted.set(true);
     this.errorMessage.set('');
+
+    if (this.form.invalid) {
+      this.host.nativeElement.querySelector<HTMLElement>('.ng-invalid:not(form)')?.focus();
+      return;
+    }
 
     const user = this.authService.getCurrentUser();
     if (!user) {
@@ -169,24 +228,25 @@ export class KycFormComponent implements OnInit {
       return;
     }
 
-    this.kycService.submitKyc(user.id, {
-      dateOfBirth: this.dateOfBirth,
-      documentType: this.documentType,
-      documentNumber: this.documentNumber
-    }).subscribe({
-      next: () => {
-        this.isLoading.set(false);
-        this.kycStatus.set('PENDING');
-        this.successMessage.set('KYC submitted successfully!');
-      },
-      error: (err) => {
-        this.isLoading.set(false);
-        this.errorMessage.set(this.errorMapping.getErrorMessage(err.errorCode));
-      }
-    });
+    this.isLoading.set(true);
+
+    this.kycService
+      .submitKyc(user.id, this.form.getRawValue())
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.isLoading.set(false);
+          this.justSubmitted.set(true);
+          this.kycStatus.set('PENDING');
+        },
+        error: (err: { errorCode?: string }) => {
+          this.isLoading.set(false);
+          this.errorMessage.set(this.errorMapping.getErrorMessage(err.errorCode ?? ''));
+        }
+      });
   }
 
-  goToDashboard(): void {
+  protected goToDashboard(): void {
     this.router.navigate(['/dashboard']);
   }
 }

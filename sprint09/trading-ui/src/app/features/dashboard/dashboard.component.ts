@@ -1,235 +1,145 @@
-import { Component, signal, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { NavbarComponent } from '../../shared/navbar/navbar.component';
+import { forkJoin } from 'rxjs';
 import { MockAuthService } from '../../shared/services/mock-auth.service';
 import { MockKycService } from '../../shared/services/mock-kyc.service';
 import { TradeApiService } from '../../shared/services/trade-api.service';
 import { ErrorMappingService } from '../../shared/services/error-mapping.service';
-import { Account, TradeApiError } from '../../shared/models/order.models';
-import { forkJoin } from 'rxjs';
+import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
+import { Account, Position, TradeApiError } from '../../shared/models/order.models';
+
+interface PortfolioSummary {
+  cash: number;
+  holdings: number;
+  total: number;
+  currency: string;
+  asOf: string;
+}
 
 @Component({
   selector: 'app-dashboard',
-  standalone: true,
-  imports: [CommonModule, RouterLink, NavbarComponent],
+  imports: [RouterLink, CurrencyPipe, DatePipe, DecimalPipe, StatusBadgeComponent],
   template: `
-    <app-navbar></app-navbar>
-
-    <div class="dashboard-container">
-      <div class="welcome-section card">
-        <h1>Welcome, {{ currentUser()?.username }}!</h1>
-        <p class="subtitle">Your Trading Dashboard</p>
-        <div class="account-info">
-          <div class="info-item">
-            <label>Account ID:</label>
-            <span>{{ currentUser()?.accountId }}</span>
-          </div>
-          <div class="info-item">
-            <label>User ID:</label>
-            <span class="user-id">{{ currentUser()?.id }}</span>
-          </div>
-          <div class="info-item">
-            <label>KYC Status:</label>
-            <span [ngSwitch]="kycStatus()">
-              <span *ngSwitchCase="'APPROVED'" class="badge badge-approved">APPROVED</span>
-              <span *ngSwitchCase="'PENDING'" class="badge badge-pending">PENDING</span>
-              <span *ngSwitchCase="'REJECTED'" class="badge badge-rejected">REJECTED</span>
-              <span *ngSwitchDefault class="badge badge-pending">NOT SUBMITTED</span>
-            </span>
-          </div>
-          <div class="info-item" *ngIf="account() as acc">
-            <label>Account Holder:</label>
-            <span>{{ acc.holderName }}</span>
-          </div>
-          <div class="info-item" *ngIf="account() as acc">
-            <label>Account Status:</label>
-            <span>{{ acc.status }}</span>
-          </div>
+    <div class="tp-page">
+      <header class="tp-page-header">
+        <div>
+          <h1>Welcome back, {{ user()?.username }}</h1>
+          <p>Your cash, holdings and account at a glance.</p>
         </div>
-      </div>
-
-      <div class="actions-section">
-        <h2>Trading Actions</h2>
-        <div class="actions-grid grid grid-2">
-          <div class="action-card card">
-            <h3>Place an Order</h3>
-            <p>Create a new buy or sell order</p>
-            <button routerLink="/orders/new" class="btn-primary">Go to Order Form</button>
-          </div>
-
-          <div class="action-card card">
-            <h3>View Orders</h3>
-            <p>Check your order history and status</p>
-            <button routerLink="/orders/history" class="btn-primary">View Blotter</button>
-          </div>
+        <div class="tp-actions">
+          <a class="tp-btn tp-btn-secondary" routerLink="/orders/history">Order history</a>
+          <a class="tp-btn tp-btn-primary tp-btn-icon-plus" data-icon routerLink="/orders/new">Place order</a>
         </div>
-      </div>
+      </header>
 
-      <div class="account-section card">
-        <h2>Account Summary</h2>
-        <div *ngIf="errorMessage()" class="alert alert-error">
-          {{ errorMessage() }}
+      @if (errorMessage(); as message) {
+        <div class="tp-alert tp-alert-error" role="alert"><span>{{ message }}</span></div>
+      }
+
+      <section class="tp-grid tp-grid-3" aria-label="Portfolio summary" [attr.aria-busy]="isLoading()">
+        <div class="tp-panel tp-stat tp-stat-primary">
+          <p class="tp-stat-label">Total portfolio</p>
+          <p class="tp-stat-value">{{ (summary()?.total | currency: currency()) ?? '—' }}</p>
+          <p class="tp-stat-meta">Cash plus holdings at cost</p>
         </div>
-        <p *ngIf="isLoading()" class="subtitle">Loading account summary...</p>
-        <div class="summary-grid" *ngIf="!isLoading() && !errorMessage()">
-          <div class="summary-item">
-            <label>Available Cash:</label>
-            <span class="amount">$ {{ availableCash() | number:'1.2-2' }}</span>
-          </div>
-          <div class="summary-item">
-            <label>Holdings Value:</label>
-            <span class="amount">$ {{ holdingsValue() | number:'1.2-2' }}</span>
-          </div>
-          <div class="summary-item">
-            <label>Total Portfolio:</label>
-            <span class="amount">$ {{ totalPortfolio() | number:'1.2-2' }}</span>
-          </div>
+        <div class="tp-panel tp-stat">
+          <p class="tp-stat-label">Available cash</p>
+          <p class="tp-stat-value">{{ (summary()?.cash | currency: currency()) ?? '—' }}</p>
+          <p class="tp-stat-meta">
+            @if (summary()?.asOf; as asOf) {
+              As of {{ asOf | date: 'MMM d, h:mm a' }}
+            } @else {
+              Ready to invest
+            }
+          </p>
         </div>
+        <div class="tp-panel tp-stat">
+          <p class="tp-stat-label">Holdings value</p>
+          <p class="tp-stat-value">{{ (summary()?.holdings | currency: currency()) ?? '—' }}</p>
+          <p class="tp-stat-meta">{{ positions().length }} open {{ positions().length === 1 ? 'position' : 'positions' }}</p>
+        </div>
+      </section>
+
+      <div class="tp-grid tp-grid-main-side">
+        <section class="tp-panel" aria-labelledby="positions-heading">
+          <div class="tp-panel-header">
+            <h2 id="positions-heading">Positions</h2>
+            <p>Valued at average cost</p>
+          </div>
+          @if (isLoading()) {
+            <p class="tp-empty">Loading positions…</p>
+          } @else if (positions().length === 0) {
+            <div class="tp-empty">
+              <strong>No open positions</strong>
+              Filled buy orders will appear here.
+            </div>
+          } @else {
+            <div class="tp-table-wrap" tabindex="0" role="region" aria-label="Positions table">
+              <table class="tp-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Symbol</th>
+                    <th scope="col" class="num">Quantity</th>
+                    <th scope="col" class="num">Avg cost</th>
+                    <th scope="col" class="num">Cost basis</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (position of positions(); track position.symbol) {
+                    <tr>
+                      <td><strong>{{ position.symbol }}</strong></td>
+                      <td class="num">{{ position.quantity | number }}</td>
+                      <td class="num">{{ position.averageCost | currency: currency() }}</td>
+                      <td class="num">{{ position.quantity * position.averageCost | currency: currency() }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </section>
+
+        <section class="tp-panel" aria-labelledby="account-heading">
+          <div class="tp-panel-header">
+            <h2 id="account-heading">Account</h2>
+          </div>
+          <dl class="tp-details tp-panel-body">
+            @if (account(); as acc) {
+              <div><dt>Holder</dt><dd>{{ acc.holderName }}</dd></div>
+            }
+            <div><dt>Account ID</dt><dd class="tp-num">{{ user()?.accountId || '—' }}</dd></div>
+            @if (account(); as acc) {
+              <div><dt>Status</dt><dd><app-status-badge [status]="acc.status" /></dd></div>
+            }
+            <div><dt>Verification</dt><dd><app-status-badge [status]="kycStatus()" /></dd></div>
+            <div><dt>User ID</dt><dd class="tp-mono">{{ user()?.id }}</dd></div>
+          </dl>
+        </section>
       </div>
     </div>
-  `,
-  styles: [`
-    .dashboard-container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: var(--spacing-2xl) var(--spacing-lg);
-      gap: var(--spacing-2xl);
-      display: flex;
-      flex-direction: column;
-    }
-
-    h1 {
-      color: var(--prussian-blue);
-      margin-bottom: var(--spacing-sm);
-    }
-
-    .subtitle {
-      color: var(--steel-blue);
-      font-size: var(--font-size-lg);
-      margin-bottom: var(--spacing-lg);
-    }
-
-    .account-info {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: var(--spacing-md);
-      margin-top: var(--spacing-md);
-    }
-
-    .info-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: var(--spacing-md);
-      background-color: var(--azure-mist);
-      border-radius: var(--radius-md);
-    }
-
-    .info-item label {
-      font-weight: 600;
-      color: var(--prussian-blue);
-      margin: 0;
-    }
-
-    .user-id {
-      font-family: monospace;
-      font-size: var(--font-size-sm);
-      color: var(--steel-blue);
-    }
-
-    .actions-section {
-      margin-top: var(--spacing-2xl);
-    }
-
-    .actions-section h2 {
-      color: var(--prussian-blue);
-      margin-bottom: var(--spacing-lg);
-    }
-
-    .action-card {
-      text-align: center;
-    }
-
-    .action-card h3 {
-      color: var(--prussian-blue);
-      margin-bottom: var(--spacing-sm);
-    }
-
-    .action-card p {
-      color: var(--steel-blue);
-      margin-bottom: var(--spacing-lg);
-    }
-
-    .account-section {
-      margin-top: var(--spacing-2xl);
-    }
-
-    .account-section h2 {
-      color: var(--prussian-blue);
-      margin-bottom: var(--spacing-lg);
-    }
-
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: var(--spacing-lg);
-    }
-
-    .summary-item {
-      padding: var(--spacing-lg);
-      background-color: var(--azure-mist);
-      border-radius: var(--radius-md);
-      border-left: 4px solid var(--amber-glow);
-    }
-
-    .summary-item label {
-      display: block;
-      color: var(--steel-blue);
-      margin-bottom: var(--spacing-sm);
-      margin-left: 0;
-    }
-
-    .amount {
-      font-size: var(--font-size-2xl);
-      font-weight: bold;
-      color: var(--primary);
-    }
-
-    @media (max-width: 768px) {
-      .actions-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-  `]
+  `
 })
 export class DashboardComponent implements OnInit {
-  currentUser = signal<any>(null);
-  kycStatus = signal<string>('NOT_SUBMITTED');
-  account = signal<Account | null>(null);
-  availableCash = signal<number>(0);
-  holdingsValue = signal<number>(0);
-  totalPortfolio = signal<number>(0);
-  isLoading = signal<boolean>(false);
-  errorMessage = signal<string>('');
+  private readonly authService = inject(MockAuthService);
+  private readonly kycService = inject(MockKycService);
+  private readonly tradeApi = inject(TradeApiService);
+  private readonly errorMapping = inject(ErrorMappingService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  constructor(
-    private authService: MockAuthService,
-    private kycService: MockKycService,
-    private tradeApi: TradeApiService,
-    private errorMapping: ErrorMappingService
-  ) {}
+  protected readonly user = this.authService.currentUser$;
+  protected readonly kycStatus = signal('NOT_SUBMITTED');
+  protected readonly account = signal<Account | null>(null);
+  protected readonly positions = signal<Position[]>([]);
+  protected readonly summary = signal<PortfolioSummary | null>(null);
+  protected readonly currency = computed(() => this.summary()?.currency || 'USD');
+  protected readonly isLoading = signal(false);
+  protected readonly errorMessage = signal('');
 
   ngOnInit(): void {
-    const user = this.authService.getCurrentUser();
-    this.currentUser.set(user);
-
-    if (user) {
-      const status = this.kycService.getKycStatusSignal()();
-      this.kycStatus.set(status || 'NOT_SUBMITTED');
-    }
-
-    this.loadAccountSummary(user?.accountId);
+    this.kycStatus.set(this.kycService.getCurrentUserKycStatus() ?? 'NOT_SUBMITTED');
+    this.loadAccountSummary(this.user()?.accountId);
   }
 
   private loadAccountSummary(accountId: number | undefined): void {
@@ -247,29 +157,36 @@ export class DashboardComponent implements OnInit {
       account: this.tradeApi.getAccount(accountId),
       balance: this.tradeApi.getBalance(accountId),
       positions: this.tradeApi.getPositions(accountId)
-    }).subscribe({
-      next: ({ account, balance, positions }) => {
-        // The positions endpoint carries no market price, so holdings are
-        // valued at cost: quantity x average cost per position.
-        const holdings = positions.reduce(
-          (total, position) => total + position.quantity * position.averageCost,
-          0
-        );
+    })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: ({ account, balance, positions }) => {
+          // The positions endpoint carries no market price, so holdings are
+          // valued at cost: quantity x average cost per position.
+          const holdings = positions.reduce(
+            (total, position) => total + position.quantity * position.averageCost,
+            0
+          );
 
-        this.account.set(account);
-        this.availableCash.set(balance.cashBalance);
-        this.holdingsValue.set(holdings);
-        this.totalPortfolio.set(balance.cashBalance + holdings);
-        this.isLoading.set(false);
-      },
-      error: (err: TradeApiError) => {
-        this.isLoading.set(false);
-        this.errorMessage.set(
-          this.errorMapping.isNetworkError(err.status)
-            ? this.errorMapping.getNetworkErrorMessage()
-            : this.errorMapping.getErrorMessage(err.errorCode)
-        );
-      }
-    });
+          this.account.set(account);
+          this.positions.set(positions);
+          this.summary.set({
+            cash: balance.cashBalance,
+            holdings,
+            total: balance.cashBalance + holdings,
+            currency: balance.currency,
+            asOf: balance.asOf
+          });
+          this.isLoading.set(false);
+        },
+        error: (err: TradeApiError) => {
+          this.isLoading.set(false);
+          this.errorMessage.set(
+            this.errorMapping.isNetworkError(err.status)
+              ? this.errorMapping.getNetworkErrorMessage()
+              : this.errorMapping.getErrorMessage(err.errorCode)
+          );
+        }
+      });
   }
 }
