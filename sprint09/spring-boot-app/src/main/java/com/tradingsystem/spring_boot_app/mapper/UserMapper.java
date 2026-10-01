@@ -17,9 +17,17 @@ public interface UserMapper {
     @Options(useGeneratedKeys = true, keyProperty = "user.userId")
     int insertUser(@Param("user") User user);
 
+    /**
+     * Loads an account holder. Users are registered by the auth service into
+     * auth.users (trading.users is never written for new users). auth.users
+     * keeps new users at PENDING even after KYC approval, since approval only
+     * activates the trading account, so PENDING maps to ACTIVE here and KYC
+     * is enforced by the account's trading status instead.
+     */
     @Select("""
-        SELECT user_id, first_name, last_name, email, phone, password_hash, status
-        FROM trading.users
+        SELECT user_id::text AS user_id, first_name, last_name, email, phone, password_hash,
+               CASE WHEN status IN ('BLOCKED', 'DEACTIVATED') THEN status ELSE 'ACTIVE' END AS status
+        FROM auth.users
         WHERE user_id = #{userId}::uuid
         """)
     @Results({
