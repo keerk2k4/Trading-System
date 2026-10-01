@@ -159,11 +159,15 @@ const DOCUMENT_TYPES = [
               <span>Date of birth and one identity document.</span>
             </li>
             <li
+              [class.is-done]="isStepTwoDone()"
               [class.is-waiting]="isStepTwoWaiting()"
               [class.is-current]="isStepTwoWaiting()"
               [attr.aria-current]="isStepTwoWaiting() ? 'step' : null"
             >
-              <strong>Administrator review</strong>
+              <strong>
+                Administrator review
+                @if (isStepTwoDone()) {<span class="sr-only">(completed)</span>}
+              </strong>
               <span>An administrator checks your document.</span>
             </li>
             <li [class.is-done]="isStepThreeDone()" [class.is-rejected]="isRejected()">
@@ -220,6 +224,7 @@ export class KycFormComponent implements OnInit {
   protected readonly isRejected = computed(() => this.normalizedKycStatus() === 'REJECTED');
   protected readonly isStepOneDone = computed(() => this.hasUploadedKyc());
   protected readonly isStepTwoWaiting = computed(() => this.normalizedKycStatus() === 'PENDING');
+  protected readonly isStepTwoDone = computed(() => this.normalizedKycStatus() === 'APPROVED');
   protected readonly isStepThreeDone = computed(() => this.normalizedKycStatus() === 'APPROVED');
   protected readonly isLoadingExistingKyc = signal(true);
   protected readonly justSubmitted = signal(false);

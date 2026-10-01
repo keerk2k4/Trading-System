@@ -1,11 +1,13 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { AccountsService, OrdersService } from '../../../generated/trade-client';
+import { OrdersService } from '../../../generated/trade-client';
 import {
   Account,
   Balance,
+  BalanceUpdateRequest,
   Order,
   OrderHistoryFilter,
   PlaceOrderRequest,
@@ -13,9 +15,10 @@ import {
   Position,
   TradeApiError
 } from '../models/order.models';
+import { TRADE_API_BASE_URL } from '../api/api-clients';
 
 // Kept as a re-export so existing imports keep working; defined in api-clients.ts.
-export { TRADE_API_BASE_URL } from '../api/api-clients';
+export { TRADE_API_BASE_URL };
 
 /**
  * Thin wrapper over the clients generated from contracts/trade-api.yaml.
@@ -27,40 +30,55 @@ export { TRADE_API_BASE_URL } from '../api/api-clients';
   providedIn: 'root'
 })
 export class TradeApiService {
-  private accounts = inject(AccountsService);
+  private http = inject(HttpClient);
   private orders = inject(OrdersService);
 
-  // GET /api/v1/accounts/{id}
-  getAccount(accountId: number): Observable<Account> {
-    return this.accounts
-      .getAccount(accountId)
+  // GET /api/v1/accounts/me
+  getAccount(): Observable<Account> {
+    return this.http
+      .get<Account>(`${TRADE_API_BASE_URL}/api/v1/accounts/me`)
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
-  // GET /api/v1/accounts/{id}/balance
-  getBalance(accountId: number): Observable<Balance> {
-    return this.accounts
-      .getBalance(accountId)
+  // GET /api/v1/accounts/me/balance
+  getBalance(): Observable<Balance> {
+    return this.http
+      .get<Balance>(`${TRADE_API_BASE_URL}/api/v1/accounts/me/balance`)
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
-  // GET /api/v1/accounts/{id}/positions
-  getPositions(accountId: number): Observable<Position[]> {
-    return this.accounts
-      .getPositions(accountId)
+  // GET /api/v1/accounts/me/positions
+  getPositions(): Observable<Position[]> {
+    return this.http
+      .get<Position[]>(`${TRADE_API_BASE_URL}/api/v1/accounts/me/positions`)
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
-  // GET /api/v1/accounts/{id}/orders, optionally narrowed by status
+  // GET /api/v1/accounts/me/orders, optionally narrowed by status
   // and/or an ISO date-time range.
-  getOrders(accountId: number, filter: OrderHistoryFilter = {}): Observable<Order[]> {
-    return this.accounts
-      .getOrders(
-        accountId,
-        filter.status || undefined,
-        filter.from ? new Date(filter.from).toISOString() : undefined,
-        filter.to ? new Date(filter.to).toISOString() : undefined
-      )
+  getOrders(filter: OrderHistoryFilter = {}): Observable<Order[]> {
+    const params: Record<string, string> = {};
+    if (filter.status) {
+      params['status'] = filter.status;
+    }
+    if (filter.from) {
+      params['from'] = new Date(filter.from).toISOString();
+    }
+    if (filter.to) {
+      params['to'] = new Date(filter.to).toISOString();
+    }
+
+    return this.http
+      .get<Order[]>(`${TRADE_API_BASE_URL}/api/v1/accounts/me/orders`, {
+        params,
+      })
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // PATCH /api/v1/accounts/me/balance
+  updateBalance(request: BalanceUpdateRequest): Observable<Balance> {
+    return this.http
+      .patch<Balance>(`${TRADE_API_BASE_URL}/api/v1/accounts/me/balance`, request)
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 

@@ -139,24 +139,17 @@ export class DashboardComponent implements OnInit {
 
   ngOnInit(): void {
     this.kycStatus.set(this.kycService.getCurrentUserKycStatus() ?? 'NOT_SUBMITTED');
-    this.loadAccountSummary(this.user()?.accountId);
+    this.loadAccountSummary();
   }
 
-  private loadAccountSummary(accountId: number | undefined): void {
-    // accountId is 0 until the trading account has been provisioned and the
-    // user has signed in again to pick it up in a fresh token.
-    if (!accountId) {
-      this.errorMessage.set(this.errorMapping.getErrorMessage('ACC-404'));
-      return;
-    }
-
+  private loadAccountSummary(): void {
     this.isLoading.set(true);
     this.errorMessage.set('');
 
     forkJoin({
-      account: this.tradeApi.getAccount(accountId),
-      balance: this.tradeApi.getBalance(accountId),
-      positions: this.tradeApi.getPositions(accountId)
+      account: this.tradeApi.getAccount(),
+      balance: this.tradeApi.getBalance(),
+      positions: this.tradeApi.getPositions()
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({

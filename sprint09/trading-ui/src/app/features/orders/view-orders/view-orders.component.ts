@@ -3,7 +3,6 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { MockAuthService } from '../../../shared/services/mock-auth.service';
 import { TradeApiService } from '../../../shared/services/trade-api.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
 import { StatusBadgeComponent } from '../../../shared/ui/status-badge.component';
@@ -144,7 +143,6 @@ const STATUS_FILTERS: { value: OrderStatus | ''; label: string }[] = [
   `]
 })
 export class ViewOrdersComponent implements OnInit {
-  private readonly authService = inject(MockAuthService);
   private readonly orderService = inject(TradeApiService);
   private readonly errorMapping = inject(ErrorMappingService);
   private readonly destroyRef = inject(DestroyRef);
@@ -171,20 +169,11 @@ export class ViewOrdersComponent implements OnInit {
   }
 
   private loadOrders(): void {
-    // accountId is 0 until the trading account has been provisioned and the
-    // user has signed in again to pick it up in a fresh token.
-    const accountId = this.authService.getCurrentUser()?.accountId;
-    if (!accountId) {
-      this.orders.set([]);
-      this.errorMessage.set(this.errorMapping.getErrorMessage('ACC-404'));
-      return;
-    }
-
     this.isRefreshing.set(true);
     this.errorMessage.set('');
 
     this.orderService
-      .getOrders(accountId, { status: this.statusFilter.value || undefined })
+      .getOrders({ status: this.statusFilter.value || undefined })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (orders) => {

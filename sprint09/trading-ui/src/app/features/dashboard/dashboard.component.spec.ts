@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { DashboardComponent } from './dashboard.component';
 import { MockAuthService } from '../../shared/services/mock-auth.service';
 import { MockKycService } from '../../shared/services/mock-kyc.service';
@@ -69,10 +69,11 @@ describe('DashboardComponent', () => {
     expect(details).toContain('Approved');
   });
 
-  it('explains a missing trading account instead of calling the API', () => {
+  it('explains a missing trading account when the backend returns ACC-404', () => {
+    tradeApi.getAccount.and.returnValue(throwError(() => ({ errorCode: 'ACC-404', message: '', status: 404 })));
     create({ id: 'u-1', username: 'gaurang123', accountId: 0, roles: ['CUSTOMER'] });
 
-    expect(tradeApi.getAccount).not.toHaveBeenCalled();
+    expect(tradeApi.getAccount).toHaveBeenCalled();
     expect(page.querySelector('[role="alert"]')?.textContent).toContain('could not be found');
     expect(statValues()).toEqual(['—', '—', '—']);
   });

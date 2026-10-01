@@ -30,13 +30,13 @@ describe('TradeApiService', () => {
   afterEach(() => http.verify());
 
   it('fetches the account, balance and positions for an account', () => {
-    service.getAccount(17).subscribe();
-    service.getBalance(17).subscribe();
-    service.getPositions(17).subscribe();
+    service.getAccount().subscribe();
+    service.getBalance().subscribe();
+    service.getPositions().subscribe();
 
-    const account = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/accounts/17`);
-    const balance = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/accounts/17/balance`);
-    const positions = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/accounts/17/positions`);
+    const account = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/accounts/me`);
+    const balance = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/accounts/me/balance`);
+    const positions = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/accounts/me/positions`);
     for (const req of [account, balance, positions]) {
       expect(req.request.method).toBe('GET');
     }
@@ -46,40 +46,49 @@ describe('TradeApiService', () => {
   });
 
   it('sends the bearer token on trade API requests', () => {
-    service.getBalance(17).subscribe();
+    service.getBalance().subscribe();
 
-    const req = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/accounts/17/balance`);
+    const req = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/accounts/me/balance`);
     expect(req.request.headers.get('Authorization')).toBe('Bearer test.jwt.token');
     req.flush({});
   });
 
   it('sends no Authorization header when there is no token', () => {
     token = null;
-    service.getBalance(17).subscribe({ error: () => {} });
+    service.getBalance().subscribe({ error: () => {} });
 
-    const req = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/accounts/17/balance`);
+    const req = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/accounts/me/balance`);
     expect(req.request.headers.has('Authorization')).toBe(false);
     req.flush({});
   });
 
-  it('requests order history with no query params by default', () => {
-    service.getOrders(17).subscribe();
+  it('patches the account balance through the JWT-scoped endpoint', () => {
+    service.updateBalance({ cashBalance: 2500.25 }).subscribe();
 
-    const req = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/accounts/17/orders`);
+    const req = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/accounts/me/balance`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ cashBalance: 2500.25 });
+    req.flush({ accountId: 17, cashBalance: 2500.25, currency: 'USD', asOf: '2026-10-01T00:00:00Z' });
+  });
+
+  it('requests order history with no query params by default', () => {
+    service.getOrders().subscribe();
+
+    const req = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/accounts/me/orders`);
     expect(req.request.params.keys()).toEqual([]);
     req.flush([]);
   });
 
   it('passes status, from and to as query params', () => {
     service
-      .getOrders(17, {
+      .getOrders({
         status: 'FILLED',
         from: '2026-01-01T00:00:00Z',
         to: new Date('2026-02-01T00:00:00Z')
       })
       .subscribe();
 
-    const req = http.expectOne((r) => r.url === `${TRADE_API_BASE_URL}/api/v1/accounts/17/orders`);
+    const req = http.expectOne((r) => r.url === `${TRADE_API_BASE_URL}/api/v1/accounts/me/orders`);
     // The generated client percent-encodes each value exactly once before
     // handing it to HttpParams, so decode before comparing.
     const param = (name: string) => decodeURIComponent(req.request.params.get(name) ?? '');
@@ -87,8 +96,8 @@ describe('TradeApiService', () => {
     expect(param('from')).toBe('2026-01-01T00:00:00.000Z');
     expect(param('to')).toBe('2026-02-01T00:00:00.000Z');
     expect(req.request.urlWithParams).toBe(
-      `${TRADE_API_BASE_URL}/api/v1/accounts/17/orders` +
-        '?status=FILLED&from=2026-01-01T00%3A00%3A00.000Z&to=2026-02-01T00%3A00%3A00.000Z'
+      `${TRADE_API_BASE_URL}/api/v1/accounts/me/orders` +
+        '?status=FILLED&from=2026-01-01T00:00:00.000Z&to=2026-02-01T00:00:00.000Z'
     );
     req.flush([]);
   });
@@ -112,10 +121,10 @@ describe('TradeApiService', () => {
 
   it('rethrows the server errorCode and message with the HTTP status', () => {
     let error: TradeApiError | undefined;
-    service.getAccount(17).subscribe({ error: (e) => (error = e) });
+    service.getAccount().subscribe({ error: (e) => (error = e) });
 
     http
-      .expectOne(`${TRADE_API_BASE_URL}/api/v1/accounts/17`)
+      .expectOne(`${TRADE_API_BASE_URL}/api/v1/accounts/me`)
       .flush({ errorCode: 'ACC-403', message: 'Account not active' }, { status: 403, statusText: 'Forbidden' });
 
     expect(error).toEqual({ errorCode: 'ACC-403', message: 'Account not active', status: 403 });
@@ -123,9 +132,9 @@ describe('TradeApiService', () => {
 
   it('reports status 0 with no errorCode when the backend is unreachable', () => {
     let error: TradeApiError | undefined;
-    service.getAccount(17).subscribe({ error: (e) => (error = e) });
+    service.getAccount().subscribe({ error: (e) => (error = e) });
 
-    http.expectOne(`${TRADE_API_BASE_URL}/api/v1/accounts/17`).error(new ProgressEvent('error'));
+    http.expectOne(`${TRADE_API_BASE_URL}/api/v1/accounts/me`).error(new ProgressEvent('error'));
 
     expect(error?.status).toBe(0);
     expect(error?.errorCode).toBe('');
@@ -185,7 +194,7 @@ describe('generated auth client wiring (provideApiClients)', () => {
 
   afterEach(() => localStorage.removeItem('auth_token'));
 
-  it('sends the bearer token on POST /kyc and maps the contract response', () => {
+  it('sends the bearer token on GET+PUT /kyc and maps the contract response', () => {
     const kyc = TestBed.inject(MockKycService);
     const http = TestBed.inject(HttpTestingController);
     let submission: KycSubmission | undefined;
@@ -194,8 +203,24 @@ describe('generated auth client wiring (provideApiClients)', () => {
       .submitKyc('user-1', { dateOfBirth: '1995-04-12', documentType: 'PASSPORT', documentNumber: 'N1234567' })
       .subscribe((s) => (submission = s));
 
+    const current = http.expectOne(`${AUTH_API_BASE_URL}/kyc`);
+    expect(current.request.method).toBe('GET');
+    expect(current.request.headers.get('Authorization')).toBe('Bearer user.jwt.token');
+    current.flush({
+      id: 42,
+      userId: 'user-1',
+      status: 'PENDING',
+      dateOfBirth: '1995-04-12',
+      documentType: 'PASSPORT',
+      documentNumber: 'N1234567',
+      submittedAt: '2026-09-30T08:00:00Z',
+      reviewedAt: null,
+      reviewedBy: null,
+      rejectionReason: null
+    });
+
     const req = http.expectOne(`${AUTH_API_BASE_URL}/kyc`);
-    expect(req.request.method).toBe('POST');
+    expect(req.request.method).toBe('PUT');
     expect(req.request.headers.get('Authorization')).toBe('Bearer user.jwt.token');
     expect(req.request.body).toEqual({
       dateOfBirth: '1995-04-12',
@@ -231,6 +256,9 @@ describe('generated auth client wiring (provideApiClients)', () => {
     const req = http.expectOne(`${AUTH_API_BASE_URL}/auth/login`);
     expect(req.request.headers.has('Authorization')).toBe(false);
     req.flush({ accessToken: 'a.b.c', refreshToken: 'r', tokenType: 'Bearer', expiresIn: 900 });
+
+    const me = http.expectOne(`${AUTH_API_BASE_URL}/auth/me`);
+    me.flush({ id: 'u-1', username: 'priya.menon', accountId: 6, roles: ['CUSTOMER'] });
     http.verify();
   });
 });

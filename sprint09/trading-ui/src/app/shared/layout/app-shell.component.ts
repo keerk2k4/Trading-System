@@ -11,6 +11,7 @@ interface NavItem {
 
 const CUSTOMER_NAV: NavItem[] = [
   { label: 'Dashboard', link: '/dashboard', icon: 'var(--tp-icon-grid)' },
+  { label: 'Funds', link: '/funds', icon: 'var(--tp-icon-wallet)' },
   { label: 'Place order', link: '/orders/new', icon: 'var(--tp-icon-order)' },
   { label: 'Orders', link: '/orders/history', icon: 'var(--tp-icon-list)' },
   { label: 'Verification', link: '/kyc-submission', icon: 'var(--tp-icon-shield)' }

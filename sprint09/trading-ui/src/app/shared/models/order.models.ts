@@ -30,6 +30,10 @@ export type Account = AccountResponse;
 export type Balance = BalanceResponse;
 export type Position = PositionResponse;
 
+export interface BalanceUpdateRequest {
+  cashBalance: number;
+}
+
 // UI-only: filter form state for the order history screen.
 export interface OrderHistoryFilter {
   status?: OrderStatus;

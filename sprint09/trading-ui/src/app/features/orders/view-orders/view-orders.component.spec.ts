@@ -2,7 +2,6 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { ViewOrdersComponent } from './view-orders.component';
-import { MockAuthService } from '../../../shared/services/mock-auth.service';
 import { TradeApiService } from '../../../shared/services/trade-api.service';
 import { Order } from '../../../shared/models/order.models';
 
@@ -24,7 +23,6 @@ function order(orderId: string, createdOn: string, extra: Partial<Order> = {}): 
 
 describe('ViewOrdersComponent', () => {
   let tradeApi: jasmine.SpyObj<TradeApiService>;
-  let accountId: number;
   let fixture: ComponentFixture<ViewOrdersComponent>;
   let page: HTMLElement;
 
@@ -32,8 +30,7 @@ describe('ViewOrdersComponent', () => {
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
-        { provide: TradeApiService, useValue: tradeApi },
-        { provide: MockAuthService, useValue: { getCurrentUser: () => ({ accountId }) } }
+        { provide: TradeApiService, useValue: tradeApi }
       ]
     });
     fixture = TestBed.createComponent(ViewOrdersComponent);
@@ -44,7 +41,6 @@ describe('ViewOrdersComponent', () => {
   const rows = () => Array.from(page.querySelectorAll('tbody tr'));
 
   beforeEach(() => {
-    accountId = 6;
     tradeApi = jasmine.createSpyObj<TradeApiService>('TradeApiService', ['getOrders']);
     tradeApi.getOrders.and.returnValue(
       of([
@@ -57,7 +53,7 @@ describe('ViewOrdersComponent', () => {
   it('lists orders newest first with side, fill price and status in words', () => {
     create();
 
-    expect(tradeApi.getOrders).toHaveBeenCalledWith(6, { status: undefined });
+    expect(tradeApi.getOrders).toHaveBeenCalledWith({ status: undefined });
     expect(rows().length).toBe(2);
     expect(rows()[0].textContent).toContain('ORD-NEW');
     expect(rows()[0].textContent).toContain('Sell');
@@ -73,7 +69,7 @@ describe('ViewOrdersComponent', () => {
     page.querySelector<HTMLInputElement>('#status-FILLED')!.click();
     fixture.detectChanges();
 
-    expect(tradeApi.getOrders).toHaveBeenCalledWith(6, { status: 'FILLED' });
+    expect(tradeApi.getOrders).toHaveBeenCalledWith({ status: 'FILLED' });
     expect(page.querySelector('.tp-empty')?.textContent).toContain('No filled orders');
   });
 
@@ -89,13 +85,5 @@ describe('ViewOrdersComponent', () => {
     create();
 
     expect(page.querySelector('[role="alert"]')?.textContent).toContain('not active');
-  });
-
-  it('does not call the API before the trading account exists', () => {
-    accountId = 0;
-    create();
-
-    expect(tradeApi.getOrders).not.toHaveBeenCalled();
-    expect(page.querySelector('[role="alert"]')?.textContent).toContain('could not be found');
   });
 });

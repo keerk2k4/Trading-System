@@ -103,6 +103,7 @@ describe('KycFormComponent', () => {
 
     expect(step(1).classList.contains('is-done')).toBeTrue();
     expect(step(2).classList.contains('is-waiting')).toBeFalse();
+    expect(step(2).classList.contains('is-done')).toBeTrue();
     expect(step(3).classList.contains('is-done')).toBeTrue();
   });
 
