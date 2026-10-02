@@ -70,6 +70,21 @@ public class ApiExceptionHandler {
         return response(HttpStatus.NOT_FOUND, "ORD-409", "Order not found");
     }
 
+    @ExceptionHandler(java.util.NoSuchElementException.class)
+    ResponseEntity<ErrorResponse> watchlistNotFound() {
+        return response(HttpStatus.NOT_FOUND, "WL-404", "Watchlist not found");
+    }
+
+    @ExceptionHandler(org.springframework.dao.DuplicateKeyException.class)
+    ResponseEntity<ErrorResponse> duplicateWatchlist() {
+        return response(HttpStatus.CONFLICT, "WL-409", "Watchlist already exists");
+    }
+
+    @ExceptionHandler(DefaultWatchlistProtectedException.class)
+    ResponseEntity<ErrorResponse> defaultWatchlistProtected() {
+        return response(HttpStatus.CONFLICT, "WL-409", "The default watchlist cannot be deleted.");
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     ResponseEntity<ErrorResponse> notCancellable() {
         return response(HttpStatus.CONFLICT, "ORD-409", "Order is not cancellable");

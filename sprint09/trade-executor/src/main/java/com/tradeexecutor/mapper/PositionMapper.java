@@ -129,14 +129,17 @@ public interface PositionMapper {
     /**
      * Find all distinct symbols that have open positions (quantity > 0).
      * Used by the market-data poller to discover which symbols to poll.
-     * 
+     *
      * @return List of distinct symbol strings
      */
     @Select("""
-        SELECT DISTINCT i.symbol FROM positions p 
-        INNER JOIN instruments i ON p.instrument_id = i.instrument_id 
+        SELECT DISTINCT i.symbol FROM trading.positions p
+        INNER JOIN trading.instruments i ON p.instrument_id = i.instrument_id
         WHERE p.quantity > 0
         """)
     List<String> findAllDistinctSymbols();
+
+    @Delete("DELETE FROM trading.positions WHERE position_id = #{positionId}")
+    int deletePosition(@Param("positionId") Long positionId);
 }
 

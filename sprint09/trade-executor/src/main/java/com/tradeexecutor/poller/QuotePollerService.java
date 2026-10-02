@@ -5,6 +5,7 @@ import com.tradeexecutor.client.QuoteResponse;
 import com.tradeexecutor.kafka.KafkaProducer;
 import com.tradeexecutor.kafka.QuotePayload;
 import com.tradeexecutor.mapper.PositionMapper;
+import com.tradeexecutor.mapper.WatchlistMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -59,18 +60,30 @@ public class QuotePollerService {
     private static final int QUOTA_LIMIT = 2000;
     
     private final PositionMapper positionMapper;
+    private final WatchlistMapper watchlistMapper;
     private final FauxnanceClient fauxnanceClient;
     private final KafkaProducer kafkaProducer;
     private final int pollIntervalSeconds;
     private long lastPollTime = 0;
-    
+
     public QuotePollerService(
             PositionMapper positionMapper,
             FauxnanceClient fauxnanceClient,
             KafkaProducer kafkaProducer,
             @Value("${app.poller.poll-interval-ms:30000}") long pollIntervalMs) {
-        
+        this(positionMapper, null, fauxnanceClient, kafkaProducer, pollIntervalMs);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public QuotePollerService(
+            PositionMapper positionMapper,
+            WatchlistMapper watchlistMapper,
+            FauxnanceClient fauxnanceClient,
+            KafkaProducer kafkaProducer,
+            @Value("${app.poller.poll-interval-ms:30000}") long pollIntervalMs) {
+
         this.positionMapper = positionMapper;
+        this.watchlistMapper = watchlistMapper;
         this.fauxnanceClient = fauxnanceClient;
         this.kafkaProducer = kafkaProducer;
         
@@ -141,24 +154,33 @@ public class QuotePollerService {
     
     /**
      * Discover symbols to poll.
-     * 
-     * Returns all distinct symbols from the Position table (symbols held by any account).
-     * Extension point: could also include watchlist symbols if implemented.
-     * 
+     *
+     * <p>Returns DISTINCT(active-position symbols UNION watchlist symbols).
+     * A {@link java.util.Set} deduplicates, so a symbol watched by many users
+     * (or both held and watched) is requested from Fauxnance and published to
+     * {@code market-data} exactly once per polling cycle.
+     *
      * @return Set of symbols to poll
      */
-    private Set<String> discoverSymbols() {
+    Set<String> discoverSymbols() {
         try {
             // Query for symbols held in positions
             List<String> heldSymbols = positionMapper.findAllDistinctSymbols();
             logger.debug("Found {} symbols in positions", heldSymbols.size());
-            
+
             Set<String> allSymbols = new HashSet<>(heldSymbols);
-            
-            // Future: add watchlist symbols here
-            // List<String> watchedSymbols = watchlistRepository.findAllDistinctSymbols();
-            // allSymbols.addAll(watchedSymbols);
-            
+
+            // Union watchlist symbols (watchlist-only stocks must also have live prices).
+            if (watchlistMapper != null) {
+                try {
+                    List<String> watchedSymbols = watchlistMapper.findAllDistinctWatchlistSymbols();
+                    logger.debug("Found {} symbols in watchlists", watchedSymbols.size());
+                    allSymbols.addAll(watchedSymbols);
+                } catch (Exception e) {
+                    logger.warn("Failed to discover watchlist symbols; polling positions only", e);
+                }
+            }
+
             return allSymbols;
         } catch (Exception e) {
             logger.error("Failed to discover symbols", e);

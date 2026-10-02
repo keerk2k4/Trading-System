@@ -59,7 +59,7 @@ public interface PositionMapper {
     @Select("""
         SELECT position_id, trading_account_id, instrument_id, product_type, quantity, average_price, realized_pnl, position_status, opened_at, closed_at, updated_at
         FROM trading.positions
-        WHERE trading_account_id = #{accountId}
+        WHERE trading_account_id = #{accountId} AND quantity > 0 AND position_status = 'OPEN'
         ORDER BY position_id
         """)
     @ConstructorArgs({
@@ -107,7 +107,7 @@ public interface PositionMapper {
     @Select("""
         SELECT position_id, trading_account_id, instrument_id, product_type, quantity, average_price, realized_pnl, position_status, opened_at, closed_at, updated_at
         FROM trading.positions
-        WHERE trading_account_id = #{accountId} AND position_status = 'OPEN'
+        WHERE trading_account_id = #{accountId} AND position_status = 'OPEN' AND quantity > 0
         ORDER BY position_id
         """)
     @Results({

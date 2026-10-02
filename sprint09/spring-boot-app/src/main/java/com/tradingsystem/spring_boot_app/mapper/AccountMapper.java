@@ -208,4 +208,11 @@ Optional<Account> findAccountByUserId(@Param("userId") String userId);
     WHERE user_id = #{userId} AND account_status = 'PENDING'
     """)
     int activatePendingAccountByUserId(@Param("userId") String userId);
+
+    @Select("""
+    SELECT user_id
+    FROM trading.trading_accounts
+    WHERE trading_account_id = #{accountId}
+    """)
+    Optional<String> findUserIdByAccountId(@Param("accountId") Long accountId);
 }

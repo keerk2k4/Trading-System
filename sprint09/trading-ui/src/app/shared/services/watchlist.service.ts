@@ -1,60 +1,36 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { Observable, catchError, forkJoin, map, of, switchMap, tap, throwError } from 'rxjs';
 import { AddStockResult, Watchlist, WatchlistStock } from '../models/watchlist.models';
-import { MarketDataService } from './market-data.service';
-import { MockAuthService } from './mock-auth.service';
+import { TradeApiService } from './trade-api.service';
 
-export const DEFAULT_WATCHLIST_ID = 'default';
 export const DEFAULT_WATCHLIST_NAME = 'Default';
 export const DEFAULT_WATCHLIST_SIZE = 10;
 export const MAX_WATCHLISTS = 20;
 export const MAX_WATCHLIST_NAME_LENGTH = 60;
 
 /**
- * Owns the user's watchlists: the seeded default list plus user-created
- * lists, the selected list, and add/remove switching.
+ * Database-backed watchlists.
  *
- * ## Persistence
+ * Membership lives in PostgreSQL (trading.watchlist / trading.watchlist_inst);
+ * live price/change come from the backend market-data cache (Kafka
+ * `market-data` -> LatestPriceCache -> REST). Nothing is stored in
+ * `localStorage` anymore; the backend is the source of truth.
  *
- * Watchlists are persisted per authenticated user in `localStorage` under
- * `tp_watchlists:<userId>`, so they survive leaving and returning to the
- * page. Frontend storage is used because the current backend offers no
- * watchlist endpoints: contracts/trade-api.yaml has no watchlist paths even
- * though the database already has `trading.watchlist` / `watchlist_inst`
- * tables (see migrations/001_initial_trading_schema.sql). No JWT secret or
- * API key is stored here; writes go through no network at all.
- *
- * ## Required backend changes (before moving off localStorage)
- *
- * Extend contracts/trade-api.yaml with JWT-scoped endpoints that resolve the
- * owner from the token's `accountId`/`sub` claim (never from a client-sent
- * user id), regenerate the trade client, and add matching Spring controllers:
- *
- * - `GET /api/v1/instruments` - searchable instrument catalog (symbol, name,
- *   price, change, changePercent) to replace MarketDataService's static list.
- * - `GET /api/v1/instruments/top-sellers?limit=10` - backs the default list.
- * - `GET /api/v1/watchlists` - the caller's lists with their symbols.
- * - `POST /api/v1/watchlists { name }` - create a list (unique name/user).
- * - `DELETE /api/v1/watchlists/{id}` - delete a non-default list.
- * - `POST /api/v1/watchlists/{id}/symbols { symbol }` - idempotent add;
- *   duplicate returns the existing entry, not a second row.
- * - `DELETE /api/v1/watchlists/{id}/symbols/{symbol}` - remove one symbol.
- *
- * All of these must require the bearer JWT (AUTH-401 otherwise) and stay
- * scoped to the caller (ACC-403 across users), mirroring the existing
- * `/api/v1/accounts/me/*` routes. Until then this service is the single
- * place to swap: keep its public method names and back them with
- * TradeApiService calls.
+ * Signals keep the existing component template working: `watchlists`,
+ * `selected`, `selectedStocks`. Async work goes through HttpClient with the
+ * JWT attached by authTokenInterceptor.
  */
 @Injectable({
   providedIn: 'root'
 })
 export class WatchlistService {
-  private readonly marketData = inject(MarketDataService);
-  private readonly authService = inject(MockAuthService);
+  private readonly tradeApi = inject(TradeApiService);
 
   private readonly lists = signal<Watchlist[]>([]);
-  private readonly selectedId = signal<string>(DEFAULT_WATCHLIST_ID);
-  private loadedKey: string | null = null;
+  private readonly selectedId = signal<string | number>('default');
+  private readonly stocks = signal<WatchlistStock[]>([]);
+  private readonly catalog = signal<WatchlistStock[]>([]);
+  private readonly loading = signal(false);
 
   /** All watchlists, default first. */
   readonly watchlists = this.lists.asReadonly();
@@ -63,133 +39,159 @@ export class WatchlistService {
   /** The currently selected watchlist (falls back to the default list). */
   readonly selected = computed<Watchlist | null>(() => {
     const all = this.lists();
-    return all.find((list) => list.id === this.selectedId()) ?? all.find((list) => list.isDefault) ?? null;
+    return (
+      all.find((list) => String(list.id) === String(this.selectedId())) ??
+      all.find((list) => list.isDefault) ??
+      null
+    );
   });
-  /** Resolved quotes for the selected watchlist, in insertion order. */
-  readonly selectedStocks = computed<WatchlistStock[]>(() => {
-    const list = this.selected();
-    if (!list) {
-      return [];
-    }
-    return list.symbols
-      .map((symbol) => this.marketData.quote(symbol))
-      .filter((stock): stock is WatchlistStock => stock !== undefined);
-  });
+  /** Live-priced quotes for the selected watchlist, in backend order. */
+  readonly selectedStocks = this.stocks.asReadonly();
+  readonly isLoading = this.loading.asReadonly();
 
   /**
-   * Loads (or seeds, on first access) the current user's watchlists. The
-   * default list is seeded once with the top 10 selling stocks; afterwards
-   * the stored state is authoritative, so removing every stock from the
-   * default list stays removed.
+   * Loads the caller's watchlists from the backend (creating the default
+   * server-side when missing), then the live-priced detail for the selected
+   * list plus the instrument catalog for search.
    */
   load(): void {
-    const key = this.storageKey();
-    if (this.loadedKey === key && this.lists().length > 0) {
-      return;
-    }
-    this.loadedKey = key;
-    const stored = this.readStored(key);
-    if (stored) {
-      this.lists.set(stored.lists);
-      this.selectedId.set(
-        stored.lists.some((list) => list.id === stored.selectedId)
-          ? stored.selectedId
-          : (stored.lists.find((list) => list.isDefault)?.id ?? stored.lists[0].id)
-      );
-      return;
-    }
-    const seeded: Watchlist = {
-      id: DEFAULT_WATCHLIST_ID,
-      name: DEFAULT_WATCHLIST_NAME,
-      isDefault: true,
-      symbols: this.marketData.topSellers(DEFAULT_WATCHLIST_SIZE).map((stock) => stock.symbol)
-    };
-    this.lists.set([seeded]);
-    this.selectedId.set(seeded.id);
-    this.persist();
+    this.loading.set(true);
+    this.tradeApi
+      .getWatchlists()
+      .pipe(
+        switchMap((lists) => {
+          const normalized = this.normalizeLists(lists);
+          this.lists.set(normalized);
+          const current = normalized.find((l) => String(l.id) === String(this.selectedId())) ??
+            normalized.find((l) => l.isDefault) ??
+            normalized[0];
+          if (current) {
+            this.selectedId.set(current.id);
+          }
+          if (!current) {
+            return of({ detail: null as never, catalog: [] as WatchlistStock[] });
+          }
+          return forkJoin({
+            detail: this.tradeApi.getWatchlistDetail(current.id).pipe(catchError(() => of(null))),
+            catalog: this.tradeApi.searchInstruments('').pipe(catchError(() => of([] as WatchlistStock[])))
+          });
+        })
+      )
+      .subscribe({
+        next: ({ detail, catalog }) => {
+          if (detail) {
+            this.applyDetail(detail);
+          }
+          this.catalog.set((catalog ?? []).map((s) => this.toStock(s)));
+          this.loading.set(false);
+        },
+        error: () => this.loading.set(false)
+      });
   }
 
-  /** Switches to another watchlist. Unknown ids are ignored. */
-  select(id: string): void {
-    if (this.selectedId() !== id && this.lists().some((list) => list.id === id)) {
-      this.selectedId.set(id);
-      this.persist();
+  /** Switches to another watchlist and refreshes its live prices. */
+  select(id: string | number): void {
+    if (String(this.selectedId()) === String(id)) {
+      return;
     }
+    if (!this.lists().some((list) => String(list.id) === String(id))) {
+      return;
+    }
+    this.selectedId.set(id);
+    this.refreshSelected();
   }
 
-  /**
-   * Creates a watchlist with the given name and selects it. Names are
-   * trimmed, must not be blank, must fit the length limit and must be unique
-   * (case-insensitive). Throws an `Error` describing the problem otherwise.
-   */
-  createWatchlist(name: string): Watchlist {
+  /** Creates a watchlist server-side and selects it. */
+  createWatchlist(name: string): Observable<Watchlist> {
     const trimmed = name.trim();
     if (!trimmed) {
-      throw new Error('Give the watchlist a name.');
+      return throwError(() => new Error('Give the watchlist a name.'));
     }
     if (trimmed.length > MAX_WATCHLIST_NAME_LENGTH) {
-      throw new Error(`Names are at most ${MAX_WATCHLIST_NAME_LENGTH} characters.`);
+      return throwError(() => new Error(`Names are at most ${MAX_WATCHLIST_NAME_LENGTH} characters.`));
     }
     if (this.lists().some((list) => list.name.toLowerCase() === trimmed.toLowerCase())) {
-      throw new Error('A watchlist with that name already exists.');
+      return throwError(() => new Error('A watchlist with that name already exists.'));
     }
     if (this.lists().length >= MAX_WATCHLISTS) {
-      throw new Error(`You can keep at most ${MAX_WATCHLISTS} watchlists.`);
+      return throwError(() => new Error(`You can keep at most ${MAX_WATCHLISTS} watchlists.`));
     }
-    const created: Watchlist = {
-      id: this.newId(),
-      name: trimmed,
-      isDefault: false,
-      symbols: []
-    };
-    this.lists.update((all) => [...all, created]);
-    this.selectedId.set(created.id);
-    this.persist();
-    return created;
+    return this.tradeApi.createWatchlist(trimmed).pipe(
+      map((created) => this.normalizeLists([created])[0]),
+      tap((created) => {
+        this.lists.update((all) => [...all, created]);
+        this.selectedId.set(created.id);
+        this.stocks.set([]);
+      }),
+      catchError((err) => {
+        const message =
+          err?.status === 409 ? 'A watchlist with that name already exists.' : (err?.message ?? 'Could not create the watchlist.');
+        return throwError(() => new Error(message));
+      })
+    );
   }
 
-  /**
-   * Deletes a user-created watchlist. The default list is protected and
-   * deleting it returns `false`. The selection falls back to the default.
-   */
-  deleteWatchlist(id: string): boolean {
-    const target = this.lists().find((list) => list.id === id);
+  /** Deletes a user-created watchlist server-side. */
+  deleteWatchlist(id: string | number): Observable<boolean> {
+    const target = this.lists().find((list) => String(list.id) === String(id));
     if (!target || target.isDefault) {
-      return false;
+      return of(false);
     }
-    this.lists.update((all) => all.filter((list) => list.id !== id));
-    if (this.selectedId() === id) {
-      this.selectedId.set(DEFAULT_WATCHLIST_ID);
-    }
-    this.persist();
-    return true;
+    return this.tradeApi.deleteWatchlist(id).pipe(
+      map(() => true),
+      tap(() => {
+        this.lists.update((all) => all.filter((list) => String(list.id) !== String(id)));
+        if (String(this.selectedId()) === String(id)) {
+          const fallback = this.lists().find((l) => l.isDefault) ?? this.lists()[0];
+          if (fallback) {
+            this.selectedId.set(fallback.id);
+            this.refreshSelected();
+          } else {
+            this.stocks.set([]);
+          }
+        }
+      }),
+      catchError(() => of(false))
+    );
   }
 
   /**
-   * Adds a stock to the currently selected watchlist. Symbols are normalised
-   * to uppercase; a symbol already present is reported as
-   * `'already-in-watchlist'` and is never duplicated. Unknown symbols throw.
+   * Adds a stock to the currently selected watchlist via the backend.
+   * Emits 'already-in-watchlist' without a request when present.
    */
-  addToSelected(symbol: string): AddStockResult {
+  addToSelected(symbol: string): Observable<AddStockResult> {
     const key = symbol.trim().toUpperCase();
-    const quote = this.marketData.quote(key);
-    if (!quote) {
-      throw new Error(`Unknown symbol "${symbol.trim()}".`);
+    if (!key) {
+      return throwError(() => new Error(`Unknown symbol "${symbol.trim()}".`));
     }
     const selected = this.selected();
     if (!selected) {
-      throw new Error('No watchlist is selected.');
+      return throwError(() => new Error('No watchlist is selected.'));
     }
-    if (selected.symbols.includes(quote.symbol)) {
-      return 'already-in-watchlist';
+    if (selected.symbols.includes(key)) {
+      return of('already-in-watchlist');
     }
-    this.lists.update((all) =>
-      all.map((list) =>
-        list.id === selected.id ? { ...list, symbols: [...list.symbols, quote.symbol] } : list
-      )
+    const known = this.catalog().some((s) => s.symbol === key) || this.stocks().some((s) => s.symbol === key);
+    void known;
+    return this.tradeApi.addWatchlistInstrument(selected.id, key).pipe(
+      map(() => 'added' as AddStockResult),
+      tap(() => {
+        this.lists.update((all) =>
+          all.map((list) =>
+            String(list.id) === String(selected.id)
+              ? { ...list, symbols: [...list.symbols, key] }
+              : list
+          )
+        );
+        this.refreshSelected();
+      }),
+      catchError((err) => {
+        if (err?.status === 404) {
+          return throwError(() => new Error(`Unknown symbol "${symbol.trim()}".`));
+        }
+        return throwError(() => new Error(err?.message ?? 'Could not add the stock.'));
+      })
     );
-    this.persist();
-    return 'added';
   }
 
   /** True when the symbol is already in the selected watchlist. */
@@ -198,7 +200,7 @@ export class WatchlistService {
     return selected?.symbols.includes(symbol.trim().toUpperCase()) ?? false;
   }
 
-  /** Removes a stock from the selected list only; other lists are untouched. */
+  /** Removes a stock from the selected list server-side. */
   removeFromSelected(symbol: string): void {
     const key = symbol.trim().toUpperCase();
     const selected = this.selected();
@@ -207,81 +209,96 @@ export class WatchlistService {
     }
     this.lists.update((all) =>
       all.map((list) =>
-        list.id === selected.id ? { ...list, symbols: list.symbols.filter((s) => s !== key) } : list
+        String(list.id) === String(selected.id)
+          ? { ...list, symbols: list.symbols.filter((s) => s !== key) }
+          : list
       )
     );
-    this.persist();
+    this.stocks.update((all) => all.filter((s) => s.symbol !== key));
+    this.tradeApi.removeWatchlistInstrument(selected.id, key).subscribe({
+      error: () => this.refreshSelected()
+    });
   }
 
-  /** Search passthrough to the market-data source (name or symbol). */
+  /** Sync filter over the backend instrument catalog (name or symbol). */
   search(query: string): WatchlistStock[] {
-    return this.marketData.search(query);
-  }
-
-  private storageKey(): string {
-    const user = this.authService.getCurrentUser();
-    return `tp_watchlists:${user?.id ?? 'guest'}`;
-  }
-
-  private readStored(key: string): { lists: Watchlist[]; selectedId: string } | null {
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) {
-        return null;
-      }
-      const parsed = JSON.parse(raw) as Watchlist[] | { lists: Watchlist[]; selectedId: string };
-      // Tolerates the original plain-array shape as well as the current
-      // `{ lists, selectedId }` shape, so older stored state keeps working.
-      const storedLists = Array.isArray(parsed) ? parsed : parsed.lists;
-      const storedSelection = Array.isArray(parsed) ? DEFAULT_WATCHLIST_ID : parsed.selectedId;
-      if (!Array.isArray(storedLists)) {
-        return null;
-      }
-      const valid = storedLists.filter(
-        (list): list is Watchlist =>
-          typeof list?.id === 'string' && typeof list?.name === 'string' && Array.isArray(list?.symbols)
-      );
-      if (valid.length === 0) {
-        return null;
-      }
-      // The default list is structural: it must always exist and stay first.
-      const rest = valid.filter((list) => list.id !== DEFAULT_WATCHLIST_ID);
-      const storedDefault = valid.find((list) => list.id === DEFAULT_WATCHLIST_ID);
-      const normalized: Watchlist[] = [
-        {
-          id: DEFAULT_WATCHLIST_ID,
-          name: typeof storedDefault?.name === 'string' && storedDefault.name ? storedDefault.name : DEFAULT_WATCHLIST_NAME,
-          isDefault: true,
-          symbols: [...new Set((storedDefault?.symbols ?? []).map((s) => String(s).toUpperCase()))]
-        },
-        ...rest.map((list) => ({
-          ...list,
-          isDefault: false,
-          symbols: [...new Set(list.symbols.map((s) => String(s).toUpperCase()))]
-        }))
-      ];
-      return { lists: normalized, selectedId: storedSelection };
-    } catch {
-      return null;
+    const key = query.trim().toLowerCase();
+    if (!key) {
+      return [];
     }
+    // Prefer the backend catalog; fall back to selected stocks when offline.
+    const base = this.catalog().length > 0 ? this.catalog() : this.stocks();
+    return base.filter(
+      (stock) => stock.symbol.toLowerCase().includes(key) || stock.companyName.toLowerCase().includes(key)
+    );
   }
 
-  private persist(): void {
-    if (this.loadedKey === null) {
+  /** Live quote for one symbol from the selected detail or catalog. */
+  quote(symbol: string): WatchlistStock | undefined {
+    const key = symbol.trim().toUpperCase();
+    return (
+      this.stocks().find((s) => s.symbol === key) ?? this.catalog().find((s) => s.symbol === key)
+    );
+  }
+
+  private refreshSelected(): void {
+    const selected = this.selected();
+    if (!selected) {
+      this.stocks.set([]);
       return;
     }
-    try {
-      localStorage.setItem(this.loadedKey, JSON.stringify({ lists: this.lists(), selectedId: this.selectedId() }));
-    } catch {
-      // Storage full or unavailable (private mode): the in-memory state
-      // still works for this visit; there is nothing useful to show.
+    this.tradeApi.getWatchlistDetail(selected.id).subscribe({
+      next: (detail) => this.applyDetail(detail),
+      error: () => {
+        // Keep membership (symbols) even when live prices are unavailable.
+        this.stocks.set(
+          selected.symbols.map((symbol) => ({
+            symbol,
+            companyName: this.catalog().find((s) => s.symbol === symbol)?.companyName ?? symbol,
+            price: this.catalog().find((s) => s.symbol === symbol)?.price ?? 0,
+            change: 0,
+            changePercent: 0
+          }))
+        );
+      }
+    });
+  }
+
+  private applyDetail(detail: { id: number; name: string; isDefault: boolean; stocks: Array<{ symbol: string; name: string; price: number; change: number; changePercent: number }> }): void {
+    this.lists.update((all) =>
+      all.map((list) =>
+        String(list.id) === String(detail.id)
+          ? { ...list, name: detail.name, isDefault: detail.isDefault, symbols: detail.stocks.map((s) => s.symbol) }
+          : list
+      )
+    );
+    this.stocks.set(detail.stocks.map((s) => this.toStock(s)));
+    for (const s of detail.stocks) {
+      const normalized = this.toStock(s);
+      if (!this.catalog().some((c) => c.symbol === normalized.symbol)) {
+        this.catalog.update((all) => [...all, normalized]);
+      }
     }
   }
 
-  private newId(): string {
-    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-      return crypto.randomUUID();
-    }
-    return `wl-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+  private normalizeLists(lists: Array<{ id: string | number; name: string; isDefault: boolean; symbols: string[] }>): Watchlist[] {
+    const mapped: Watchlist[] = lists.map((l) => ({
+      id: l.id,
+      name: l.name,
+      isDefault: l.isDefault,
+      symbols: [...new Set((l.symbols ?? []).map((s) => String(s).toUpperCase()))]
+    }));
+    mapped.sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
+    return mapped;
+  }
+
+  private toStock(s: { symbol: string; name?: string; companyName?: string; price: number; change: number; changePercent: number }): WatchlistStock {
+    return {
+      symbol: String(s.symbol).toUpperCase(),
+      companyName: s.companyName ?? s.name ?? s.symbol,
+      price: Number(s.price ?? 0),
+      change: Number(s.change ?? 0),
+      changePercent: Number(s.changePercent ?? 0)
+    };
   }
 }

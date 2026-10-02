@@ -2,6 +2,8 @@ package com.tradingsystem.spring_boot_app.service;
 
 import com.tradingsystem.spring_boot_app.dto.internal.InternalAccountResponse;
 import com.tradingsystem.spring_boot_app.mapper.AccountMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,13 +13,22 @@ import java.util.Optional;
 @Service
 public class InternalAccountService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(InternalAccountService.class);
     private static final BigDecimal STARTING_BALANCE = BigDecimal.ZERO;
     private static final String STARTING_STATUS = "PENDING";
 
     private final AccountMapper accountMapper;
+    private final WatchlistService watchlistService;
 
-    public InternalAccountService(AccountMapper accountMapper) {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public InternalAccountService(AccountMapper accountMapper, WatchlistService watchlistService) {
         this.accountMapper = accountMapper;
+        this.watchlistService = watchlistService;
+    }
+
+    /** Backwards-compatible constructor for existing unit tests. */
+    public InternalAccountService(AccountMapper accountMapper) {
+        this(accountMapper, null);
     }
 
     @Transactional
@@ -26,7 +37,20 @@ public class InternalAccountService {
 
         Long newAccountId = accountMapper.insertAccount(accountNumber, userId, STARTING_STATUS);
 
+        ensureDefaultWatchlist(userId);
+
         return new InternalAccountResponse(newAccountId, accountNumber, STARTING_BALANCE, STARTING_STATUS);
+    }
+
+    private void ensureDefaultWatchlist(String userId) {
+        if (watchlistService == null) {
+            return;
+        }
+        try {
+            watchlistService.ensureDefaultWatchlist(userId);
+        } catch (Exception e) {
+            LOGGER.warn("Failed to create default watchlist for user {}", userId, e);
+        }
     }
 
     @Transactional

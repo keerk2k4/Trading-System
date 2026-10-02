@@ -89,6 +89,57 @@ export class TradeApiService {
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
+  // GET /api/v1/watchlists
+  getWatchlists(): Observable<import('../models/watchlist.models').Watchlist[]> {
+    return this.http
+      .get<import('../models/watchlist.models').Watchlist[]>(`${TRADE_API_BASE_URL}/api/v1/watchlists`)
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // POST /api/v1/watchlists
+  createWatchlist(name: string): Observable<import('../models/watchlist.models').Watchlist> {
+    return this.http
+      .post<import('../models/watchlist.models').Watchlist>(`${TRADE_API_BASE_URL}/api/v1/watchlists`, { name })
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // GET /api/v1/watchlists/{id}
+  getWatchlistDetail(id: number | string): Observable<import('../models/watchlist.models').WatchlistDetail> {
+    return this.http
+      .get<import('../models/watchlist.models').WatchlistDetail>(`${TRADE_API_BASE_URL}/api/v1/watchlists/${id}`)
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // DELETE /api/v1/watchlists/{id}
+  deleteWatchlist(id: number | string): Observable<void> {
+    return this.http
+      .delete<void>(`${TRADE_API_BASE_URL}/api/v1/watchlists/${id}`)
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // POST /api/v1/watchlists/{id}/instruments
+  addWatchlistInstrument(id: number | string, symbol: string): Observable<import('../models/watchlist.models').WatchlistStock> {
+    return this.http
+      .post<import('../models/watchlist.models').WatchlistStock>(
+        `${TRADE_API_BASE_URL}/api/v1/watchlists/${id}/instruments`, { symbol })
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // DELETE /api/v1/watchlists/{id}/instruments/{symbol}
+  removeWatchlistInstrument(id: number | string, symbol: string): Observable<void> {
+    return this.http
+      .delete<void>(`${TRADE_API_BASE_URL}/api/v1/watchlists/${id}/instruments/${encodeURIComponent(symbol)}`)
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // GET /api/v1/instruments?search=
+  searchInstruments(query: string): Observable<import('../models/watchlist.models').WatchlistStock[]> {
+    return this.http
+      .get<import('../models/watchlist.models').WatchlistStock[]>(
+        `${TRADE_API_BASE_URL}/api/v1/instruments`, { params: { search: query } })
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
   // Same idea as MockAuthService.rethrowServerError: unwrap the server's
   // { errorCode, message } body so components keep reading `err.errorCode`.
   // The HTTP status is carried along too, because a request that never

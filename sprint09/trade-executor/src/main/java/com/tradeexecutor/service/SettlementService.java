@@ -283,6 +283,18 @@ public class SettlementService {
                 updatedAveragePrice = current.getAveragePrice().setScale(2, RoundingMode.HALF_UP);
             }
 
+            if (updatedQuantity == 0) {
+                // Fully sold: remove the active position row. The SELL order
+                // itself remains in orders/order_history as the audit trail.
+                int deleted = positionMapper.deletePosition(current.getPositionId());
+                if (deleted == 0) {
+                    throw new IllegalStateException("Failed to remove sold-out position for account " + accountId + " and instrument " + instrumentId);
+                }
+                logger.info("    ✓ Position fully sold and removed (positionId={})",
+                    current.getPositionId());
+                return;
+            }
+
             int updated = positionMapper.updatePosition(current.getPositionId(), updatedQuantity, updatedAveragePrice);
             if (updated == 0) {
                 throw new IllegalStateException("Failed to update position for account " + accountId + " and instrument " + instrumentId);
@@ -362,6 +374,16 @@ public class SettlementService {
                 }
                 // SELL preserves weighted average cost basis; only quantity changes.
                 updatedAveragePrice = current.getAveragePrice().setScale(2, RoundingMode.HALF_UP);
+            }
+
+            if (updatedQuantity == 0) {
+                int deleted = holdingMapper.deleteHolding(current.getHoldingId());
+                if (deleted == 0) {
+                    throw new IllegalStateException("Failed to remove sold-out holding for account " + accountId + " and instrument " + instrumentId);
+                }
+                logger.info("    ✓ Holding fully sold and removed (holdingId={})",
+                    current.getHoldingId());
+                return;
             }
 
             int updated = holdingMapper.updateHolding(current.getHoldingId(), updatedQuantity, updatedAveragePrice);

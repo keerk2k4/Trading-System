@@ -57,4 +57,7 @@ public interface HoldingMapper {
         WHERE holding_id = #{holdingId}
         """)
     int updateHolding(@Param("holdingId") Long holdingId, @Param("quantity") int quantity, @Param("averagePrice") BigDecimal averagePrice);
+
+    @Delete("DELETE FROM trading.holdings WHERE holding_id = #{holdingId}")
+    int deleteHolding(@Param("holdingId") Long holdingId);
 }

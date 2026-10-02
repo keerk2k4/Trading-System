@@ -23,11 +23,14 @@ public class AccountService {
     private final AccountMapper accounts;
     private final PositionMapper positions;
     private final OrderMapper orders;
+    private final LatestPriceCache prices;
 
-    public AccountService(AccountMapper accounts, PositionMapper positions, OrderMapper orders) {
+    public AccountService(AccountMapper accounts, PositionMapper positions, OrderMapper orders,
+                          LatestPriceCache prices) {
         this.accounts = accounts;
         this.positions = positions;
         this.orders = orders;
+        this.prices = prices != null ? prices : new LatestPriceCache();
     }
 
     public AccountResponse getAccount(long id) {
@@ -55,7 +58,9 @@ public class AccountService {
 
     public List<PositionResponse> getPositions(long id) {
         account(id);
-        return positions.findPositionsByAccountId(id).stream().map(this::position).toList();
+        return positions.findPositionsByAccountId(id).stream()
+            .filter(p -> p.getQuantity() > 0 && !"CLOSED".equalsIgnoreCase(p.getPositionStatus()))
+            .map(this::position).toList();
     }
 
     public List<OrderHistoryEntry> getOrders(long id, OrderStatus status,
@@ -73,8 +78,15 @@ public class AccountService {
     }
 
     private PositionResponse position(Position position) {
+        String symbol = position.getInstrument().getSymbol();
+        java.math.BigDecimal currentPrice = prices.get(symbol)
+                .map(com.tradingsystem.spring_boot_app.kafka.QuotePayload::price)
+                .orElse(null);
+        java.math.BigDecimal marketValue = currentPrice == null ? null
+                : currentPrice.multiply(java.math.BigDecimal.valueOf(position.getQuantity()));
         return new PositionResponse(position.getAccount().getAccountId(),
-                position.getInstrument().getSymbol(), position.getQuantity(), position.getAveragePrice());
+                symbol, position.getQuantity(), position.getAveragePrice(),
+                currentPrice, marketValue);
     }
 
     private OrderHistoryEntry order(Order order) {

@@ -41,7 +41,7 @@ public interface InstrumentMapper {
      */
     @Select("""
         SELECT instrument_id, symbol, display_name, asset_class, quotation_currency, status
-        FROM instruments
+        FROM trading.instruments
         WHERE instrument_id = #{instrumentId}
         """)
     @Results({
@@ -68,7 +68,7 @@ public interface InstrumentMapper {
      */
     @Select("""
         SELECT instrument_id, symbol, display_name, asset_class, quotation_currency, status
-        FROM instruments
+        FROM trading.instruments
         WHERE symbol = #{symbol}
         """)
     @Results({
@@ -93,7 +93,7 @@ public interface InstrumentMapper {
      */
     @Select("""
         SELECT instrument_id, symbol, display_name, asset_class, quotation_currency, status
-        FROM instruments
+        FROM trading.instruments
         WHERE status = #{status}
         ORDER BY symbol
         """)
@@ -103,6 +103,13 @@ public interface InstrumentMapper {
         @Result(property = "displayName", column = "display_name"),
         @Result(property = "assetClass", column = "asset_class"),
         @Result(property = "quotationCurrency", column = "quotation_currency")
+    })
+    @ConstructorArgs({
+        @Arg(column = "instrument_id", javaType = Long.class),
+        @Arg(column = "symbol", javaType = String.class),
+        @Arg(column = "display_name", javaType = String.class),
+        @Arg(column = "asset_class", javaType = com.tradingsystem.domain.enums.AssetClass.class),
+        @Arg(column = "quotation_currency", javaType = String.class)
     })
     List<Instrument> findInstrumentsByStatus(@Param("status") String status);
     
@@ -123,6 +130,6 @@ public interface InstrumentMapper {
      * Counts total instruments.
      * @return the count of instruments
      */
-    @Select("SELECT COUNT(*) FROM instruments")
+    @Select("SELECT COUNT(*) FROM trading.instruments")
     int countInstruments();
 }

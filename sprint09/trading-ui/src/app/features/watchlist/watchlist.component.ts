@@ -393,31 +393,22 @@ export class WatchlistComponent implements OnInit {
   protected readonly createMode = signal(false);
   protected readonly newName = signal('');
   protected readonly createError = signal('');
-  protected readonly pendingDeleteId = signal<string | null>(null);
+  protected readonly pendingDeleteId = signal<string | number | null>(null);
 
-  protected readonly isLoading = signal(false);
+  protected readonly isLoading = this.service.isLoading;
   protected readonly errorMessage = signal('');
   protected readonly notice = signal('');
 
   ngOnInit(): void {
-    this.isLoading.set(true);
     this.errorMessage.set('');
-    try {
-      this.service.load();
-    } catch {
-      // Watchlists live in local storage, not on the network: a failure here
-      // means the stored state is unreadable, never a dropped HTTP call.
-      this.errorMessage.set('Could not load your watchlists. Please try again.');
-    } finally {
-      this.isLoading.set(false);
-    }
+    this.service.load();
   }
 
-  protected stockCount(id: string): number {
-    return this.watchlists().find((list) => list.id === id)?.symbols.length ?? 0;
+  protected stockCount(id: string | number): number {
+    return this.watchlists().find((list) => String(list.id) === String(id))?.symbols.length ?? 0;
   }
 
-  protected onSwitch(id: string): void {
+  protected onSwitch(id: string | number): void {
     this.service.select(id);
     this.pendingDeleteId.set(null);
     this.notice.set('');
@@ -432,17 +423,19 @@ export class WatchlistComponent implements OnInit {
   protected create(event: Event): void {
     event.preventDefault();
     this.createError.set('');
-    try {
-      const created = this.service.createWatchlist(this.newName());
-      this.createMode.set(false);
-      this.newName.set('');
-      this.notice.set(`Watchlist “${created.name}” created.`);
-    } catch (err) {
-      this.createError.set(err instanceof Error ? err.message : 'Could not create the watchlist.');
-    }
+    this.service.createWatchlist(this.newName()).subscribe({
+      next: (created) => {
+        this.createMode.set(false);
+        this.newName.set('');
+        this.notice.set(`Watchlist “${created.name}” created.`);
+      },
+      error: (err) => {
+        this.createError.set(err instanceof Error ? err.message : 'Could not create the watchlist.');
+      }
+    });
   }
 
-  protected requestDelete(id: string): void {
+  protected requestDelete(id: string | number): void {
     this.pendingDeleteId.set(id);
   }
 
@@ -452,28 +445,39 @@ export class WatchlistComponent implements OnInit {
 
   protected confirmDelete(): void {
     const id = this.pendingDeleteId();
-    if (!id) {
+    if (id === null || id === undefined) {
       return;
     }
-    const target = this.watchlists().find((list) => list.id === id);
-    const removed = this.service.deleteWatchlist(id);
-    this.pendingDeleteId.set(null);
-    if (removed && target) {
-      this.notice.set(`Watchlist “${target.name}” deleted.`);
-    }
+    const target = this.watchlists().find((list) => String(list.id) === String(id));
+    this.service.deleteWatchlist(id).subscribe({
+      next: (removed) => {
+        this.pendingDeleteId.set(null);
+        if (removed && target) {
+          this.notice.set(`Watchlist “${target.name}” deleted.`);
+        } else if (!removed) {
+          this.notice.set('Could not delete the watchlist.');
+        }
+      },
+      error: () => {
+        this.pendingDeleteId.set(null);
+        this.notice.set('Could not delete the watchlist.');
+      }
+    });
   }
 
   protected add(symbol: string): void {
     this.notice.set('');
-    try {
-      const result = this.service.addToSelected(symbol);
-      const name = this.selected()?.name ?? 'watchlist';
-      this.notice.set(
-        result === 'added' ? `${symbol.trim().toUpperCase()} added to “${name}”.` : 'Already in watchlist'
-      );
-    } catch (err) {
-      this.notice.set(err instanceof Error ? err.message : 'Could not add the stock.');
-    }
+    this.service.addToSelected(symbol).subscribe({
+      next: (result) => {
+        const name = this.selected()?.name ?? 'watchlist';
+        this.notice.set(
+          result === 'added' ? `${symbol.trim().toUpperCase()} added to “${name}”.` : 'Already in watchlist'
+        );
+      },
+      error: (err) => {
+        this.notice.set(err instanceof Error ? err.message : 'Could not add the stock.');
+      }
+    });
   }
 
   protected remove(symbol: string): void {

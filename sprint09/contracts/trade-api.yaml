@@ -73,6 +73,8 @@ tags:
     description: Placing and cancelling orders.
   - name: Accounts
     description: Account details, cash balance, holdings and order history.
+  - name: Watchlists
+    description: Database-backed watchlists enriched with live market-data prices.
 
 security:
   - bearerAuth: []
@@ -472,6 +474,213 @@ paths:
         '404':
           $ref: '#/components/responses/AccountNotFound'
 
+  /api/v1/watchlists:
+    get:
+      tags: [Watchlists]
+      operationId: getWatchlists
+      summary: List the signed-in user's watchlists
+      description: |
+        Persistent watchlists from PostgreSQL (trading.watchlist /
+        trading.watchlist_inst). Ownership is resolved from the JWT
+        `accountId` claim; watchlists are isolated between users. The default
+        watchlist is created on demand if missing.
+      responses:
+        '200':
+          description: Watchlists for the caller.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WatchlistResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+    post:
+      tags: [Watchlists]
+      operationId: createWatchlist
+      summary: Create a watchlist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWatchlistRequest'
+      responses:
+        '201':
+          description: Watchlist created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WatchlistResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+        '409':
+          description: A watchlist with that name already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+  /api/v1/watchlists/{watchlistId}:
+    get:
+      tags: [Watchlists]
+      operationId: getWatchlist
+      summary: Get one watchlist with live prices
+      description: |
+        Persistent membership from PostgreSQL combined with the latest
+        `market-data` quote from the backend in-memory cache. Live
+        price/change values are never persisted.
+      parameters:
+        - name: watchlistId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Watchlist detail with live prices.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WatchlistDetailResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/AccountNotActive'
+        '404':
+          description: Watchlist or account not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [Watchlists]
+      operationId: deleteWatchlist
+      summary: Delete a non-default watchlist
+      parameters:
+        - name: watchlistId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Watchlist deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/AccountNotActive'
+        '404':
+          description: Watchlist or account not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The default watchlist cannot be deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/watchlists/{watchlistId}/instruments:
+    post:
+      tags: [Watchlists]
+      operationId: addWatchlistInstrument
+      summary: Add an instrument to a watchlist
+      parameters:
+        - name: watchlistId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddWatchlistInstrumentRequest'
+      responses:
+        '201':
+          description: Instrument added with live price.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WatchlistStockResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/AccountNotActive'
+        '404':
+          description: Watchlist, account or instrument not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/watchlists/{watchlistId}/instruments/{symbol}:
+    delete:
+      tags: [Watchlists]
+      operationId: removeWatchlistInstrument
+      summary: Remove an instrument from a watchlist
+      parameters:
+        - name: watchlistId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Instrument removed.
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/AccountNotActive'
+        '404':
+          description: Watchlist or account not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/instruments:
+    get:
+      tags: [Watchlists]
+      operationId: searchInstruments
+      summary: Search tradable instruments with live prices
+      parameters:
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Matching instruments with live prices.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InstrumentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+
   /api/v1/accounts/me/orders:
     get:
       tags: [Accounts]
@@ -832,6 +1041,118 @@ components:
             Weighted average cost basis per unit. A buy recalculates it. A sell reduces quantity and
             leaves it unchanged, which is what makes realised profit and loss computable later.
           example: 25.50
+        currentPrice:
+          type: [number, 'null']
+          format: double
+          description: Latest market-data price from the backend cache. Null when no quote seen yet.
+          example: 245.30
+        marketValue:
+          type: [number, 'null']
+          format: double
+          description: quantity multiplied by currentPrice. Null when no quote seen yet.
+          example: 2453.00
+
+    WatchlistResponse:
+      type: object
+      additionalProperties: false
+      required: [id, name, isDefault, symbols]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          example: Default
+        isDefault:
+          type: boolean
+          example: true
+        symbols:
+          type: array
+          items:
+            type: string
+          example: [AAPL, MSFT]
+
+    WatchlistDetailResponse:
+      type: object
+      additionalProperties: false
+      required: [id, name, isDefault, stocks]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        isDefault:
+          type: boolean
+        stocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/WatchlistStockResponse'
+
+    WatchlistStockResponse:
+      type: object
+      additionalProperties: false
+      required: [symbol, name, price, change, changePercent]
+      properties:
+        symbol:
+          type: string
+          example: AAPL
+        name:
+          type: string
+          example: Apple Inc.
+        price:
+          type: number
+          format: double
+          description: Latest market-data price; reference instruments.price when no quote yet.
+          example: 245.30
+        change:
+          type: number
+          format: double
+          example: 1.25
+        changePercent:
+          type: number
+          format: double
+          example: 0.51
+
+    CreateWatchlistRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 60
+          example: Technology
+
+    AddWatchlistInstrumentRequest:
+      type: object
+      additionalProperties: false
+      required: [symbol]
+      properties:
+        symbol:
+          type: string
+          maxLength: 20
+          example: AAPL
+
+    InstrumentResponse:
+      type: object
+      additionalProperties: false
+      required: [symbol, name, price, change, changePercent]
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+          format: double
+        change:
+          type: number
+          format: double
+        changePercent:
+          type: number
+          format: double
 
     ErrorResponse:
       type: object

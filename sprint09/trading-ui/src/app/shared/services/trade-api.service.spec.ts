@@ -121,6 +121,38 @@ describe('TradeApiService', () => {
     req.flush({ orderId: 'ORD-1', status: 'NEW' });
   });
 
+  it('fetches watchlists and live-priced detail from the backend', () => {
+    service.getWatchlists().subscribe();
+    service.getWatchlistDetail(1).subscribe();
+
+    const lists = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/watchlists`);
+    const detail = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/watchlists/1`);
+    expect(lists.request.method).toBe('GET');
+    expect(detail.request.method).toBe('GET');
+    expect(lists.request.headers.get('Authorization')).toBe('Bearer test.jwt.token');
+    lists.flush([]);
+    detail.flush({ id: 1, name: 'Default', isDefault: true, stocks: [] });
+  });
+
+  it('creates, adds to and removes from watchlists through the backend', () => {
+    service.createWatchlist('Tech').subscribe();
+    const created = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/watchlists`);
+    expect(created.request.method).toBe('POST');
+    expect(created.request.body).toEqual({ name: 'Tech' });
+    created.flush({ id: 2, name: 'Tech', isDefault: false, symbols: [] });
+
+    service.addWatchlistInstrument(2, 'AAPL').subscribe();
+    const added = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/watchlists/2/instruments`);
+    expect(added.request.method).toBe('POST');
+    expect(added.request.body).toEqual({ symbol: 'AAPL' });
+    added.flush({ symbol: 'AAPL', name: 'Apple Inc.', price: 1, change: 0, changePercent: 0 });
+
+    service.removeWatchlistInstrument(2, 'AAPL').subscribe();
+    const removed = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/watchlists/2/instruments/AAPL`);
+    expect(removed.request.method).toBe('DELETE');
+    removed.flush(null);
+  });
+
   it('rethrows the server errorCode and message with the HTTP status', () => {
     let error: TradeApiError | undefined;
     service.getAccount().subscribe({ error: (e) => (error = e) });

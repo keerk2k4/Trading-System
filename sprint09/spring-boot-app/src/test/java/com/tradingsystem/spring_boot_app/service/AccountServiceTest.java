@@ -54,7 +54,8 @@ class AccountServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AccountService(accounts, positions, orders);
+        service = new AccountService(accounts, positions, orders,
+                new com.tradingsystem.spring_boot_app.service.LatestPriceCache());
     }
 
     @Test

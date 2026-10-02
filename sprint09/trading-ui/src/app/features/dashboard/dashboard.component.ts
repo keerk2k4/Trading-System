@@ -42,7 +42,7 @@ interface PortfolioSummary {
         <div class="tp-panel tp-stat tp-stat-primary">
           <p class="tp-stat-label">Total portfolio</p>
           <p class="tp-stat-value">{{ (summary()?.total | currency: currency()) ?? '—' }}</p>
-          <p class="tp-stat-meta">Cash plus holdings at cost</p>
+          <p class="tp-stat-meta">Cash plus holdings at live price</p>
         </div>
         <div class="tp-panel tp-stat">
           <p class="tp-stat-label">Available cash</p>
@@ -66,7 +66,7 @@ interface PortfolioSummary {
         <section class="tp-panel" aria-labelledby="positions-heading">
           <div class="tp-panel-header">
             <h2 id="positions-heading">Positions</h2>
-            <p>Valued at average cost</p>
+            <p>Live price from market-data; falls back to average cost</p>
           </div>
           @if (isLoading()) {
             <p class="tp-empty">Loading positions…</p>
@@ -83,7 +83,8 @@ interface PortfolioSummary {
                     <th scope="col">Symbol</th>
                     <th scope="col" class="num">Quantity</th>
                     <th scope="col" class="num">Avg cost</th>
-                    <th scope="col" class="num">Cost basis</th>
+                    <th scope="col" class="num">Live price</th>
+                    <th scope="col" class="num">Market value</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -92,7 +93,8 @@ interface PortfolioSummary {
                       <td><strong>{{ position.symbol }}</strong></td>
                       <td class="num">{{ position.quantity | number }}</td>
                       <td class="num">{{ position.averageCost | currency: currency() }}</td>
-                      <td class="num">{{ position.quantity * position.averageCost | currency: currency() }}</td>
+                      <td class="num">{{ (position.currentPrice ?? position.averageCost) | currency: currency() }}</td>
+                      <td class="num">{{ (position.marketValue ?? position.quantity * position.averageCost) | currency: currency() }}</td>
                     </tr>
                   }
                 </tbody>
@@ -154,10 +156,11 @@ export class DashboardComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: ({ account, balance, positions }) => {
-          // The positions endpoint carries no market price, so holdings are
-          // valued at cost: quantity x average cost per position.
+          // Positions carry the latest market-data price when the backend has
+          // seen a quote; otherwise fall back to average cost.
           const holdings = positions.reduce(
-            (total, position) => total + position.quantity * position.averageCost,
+            (total, position) =>
+              total + (position.marketValue ?? position.quantity * position.averageCost),
             0
           );
 
