@@ -20,7 +20,7 @@ import { safeReturnUrl } from '../../../shared/guards/safe-return-url';
     >
       <form class="tp-form" [formGroup]="form" (ngSubmit)="onSubmit()">
         @if (errorMessage(); as message) {
-          <div class="tp-alert tp-alert-error" role="alert">
+          <div class="tp-alert tp-alert-error" role="alert" data-testid="login-error">
             <span>{{ message }}</span>
           </div>
         }

@@ -104,7 +104,7 @@ export const POLL_MAX_DURATION_MS = 5 * 60_000;
               </thead>
               <tbody>
                 @for (order of orders(); track order.orderId) {
-                  <tr>
+                  <tr data-testid="order-row" [attr.data-order-id]="order.orderId">
                     <td class="tp-mono">{{ order.orderId }}</td>
                     <td class="tp-muted">{{ order.createdOn | date: 'MMM d, y, h:mm a' }}</td>
                     <td><strong>{{ order.symbol }}</strong></td>
@@ -116,7 +116,7 @@ export const POLL_MAX_DURATION_MS = 5 * 60_000;
                     <td class="num">{{ order.quantity | number }}</td>
                     <td class="num">{{ order.price | currency }}</td>
                     <td class="num">{{ (order.executedPrice | currency) ?? '—' }}</td>
-                    <td><app-status-badge [status]="order.status" /></td>
+                    <td><app-status-badge data-testid="order-status" [status]="order.status" /></td>
                   </tr>
                 }
               </tbody>
@@ -124,7 +124,7 @@ export const POLL_MAX_DURATION_MS = 5 * 60_000;
           </div>
         }
 
-        <details class="guide">
+        <details class="guide" data-testid="status-guide">
           <summary>What do the statuses mean?</summary>
           <dl>
             <div><dt><app-status-badge status="NEW" /></dt><dd>Submitted and waiting for execution. This is the normal state.</dd></div>

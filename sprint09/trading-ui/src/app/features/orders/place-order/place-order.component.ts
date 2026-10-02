@@ -71,22 +71,22 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
           <div class="tp-panel-body">
             @if (placedOrder(); as order) {
               <div class="tp-form">
-                <div class="tp-alert tp-alert-success" role="status">
+                <div class="tp-alert tp-alert-success" role="status" data-testid="order-result">
                   <span>{{ order.message || 'Your order has been submitted.' }}</span>
                 </div>
                 <dl class="tp-details">
-                  <div><dt>Order ID</dt><dd class="tp-mono">{{ order.orderId }}</dd></div>
-                  <div><dt>Status</dt><dd><app-status-badge [status]="order.status" /></dd></div>
+                  <div><dt>Order ID</dt><dd class="tp-mono" data-testid="order-id">{{ order.orderId }}</dd></div>
+                  <div><dt>Status</dt><dd><app-status-badge data-testid="order-status" [status]="order.status" /></dd></div>
                 </dl>
                 <div class="tp-actions">
-                  <a class="tp-btn tp-btn-primary" routerLink="/orders/history">View orders</a>
+                  <a class="tp-btn tp-btn-primary" routerLink="/orders/history" data-testid="order-view-orders">View orders</a>
                   <button class="tp-btn tp-btn-secondary" type="button" (click)="resetForm()">Place another order</button>
                 </div>
               </div>
             } @else {
               <form class="tp-form" [formGroup]="form" (ngSubmit)="onPlaceOrder()">
                 @if (errorMessage(); as message) {
-                  <div class="tp-alert tp-alert-error" role="alert"><span>{{ message }}</span></div>
+                  <div class="tp-alert tp-alert-error" role="alert" data-testid="order-error"><span>{{ message }}</span></div>
                 }
 
                 <fieldset class="tp-segmented">
@@ -100,7 +100,7 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                       formControlName="side"
                       [attr.aria-describedby]="sideError() ? 'side-error' : null"
                     />
-                    <label for="side-buy" class="is-buy">Buy</label>
+                    <label for="side-buy" class="is-buy" data-testid="order-side-buy">Buy</label>
                     <input
                       type="radio"
                       id="side-sell"
@@ -109,7 +109,7 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                       formControlName="side"
                       [attr.aria-describedby]="sideError() ? 'side-error' : null"
                     />
-                    <label for="side-sell" class="is-sell">Sell</label>
+                    <label for="side-sell" class="is-sell" data-testid="order-side-sell">Sell</label>
                   </div>
                   @if (sideError(); as message) {
                     <p class="tp-field-error" id="side-error">{{ message }}</p>
@@ -121,6 +121,7 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                   <input
                     class="tp-input symbol"
                     id="symbol"
+                    data-testid="order-symbol"
                     type="text"
                     formControlName="symbol"
                     autocomplete="off"
@@ -143,6 +144,7 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                     <input
                       class="tp-input tp-num"
                       id="quantity"
+                      data-testid="order-quantity"
                       type="number"
                       inputmode="numeric"
                       min="1"
@@ -153,7 +155,7 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                       [attr.aria-describedby]="quantityError() ? 'quantity-error' : null"
                     />
                     @if (quantityError(); as message) {
-                      <p class="tp-field-error" id="quantity-error">{{ message }}</p>
+                      <p class="tp-field-error" id="quantity-error" data-testid="order-error-quantity">{{ message }}</p>
                     }
                   </div>
                   <div>
@@ -161,6 +163,7 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                     <input
                       class="tp-input tp-num"
                       id="price"
+                      data-testid="order-price"
                       type="number"
                       inputmode="decimal"
                       min="0.01"
@@ -178,6 +181,7 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
 
                 <button
                   class="tp-btn tp-btn-primary tp-btn-block"
+                  data-testid="order-submit"
                   type="submit"
                   [attr.aria-disabled]="isLoading() ? 'true' : null"
                 >
@@ -200,7 +204,7 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
           </div>
           <div class="tp-panel-body">
             <dl class="tp-details">
-              <div><dt>Account</dt><dd class="tp-num">{{ accountId() || '—' }}</dd></div>
+              <div><dt>Account</dt><dd class="tp-num" data-testid="order-account">{{ accountId() || '—' }}</dd></div>
               <div><dt>Symbol</dt><dd>{{ summarySymbol() || '—' }}</dd></div>
               <div>
                 <dt>Side</dt>
