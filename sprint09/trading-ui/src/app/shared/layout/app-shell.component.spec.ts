@@ -41,7 +41,7 @@ describe('AppShellComponent', () => {
   it('shows the trading navigation and account for a customer', () => {
     create({ id: 'u-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] });
 
-    expect(navLabels()).toEqual(['Dashboard', 'Funds', 'Place order', 'Orders', 'Verification']);
+    expect(navLabels()).toEqual(['Dashboard', 'Watchlist', 'Funds', 'Place order', 'Orders', 'Verification']);
     expect(page.querySelector('.sh-name')?.textContent).toContain('gaurang123');
     expect(page.querySelector('.sh-role')?.textContent).toContain('Account 6');
   });

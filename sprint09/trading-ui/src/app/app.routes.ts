@@ -69,6 +69,13 @@ export const routes: Routes = [
         canActivate: [kycApprovalGuard],
         loadComponent: () =>
           import('./features/funds/funds.component').then((m) => m.FundsComponent)
+      },
+      {
+        path: 'watchlist',
+        title: 'Watchlist · Trading Platform',
+        canActivate: [kycApprovalGuard],
+        loadComponent: () =>
+          import('./features/watchlist/watchlist.component').then((m) => m.WatchlistComponent)
       }
     ]
   },
