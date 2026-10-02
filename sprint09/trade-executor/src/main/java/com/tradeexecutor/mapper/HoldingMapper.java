@@ -19,10 +19,9 @@ public interface HoldingMapper {
      * @return number of rows affected
      */
     @Insert("""
-        INSERT INTO trading.holdings (demat_account_id, instrument_id, quantity, average_price, created_at_date, updated_at)
-        VALUES (#{holding.account.accountId}, #{holding.instrument.instrumentId}, #{holding.quantity}, #{holding.averagePrice}, CURRENT_DATE, CURRENT_TIMESTAMP)
+        INSERT INTO trading.holdings (holding_id, demat_account_id, instrument_id, quantity, average_price, created_at_date, updated_at)
+        VALUES (#{holding.holdingId}, #{holding.account.accountId}, #{holding.instrument.instrumentId}, #{holding.quantity}, #{holding.averagePrice}, CURRENT_DATE, CURRENT_TIMESTAMP)
         """)
-    @Options(useGeneratedKeys = true, keyProperty = "holding.holdingId")
     int insertHolding(@Param("holding") Holding holding);
     
     /**

@@ -3,10 +3,12 @@ package com.tradeexecutor.service;
 import com.tradingsystem.domain.entities.Instrument;
 import com.tradingsystem.domain.entities.Order;
 import com.tradingsystem.domain.entities.Position;
+import com.tradingsystem.domain.entities.Holding;
 import com.tradingsystem.domain.enums.OrderSide;
 import com.tradeexecutor.execution.ExecutionResult;
 import com.tradeexecutor.kafka.KafkaProducer;
 import com.tradeexecutor.mapper.AccountMapper;
+import com.tradeexecutor.mapper.HoldingMapper;
 import com.tradeexecutor.mapper.OrderMapper;
 import com.tradeexecutor.mapper.PositionMapper;
 import com.tradeexecutor.model.TradeEvent;
@@ -42,6 +44,9 @@ public class SettlementServiceTest {
     private PositionMapper positionMapperMock;
     
     @Mock
+    private HoldingMapper holdingMapperMock;
+    
+    @Mock
     private KafkaProducer kafkaProducerMock;
     
     @BeforeEach
@@ -50,6 +55,7 @@ public class SettlementServiceTest {
             orderMapperMock,
             accountMapperMock,
             positionMapperMock,
+            holdingMapperMock,
             kafkaProducerMock
         );
     }
@@ -256,6 +262,19 @@ public class SettlementServiceTest {
         return order;
     }
     
+    private Order createMockOrder(Long orderId, Long instrumentId, String symbol, com.tradingsystem.domain.enums.ProductType productType) {
+        Order order = mock(Order.class, withSettings().lenient());
+        when(order.getOrderId()).thenReturn(orderId);
+        
+        Instrument instrument = mock(Instrument.class);
+        when(instrument.getInstrumentId()).thenReturn(instrumentId);
+        when(order.getInstrument()).thenReturn(instrument);
+        
+        when(order.getProductType()).thenReturn(productType);
+        
+        return order;
+    }
+    
     private Position createMockPosition(Long accountId, Long instrumentId, int quantity, BigDecimal averagePrice) {
         Position position = mock(Position.class, withSettings().lenient());
         
@@ -270,5 +289,179 @@ public class SettlementServiceTest {
         when(position.getQuantity()).thenReturn(quantity);
         when(position.getAveragePrice()).thenReturn(averagePrice);
         return position;
+    }
+    
+    private Holding createMockHolding(Long accountId, Long instrumentId, int quantity, BigDecimal averagePrice) {
+        Holding holding = mock(Holding.class, withSettings().lenient());
+        
+        Account mockAccount = mock(Account.class, withSettings().lenient());
+        when(mockAccount.getAccountId()).thenReturn(accountId);
+        
+        Instrument mockInstrument = mock(Instrument.class, withSettings().lenient());
+        when(mockInstrument.getInstrumentId()).thenReturn(instrumentId);
+        
+        when(holding.getAccount()).thenReturn(mockAccount);
+        when(holding.getInstrument()).thenReturn(mockInstrument);
+        when(holding.getQuantity()).thenReturn(quantity);
+        when(holding.getAveragePrice()).thenReturn(averagePrice);
+        return holding;
+    }
+    
+    @Test
+    @DisplayName("DELIVERY BUY order: creates both holding and position")
+    void testSettleFilled_DeliveryBuyOrder_CreatesHoldingAndPosition() {
+        Long orderId = 123L;
+        Long accountId = 456L;
+        Long instrumentId = 789L;
+        BigDecimal executionPrice = new BigDecimal("100.50");
+        int quantity = 10;
+        OrderSide side = OrderSide.BUY;
+        ExecutionResult result = ExecutionResult.filled(executionPrice);
+        
+        when(orderMapperMock.markOrderFilled(orderId, executionPrice))
+            .thenReturn(1);
+        
+        Account mockAccount = createMockAccount(accountId, 5000);
+        when(accountMapperMock.findAccountById(accountId))
+            .thenReturn(java.util.Optional.of(mockAccount));
+        
+        when(accountMapperMock.getAccountVersion(accountId))
+            .thenReturn(java.util.Optional.of(2L));
+        
+        when(accountMapperMock.updateAvailableBalanceOptimistic(
+            anyLong(), any(BigDecimal.class), anyLong()
+        )).thenReturn(1);
+        
+        Order mockOrder = createMockOrder(orderId, instrumentId, "AAPL", com.tradingsystem.domain.enums.ProductType.DELIVERY);
+        when(orderMapperMock.findOrderById(orderId))
+            .thenReturn(java.util.Optional.of(mockOrder));
+        
+        // Holding setup
+        when(holdingMapperMock.findHoldingByAccountAndInstrument(accountId, instrumentId))
+            .thenReturn(java.util.Optional.empty());
+        when(holdingMapperMock.insertHolding(any(Holding.class)))
+            .thenReturn(1);
+        
+        // Position setup
+        when(positionMapperMock.findPositionByAccountAndInstrument(accountId, instrumentId))
+            .thenReturn(java.util.Optional.empty());
+        when(positionMapperMock.insertPosition(any(Position.class)))
+            .thenReturn(1);
+        
+        assertDoesNotThrow(() -> settlementService.settleOrder(
+            orderId, accountId, executionPrice, quantity, side, result
+        ));
+        
+        verify(holdingMapperMock, times(1)).insertHolding(any(Holding.class));
+        verify(positionMapperMock, times(1)).insertPosition(any(Position.class));
+        verify(kafkaProducerMock, times(1)).publishTradeEvent(
+            eq(accountId.toString()), any(TradeEvent.class)
+        );
+    }
+    
+    @Test
+    @DisplayName("DELIVERY SELL order: updates both holding and position")
+    void testSettleFilled_DeliverySellOrder_UpdatesHoldingAndPosition() {
+        Long orderId = 123L;
+        Long accountId = 456L;
+        Long instrumentId = 789L;
+        BigDecimal executionPrice = new BigDecimal("100.50");
+        int quantity = 5;
+        OrderSide side = OrderSide.SELL;
+        ExecutionResult result = ExecutionResult.filled(executionPrice);
+        
+        when(orderMapperMock.markOrderFilled(orderId, executionPrice))
+            .thenReturn(1);
+        
+        Account mockAccount = createMockAccount(accountId, 5000);
+        when(accountMapperMock.findAccountById(accountId))
+            .thenReturn(java.util.Optional.of(mockAccount));
+        
+        when(accountMapperMock.getAccountVersion(accountId))
+            .thenReturn(java.util.Optional.of(2L));
+        
+        when(accountMapperMock.updateAvailableBalanceOptimistic(
+            anyLong(), any(BigDecimal.class), anyLong()
+        )).thenReturn(1);
+        
+        Order mockOrder = createMockOrder(orderId, instrumentId, "AAPL", com.tradingsystem.domain.enums.ProductType.DELIVERY);
+        when(orderMapperMock.findOrderById(orderId))
+            .thenReturn(java.util.Optional.of(mockOrder));
+        
+        // Holding setup - existing holding with 10 shares
+        Holding existingHolding = createMockHolding(accountId, instrumentId, 10, new BigDecimal("100.00"));
+        existingHolding = mock(Holding.class, withSettings().lenient());
+        when(existingHolding.getHoldingId()).thenReturn(999L);
+        when(existingHolding.getQuantity()).thenReturn(10);
+        when(existingHolding.getAveragePrice()).thenReturn(new BigDecimal("100.00"));
+        when(holdingMapperMock.findHoldingByAccountAndInstrument(accountId, instrumentId))
+            .thenReturn(java.util.Optional.of(existingHolding));
+        when(holdingMapperMock.updateHolding(anyLong(), anyInt(), any(BigDecimal.class)))
+            .thenReturn(1);
+        
+        // Position setup
+        Position existingPosition = createMockPosition(accountId, instrumentId, 10, new BigDecimal("100.00"));
+        when(positionMapperMock.findPositionByAccountAndInstrument(accountId, instrumentId))
+            .thenReturn(java.util.Optional.of(existingPosition));
+        when(positionMapperMock.updatePosition(anyLong(), anyInt(), any(BigDecimal.class)))
+            .thenReturn(1);
+        
+        assertDoesNotThrow(() -> settlementService.settleOrder(
+            orderId, accountId, executionPrice, quantity, side, result
+        ));
+        
+        verify(holdingMapperMock, times(1)).updateHolding(anyLong(), anyInt(), any(BigDecimal.class));
+        verify(positionMapperMock, times(1)).updatePosition(anyLong(), anyInt(), any(BigDecimal.class));
+        verify(kafkaProducerMock, times(1)).publishTradeEvent(
+            eq(accountId.toString()), any(TradeEvent.class)
+        );
+    }
+    
+    @Test
+    @DisplayName("INTRADAY order: only creates/updates position, no holding")
+    void testSettleFilled_IntradayOrder_OnlyPositionCreated() {
+        Long orderId = 123L;
+        Long accountId = 456L;
+        Long instrumentId = 789L;
+        BigDecimal executionPrice = new BigDecimal("100.50");
+        int quantity = 10;
+        OrderSide side = OrderSide.BUY;
+        ExecutionResult result = ExecutionResult.filled(executionPrice);
+        
+        when(orderMapperMock.markOrderFilled(orderId, executionPrice))
+            .thenReturn(1);
+        
+        Account mockAccount = createMockAccount(accountId, 5000);
+        when(accountMapperMock.findAccountById(accountId))
+            .thenReturn(java.util.Optional.of(mockAccount));
+        
+        when(accountMapperMock.getAccountVersion(accountId))
+            .thenReturn(java.util.Optional.of(2L));
+        
+        when(accountMapperMock.updateAvailableBalanceOptimistic(
+            anyLong(), any(BigDecimal.class), anyLong()
+        )).thenReturn(1);
+        
+        Order mockOrder = createMockOrder(orderId, instrumentId, "AAPL", com.tradingsystem.domain.enums.ProductType.INTRADAY);
+        when(orderMapperMock.findOrderById(orderId))
+            .thenReturn(java.util.Optional.of(mockOrder));
+        
+        // Position setup only
+        when(positionMapperMock.findPositionByAccountAndInstrument(accountId, instrumentId))
+            .thenReturn(java.util.Optional.empty());
+        when(positionMapperMock.insertPosition(any(Position.class)))
+            .thenReturn(1);
+        
+        assertDoesNotThrow(() -> settlementService.settleOrder(
+            orderId, accountId, executionPrice, quantity, side, result
+        ));
+        
+        verify(holdingMapperMock, never()).insertHolding(any());
+        verify(holdingMapperMock, never()).updateHolding(anyLong(), anyInt(), any());
+        verify(holdingMapperMock, never()).findHoldingByAccountAndInstrument(anyLong(), anyLong());
+        verify(positionMapperMock, times(1)).insertPosition(any(Position.class));
+        verify(kafkaProducerMock, times(1)).publishTradeEvent(
+            eq(accountId.toString()), any(TradeEvent.class)
+        );
     }
 }

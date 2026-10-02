@@ -9,6 +9,7 @@ import com.tradingsystem.domain.enums.ProductType;
 import com.tradeexecutor.execution.ExecutionResult;
 import com.tradeexecutor.kafka.KafkaProducer;
 import com.tradeexecutor.mapper.AccountMapper;
+import com.tradeexecutor.mapper.HoldingMapper;
 import com.tradeexecutor.mapper.OrderMapper;
 import com.tradeexecutor.mapper.PositionMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,13 +53,15 @@ class SettlementServiceEdgeCaseTest {
     @Mock
     private PositionMapper positionMapper;
     @Mock
+    private HoldingMapper holdingMapper;
+    @Mock
     private KafkaProducer kafkaProducer;
 
     private SettlementService settlementService;
 
     @BeforeEach
     void setUp() {
-        settlementService = new SettlementService(orderMapper, accountMapper, positionMapper, kafkaProducer);
+        settlementService = new SettlementService(orderMapper, accountMapper, positionMapper, holdingMapper, kafkaProducer);
         ReflectionTestUtils.setField(settlementService, "maxOptimisticLockRetries", 0);
     }
 
