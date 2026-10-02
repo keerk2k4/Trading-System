@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { BehaviorSubject, of, throwError } from 'rxjs';
 import { PlaceOrderComponent } from './place-order.component';
 import { MockAuthService } from '../../../shared/services/mock-auth.service';
 import { TradeApiService } from '../../../shared/services/trade-api.service';
@@ -195,6 +195,55 @@ describe('PlaceOrderComponent', () => {
     expect(badge.classList).toContain('tp-badge-negative');
     expect(page.textContent).toContain('ORD-2');
     expect(page.textContent).toContain('Order rejected');
+  });
+
+  it('fills the symbol from the ?symbol= query param when arriving from the watchlist', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        { provide: TradeApiService, useValue: tradeApi },
+        {
+          provide: MockAuthService,
+          useValue: { currentUser$: signal({ id: 'u-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] }) }
+        },
+        { provide: ActivatedRoute, useValue: { queryParamMap: of(convertToParamMap({ symbol: 'msft' })) } }
+      ]
+    });
+    const linked: ComponentFixture<PlaceOrderComponent> = TestBed.createComponent(PlaceOrderComponent);
+    linked.detectChanges();
+
+    const prefilled = (linked.nativeElement as HTMLElement).querySelector<HTMLInputElement>('#symbol')!;
+    expect(prefilled.value).toBe('MSFT');
+    expect(linked.nativeElement.textContent).toContain('MSFT');
+  });
+
+  it('never clobbers a symbol the user has already typed', () => {
+    const params = new BehaviorSubject(convertToParamMap({}));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        { provide: TradeApiService, useValue: tradeApi },
+        {
+          provide: MockAuthService,
+          useValue: { currentUser$: signal({ id: 'u-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] }) }
+        },
+        { provide: ActivatedRoute, useValue: { queryParamMap: params.asObservable() } }
+      ]
+    });
+    const linked: ComponentFixture<PlaceOrderComponent> = TestBed.createComponent(PlaceOrderComponent);
+    linked.detectChanges();
+
+    const input = (linked.nativeElement as HTMLElement).querySelector<HTMLInputElement>('#symbol')!;
+    input.value = 'NVDA';
+    input.dispatchEvent(new Event('input'));
+    linked.detectChanges();
+    // A later navigation param must not overwrite what the user typed.
+    params.next(convertToParamMap({ symbol: 'AAPL' }));
+    linked.detectChanges();
+
+    expect(input.value).toBe('NVDA');
   });
 
   it('shows a business rejection from the server and keeps the ticket for correction', () => {

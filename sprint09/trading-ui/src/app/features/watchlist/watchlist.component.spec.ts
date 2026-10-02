@@ -67,8 +67,20 @@ describe('WatchlistComponent', () => {
     fixture.detectChanges();
 
     expect(page.textContent).toContain('Watchlist “Tech Stocks” created.');
-    expect(page.querySelector<HTMLSelectElement>('[data-testid="watchlist-select"]')!.value).not.toBe('default');
+    expect(page.querySelector('[data-testid="watchlist-switch"].is-active')?.textContent).toContain('Tech Stocks');
     expect(page.textContent).toContain('0 stocks in Tech Stocks');
+  });
+
+  it('shows every watchlist side by side in one horizontal bar', () => {
+    create();
+    TestBed.inject(WatchlistService).createWatchlist('Tech Stocks');
+    fixture.detectChanges();
+
+    const tabs = Array.from(page.querySelectorAll('[data-testid="watchlist-switch"]'));
+    expect(page.querySelector('.wl-tabs')).not.toBeNull();
+    expect(tabs.length).toBe(2);
+    expect(tabs[0].textContent).toContain('Default');
+    expect(tabs[1].textContent).toContain('Tech Stocks');
   });
 
   it('rejects a duplicate watchlist name', () => {
@@ -91,12 +103,11 @@ describe('WatchlistComponent', () => {
     const tech = service.createWatchlist('Banking Stocks');
     fixture.detectChanges();
 
-    const select = page.querySelector<HTMLSelectElement>('[data-testid="watchlist-select"]')!;
-    select.value = tech.id;
-    select.dispatchEvent(new Event('change'));
+    page.querySelector<HTMLButtonElement>(`[data-testid="watchlist-switch"][data-list="${tech.id}"]`)!.click();
     fixture.detectChanges();
 
     expect(page.textContent).toContain('0 stocks in Banking Stocks');
+    expect(page.querySelector('[data-testid="watchlist-switch"].is-active')?.textContent).toContain('Banking Stocks');
   });
 
   it('searches by company name and adds the stock to the selected watchlist', () => {
@@ -139,14 +150,12 @@ describe('WatchlistComponent', () => {
     fixture.detectChanges();
 
     // Default list offers no delete action.
-    const select = page.querySelector<HTMLSelectElement>('[data-testid="watchlist-select"]')!;
-    select.value = 'default';
-    select.dispatchEvent(new Event('change'));
+    page.querySelector<HTMLButtonElement>(`[data-testid="watchlist-switch"][data-list="default"]`)!.click();
     fixture.detectChanges();
     expect(page.querySelector('[data-testid="watchlist-delete"]')).toBeNull();
 
-    select.value = service.watchlists().find((l) => l.name === 'Temporary')!.id;
-    select.dispatchEvent(new Event('change'));
+    const temporaryId = service.watchlists().find((l) => l.name === 'Temporary')!.id;
+    page.querySelector<HTMLButtonElement>(`[data-testid="watchlist-switch"][data-list="${temporaryId}"]`)!.click();
     fixture.detectChanges();
     page.querySelector<HTMLButtonElement>('[data-testid="watchlist-delete"]')!.click();
     fixture.detectChanges();
@@ -155,6 +164,19 @@ describe('WatchlistComponent', () => {
 
     expect(page.textContent).toContain('deleted');
     expect(service.watchlists().some((l) => l.name === 'Temporary')).toBe(false);
+  });
+
+  it('links each stock symbol and company to the place-order page with its symbol', () => {
+    create();
+
+    const links = Array.from(page.querySelectorAll<HTMLAnchorElement>('[data-testid="trade-stock"]'));
+    const aapl = links.filter((a) => a.dataset['symbol'] === 'AAPL');
+    // One link on the symbol, one on the company name.
+    expect(aapl.length).toBe(2);
+    for (const link of aapl) {
+      expect(link.getAttribute('href')).toContain('/orders/new');
+      expect(link.getAttribute('href')).toContain('symbol=AAPL');
+    }
   });
 
   it('reports a loading failure instead of an empty screen', () => {

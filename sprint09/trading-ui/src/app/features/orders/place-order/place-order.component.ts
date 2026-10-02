@@ -3,6 +3,7 @@ import {
   DestroyRef,
   ElementRef,
   Injector,
+  OnInit,
   afterNextRender,
   computed,
   inject,
@@ -18,7 +19,7 @@ import {
   ValidationErrors,
   Validators
 } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MockAuthService } from '../../../shared/services/mock-auth.service';
 import { TradeApiService } from '../../../shared/services/trade-api.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
@@ -225,10 +226,11 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
     .estimate { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--tp-border); }
   `]
 })
-export class PlaceOrderComponent {
+export class PlaceOrderComponent implements OnInit {
   private readonly authService = inject(MockAuthService);
   private readonly orderService = inject(TradeApiService);
   private readonly errorMapping = inject(ErrorMappingService);
+  private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -260,6 +262,19 @@ export class PlaceOrderComponent {
 
   // Kept across a retry of the same submission (see onPlaceOrder).
   private idempotencyKey = '';
+
+  ngOnInit(): void {
+    // Deep link from the watchlist (/orders/new?symbol=AAPL): fill the ticket
+    // with that stock. The user's own typing always wins, so only a pristine
+    // control is ever filled and validation still applies unchanged.
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const symbol = (params.get('symbol') ?? '').trim().toUpperCase();
+      const control = this.form.controls.symbol;
+      if (symbol && control.pristine && control.value !== symbol) {
+        control.setValue(symbol);
+      }
+    });
+  }
 
   protected sideError(): string | null {
     return this.shows('side') ? 'Choose buy or sell.' : null;

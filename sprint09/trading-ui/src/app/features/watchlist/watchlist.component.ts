@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CurrencyPipe, DecimalPipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { WatchlistService } from '../../shared/services/watchlist.service';
 
 /**
@@ -9,7 +10,7 @@ import { WatchlistService } from '../../shared/services/watchlist.service';
  */
 @Component({
   selector: 'app-watchlist',
-  imports: [CurrencyPipe, DecimalPipe],
+  imports: [CurrencyPipe, DecimalPipe, RouterLink],
   template: `
     <div class="tp-page">
       <header class="tp-page-header">
@@ -37,7 +38,7 @@ import { WatchlistService } from '../../shared/services/watchlist.service';
         <div class="tp-alert tp-alert-info" role="status"><span>{{ note }}</span></div>
       }
 
-      <div class="tp-grid tp-grid-main-side">
+      <div>
         <section class="tp-panel" aria-labelledby="watchlist-heading" [attr.aria-busy]="isLoading()">
           <div class="tp-panel-header">
             <div>
@@ -52,19 +53,6 @@ import { WatchlistService } from '../../shared/services/watchlist.service';
               </p>
             </div>
             <div class="wl-picker">
-              <label class="sr-only" for="wl-select">Selected watchlist</label>
-              <select
-                id="wl-select"
-                class="tp-input wl-select"
-                data-testid="watchlist-select"
-                (change)="onSelect($event)"
-              >
-                @for (list of watchlists(); track list.id) {
-                  <option [value]="list.id" [selected]="list.id === selected()?.id">
-                    {{ list.name }}{{ list.isDefault ? ' (Default)' : '' }}
-                  </option>
-                }
-              </select>
               @if (selected() && !selected()!.isDefault) {
                 @if (pendingDeleteId() === selected()!.id) {
                   <button
@@ -91,6 +79,49 @@ import { WatchlistService } from '../../shared/services/watchlist.service';
           </div>
 
           <div class="tp-panel-body">
+            @if (createMode()) {
+              <form class="wl-create" (submit)="create($event)">
+                <label class="tp-label" for="wl-name">New watchlist name</label>
+                <div class="wl-create-row">
+                  <input
+                    id="wl-name"
+                    class="tp-input"
+                    type="text"
+                    maxlength="60"
+                    placeholder="For example Tech Stocks"
+                    data-testid="watchlist-name"
+                    [value]="newName()"
+                    (input)="newName.set($any($event.target).value)"
+                  />
+                  <div class="tp-actions">
+                    <button class="tp-btn tp-btn-primary" type="submit" data-testid="watchlist-create">
+                      Create
+                    </button>
+                    <button class="tp-btn tp-btn-secondary" type="button" (click)="toggleCreate()">Cancel</button>
+                  </div>
+                </div>
+                @if (createError(); as message) {
+                  <p class="tp-field-error" role="alert">{{ message }}</p>
+                }
+              </form>
+            }
+            <div class="wl-tabs" role="group" aria-label="Watchlists">
+              @for (list of watchlists(); track list.id) {
+                <button
+                  type="button"
+                  class="wl-tab"
+                  data-testid="watchlist-switch"
+                  [attr.data-list]="list.id"
+                  [class.is-active]="list.id === selected()?.id"
+                  [attr.aria-current]="list.id === selected()?.id ? 'true' : null"
+                  (click)="onSwitch(list.id)"
+                >
+                  <span class="wl-tab-name">{{ list.name }}</span>
+                  <span class="wl-tab-count tp-num">{{ stockCount(list.id) }}</span>
+                </button>
+              }
+            </div>
+            <p class="tp-hint">The Default list cannot be deleted. Select a list to view its stocks.</p>
             <div>
               <label class="tp-label" for="wl-search">Search stocks</label>
               <input
@@ -164,9 +195,27 @@ import { WatchlistService } from '../../shared/services/watchlist.service';
                     @for (stock of stocks(); track stock.symbol) {
                       <tr data-testid="watch-row" [attr.data-symbol]="stock.symbol">
                         <td>
-                          <strong>{{ stock.symbol }}</strong>
+                          <a
+                            class="wl-trade-link"
+                            routerLink="/orders/new"
+                            [queryParams]="{ symbol: stock.symbol }"
+                            [attr.aria-label]="'Trade ' + stock.symbol + ' (' + stock.companyName + ')'"
+                            data-testid="trade-stock"
+                            [attr.data-symbol]="stock.symbol"
+                            ><strong>{{ stock.symbol }}</strong></a
+                          >
                         </td>
-                        <td>{{ stock.companyName }}</td>
+                        <td>
+                          <a
+                            class="wl-trade-link"
+                            routerLink="/orders/new"
+                            [queryParams]="{ symbol: stock.symbol }"
+                            [attr.aria-label]="'Trade ' + stock.symbol + ' (' + stock.companyName + ')'"
+                            data-testid="trade-stock"
+                            [attr.data-symbol]="stock.symbol"
+                            >{{ stock.companyName }}</a
+                          >
+                        </td>
                         <td class="num">{{ stock.price | currency }}</td>
                         <td
                           class="num"
@@ -197,57 +246,6 @@ import { WatchlistService } from '../../shared/services/watchlist.service';
             }
           </div>
         </section>
-
-        <aside class="tp-panel" aria-labelledby="lists-heading">
-          <div class="tp-panel-header">
-            <h2 id="lists-heading">Your lists</h2>
-          </div>
-          <div class="tp-panel-body">
-            @if (createMode()) {
-              <form class="wl-create" (submit)="create($event)">
-                <label class="tp-label" for="wl-name">New watchlist name</label>
-                <input
-                  id="wl-name"
-                  class="tp-input"
-                  type="text"
-                  maxlength="60"
-                  placeholder="For example Tech Stocks"
-                  data-testid="watchlist-name"
-                  [value]="newName()"
-                  (input)="newName.set($any($event.target).value)"
-                />
-                @if (createError(); as message) {
-                  <p class="tp-field-error" role="alert">{{ message }}</p>
-                }
-                <div class="tp-actions">
-                  <button class="tp-btn tp-btn-primary" type="submit" data-testid="watchlist-create">
-                    Create
-                  </button>
-                  <button class="tp-btn tp-btn-secondary" type="button" (click)="toggleCreate()">Cancel</button>
-                </div>
-              </form>
-            }
-            <ul class="wl-side-list">
-              @for (list of watchlists(); track list.id) {
-                <li>
-                  <button
-                    type="button"
-                    class="wl-side-item"
-                    data-testid="watchlist-switch"
-                    [attr.data-list]="list.id"
-                    [class.is-active]="list.id === selected()?.id"
-                    [attr.aria-current]="list.id === selected()?.id ? 'true' : null"
-                    (click)="onSwitch(list.id)"
-                  >
-                    <span class="wl-side-name">{{ list.name }}</span>
-                    <span class="tp-muted tp-num">{{ stockCount(list.id) }}</span>
-                  </button>
-                </li>
-              }
-            </ul>
-            <p class="tp-hint">The Default list cannot be deleted.</p>
-          </div>
-        </aside>
       </div>
     </div>
   `,
@@ -259,10 +257,83 @@ import { WatchlistService } from '../../shared/services/watchlist.service';
         align-items: center;
         gap: 0.5rem;
       }
-      .wl-select {
-        width: auto;
-        min-width: 11rem;
+      .wl-create {
+        display: flex;
+        flex-direction: column;
+        gap: 0.625rem;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        border: 1px solid var(--tp-border);
+        border-radius: var(--tp-radius);
+        background-color: var(--tp-surface-raised);
+      }
+      .wl-create-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.625rem;
+      }
+      .wl-create-row .tp-input {
+        flex: 1;
+        min-width: 12rem;
+      }
+      .wl-tabs {
+        display: flex;
+        gap: 0.5rem;
+        overflow-x: auto;
+        padding: 0.25rem 0.125rem 0.5rem;
+        margin-bottom: 0.25rem;
+      }
+      .wl-tab {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
         min-height: 2.5rem;
+        padding: 0.5rem 0.875rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        white-space: nowrap;
+        color: var(--tp-text-muted);
+        background-color: var(--tp-surface);
+        border: 1px solid var(--tp-border);
+        border-radius: 999px;
+      }
+      .wl-tab:hover {
+        color: var(--tp-text);
+        background-color: var(--tp-surface-raised);
+      }
+      .wl-tab.is-active {
+        color: var(--tp-text);
+        background-color: var(--tp-glow);
+        border-color: var(--tp-accent);
+        box-shadow: inset 0 -2px 0 var(--tp-accent);
+      }
+      .wl-tab:focus-visible {
+        outline: 2px solid var(--tp-focus);
+        outline-offset: 2px;
+      }
+      .wl-tab-count {
+        display: inline-grid;
+        place-items: center;
+        min-width: 1.5rem;
+        padding: 0 0.375rem;
+        font-size: 0.75rem;
+        border-radius: 999px;
+        background-color: color-mix(in srgb, currentColor 12%, transparent);
+      }
+      .wl-trade-link {
+        color: inherit;
+        text-decoration: none;
+        border-radius: 0.125rem;
+      }
+      .wl-trade-link:hover {
+        color: var(--tp-link);
+        text-decoration: underline;
+        text-underline-offset: 0.2em;
+      }
+      .wl-trade-link:focus-visible {
+        outline: 2px solid var(--tp-focus);
+        outline-offset: 2px;
       }
       .wl-results {
         margin-top: 1rem;
@@ -306,48 +377,6 @@ import { WatchlistService } from '../../shared/services/watchlist.service';
         min-height: 2.25rem;
         padding: 0.375rem 0.75rem;
       }
-      .wl-create {
-        display: flex;
-        flex-direction: column;
-        gap: 0.625rem;
-        margin-bottom: 1rem;
-        padding-bottom: 1rem;
-        border-bottom: 1px solid var(--tp-border);
-      }
-      .wl-side-list {
-        list-style: none;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-      }
-      .wl-side-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-        width: 100%;
-        padding: 0.5rem 0.75rem;
-        font-size: 0.875rem;
-        font-weight: 500;
-        text-align: left;
-        border-radius: var(--tp-radius);
-        color: var(--tp-text-muted);
-      }
-      .wl-side-item:hover {
-        color: var(--tp-text);
-        background-color: var(--tp-surface-raised);
-      }
-      .wl-side-item.is-active {
-        color: var(--tp-text);
-        background-color: var(--tp-glow);
-        box-shadow: inset 2px 0 0 var(--tp-accent);
-      }
-      .wl-side-name {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
     `
   ]
 })
@@ -386,11 +415,6 @@ export class WatchlistComponent implements OnInit {
 
   protected stockCount(id: string): number {
     return this.watchlists().find((list) => list.id === id)?.symbols.length ?? 0;
-  }
-
-  protected onSelect(event: Event): void {
-    const id = (event.target as HTMLSelectElement).value;
-    this.onSwitch(id);
   }
 
   protected onSwitch(id: string): void {
