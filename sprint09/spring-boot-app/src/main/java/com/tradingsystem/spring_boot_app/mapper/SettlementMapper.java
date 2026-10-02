@@ -20,8 +20,8 @@ public interface SettlementMapper {
      * @return number of rows affected
      */
     @Insert("""
-        INSERT INTO settlements (execution_id, demat_account_id, quantity, settlement_date, status, created_at, updated_at)
-        VALUES (#{settlement.settlementId}, #{settlement.account.accountId}, #{settlement.quantity}, CURRENT_DATE, 'PENDING', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        INSERT INTO trading.settlements (execution_id, demat_account_id, quantity, settlement_date, status, created_at, updated_at)
+        VALUES (#{settlement.executionId}, #{settlement.account.accountId}, #{settlement.quantity}, CURRENT_DATE, 'PENDING', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """)
     @Options(useGeneratedKeys = true, keyProperty = "settlement.settlementId")
     int insertSettlement(@Param("settlement") Settlement settlement);
@@ -33,13 +33,12 @@ public interface SettlementMapper {
      */
     @Select("""
         SELECT settlement_id, execution_id, demat_account_id, quantity, settlement_date, status, created_at, updated_at
-        FROM settlements
+        FROM trading.settlements
         WHERE settlement_id = #{settlementId}
         """)
     @Results({
         @Result(property = "settlementId", column = "settlement_id"),
         @Result(property = "account", column = "demat_account_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.AccountMapper.findAccountById")),
-        @Result(property = "instrument", column = "execution_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.InstrumentMapper.findInstrumentById")),
         @Result(property = "quantity", column = "quantity"),
         @Result(property = "status", column = "status")
     })
@@ -52,13 +51,12 @@ public interface SettlementMapper {
      */
     @Select("""
         SELECT settlement_id, execution_id, demat_account_id, quantity, settlement_date, status, created_at, updated_at
-        FROM settlements
+        FROM trading.settlements
         WHERE execution_id = #{executionId}
         """)
     @Results({
         @Result(property = "settlementId", column = "settlement_id"),
         @Result(property = "account", column = "demat_account_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.AccountMapper.findAccountById")),
-        @Result(property = "instrument", column = "execution_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.InstrumentMapper.findInstrumentById")),
         @Result(property = "quantity", column = "quantity"),
         @Result(property = "status", column = "status")
     })
@@ -71,14 +69,13 @@ public interface SettlementMapper {
      */
     @Select("""
         SELECT settlement_id, execution_id, demat_account_id, quantity, settlement_date, status, created_at, updated_at
-        FROM settlements
+        FROM trading.settlements
         WHERE demat_account_id = #{accountId}
         ORDER BY settlement_id
         """)
     @Results({
         @Result(property = "settlementId", column = "settlement_id"),
         @Result(property = "account", column = "demat_account_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.AccountMapper.findAccountById")),
-        @Result(property = "instrument", column = "execution_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.InstrumentMapper.findInstrumentById")),
         @Result(property = "quantity", column = "quantity"),
         @Result(property = "status", column = "status")
     })
@@ -91,14 +88,13 @@ public interface SettlementMapper {
      */
     @Select("""
         SELECT settlement_id, execution_id, demat_account_id, quantity, settlement_date, status, created_at, updated_at
-        FROM settlements
+        FROM trading.settlements
         WHERE status = #{status}
         ORDER BY settlement_id
         """)
     @Results({
         @Result(property = "settlementId", column = "settlement_id"),
         @Result(property = "account", column = "demat_account_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.AccountMapper.findAccountById")),
-        @Result(property = "instrument", column = "execution_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.InstrumentMapper.findInstrumentById")),
         @Result(property = "quantity", column = "quantity"),
         @Result(property = "status", column = "status")
     })
@@ -111,14 +107,13 @@ public interface SettlementMapper {
      */
     @Select("""
         SELECT settlement_id, execution_id, demat_account_id, quantity, settlement_date, status, created_at, updated_at
-        FROM settlements
+        FROM trading.settlements
         WHERE settlement_date = #{settlementDate}
         ORDER BY settlement_id
         """)
     @Results({
         @Result(property = "settlementId", column = "settlement_id"),
         @Result(property = "account", column = "demat_account_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.AccountMapper.findAccountById")),
-        @Result(property = "instrument", column = "execution_id", one = @One(select = "com.tradingsystem.spring_boot_app.mapper.InstrumentMapper.findInstrumentById")),
         @Result(property = "quantity", column = "quantity"),
         @Result(property = "status", column = "status")
     })
@@ -131,7 +126,7 @@ public interface SettlementMapper {
      * @return number of rows affected
      */
     @Update("""
-        UPDATE settlements
+        UPDATE trading.settlements
         SET status = #{status}, updated_at = CURRENT_TIMESTAMP
         WHERE settlement_id = #{settlementId}
         """)

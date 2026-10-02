@@ -23,7 +23,7 @@ public interface InstrumentMapper {
      * @return number of rows affected
      */
     @Insert("""
-        INSERT INTO instruments (symbol, display_name, asset_class, quotation_currency, status, availability, price)
+        INSERT INTO trading.instruments (symbol, display_name, asset_class, quotation_currency, status, availability, price)
         VALUES (#{symbol}, #{displayName}, #{assetClass}, 'USD', 'ACTIVE', TRUE, 0)
         """)
     @Options(useGeneratedKeys = true, keyProperty = "instrumentId")
@@ -113,7 +113,7 @@ public interface InstrumentMapper {
      * @return number of rows affected
      */
     @Update("""
-        UPDATE instruments
+        UPDATE trading.instruments
         SET status = #{status}, updated_at = CURRENT_TIMESTAMP
         WHERE instrument_id = #{instrumentId}
         """)

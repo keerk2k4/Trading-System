@@ -20,8 +20,8 @@ public interface HoldingMapper {
      * @return number of rows affected
      */
     @Insert("""
-        INSERT INTO holdings (demat_account_id, instrument_id, quantity, average_price, created_at, updated_at)
-        VALUES (#{holding.account.accountId}, #{holding.instrument.instrumentId}, #{holding.quantity}, #{holding.averagePrice}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        INSERT INTO trading.holdings (demat_account_id, instrument_id, quantity, average_price, created_at_date, updated_at)
+        VALUES (#{holding.account.accountId}, #{holding.instrument.instrumentId}, #{holding.quantity}, #{holding.averagePrice}, CURRENT_DATE, CURRENT_TIMESTAMP)
         """)
     @Options(useGeneratedKeys = true, keyProperty = "holding.holdingId")
     int insertHolding(@Param("holding") Holding holding);
@@ -32,8 +32,8 @@ public interface HoldingMapper {
      * @return the holding, or empty if not found
      */
     @Select("""
-        SELECT holding_id, demat_account_id, instrument_id, quantity, average_price, created_at, updated_at
-        FROM holdings
+        SELECT holding_id, demat_account_id, instrument_id, quantity, average_price, created_at_date, updated_at
+        FROM trading.holdings
         WHERE holding_id = #{holdingId}
         """)
     @Results({
@@ -50,8 +50,8 @@ public interface HoldingMapper {
      * @return list of holdings for the account
      */
     @Select("""
-        SELECT holding_id, demat_account_id, instrument_id, quantity, average_price, created_at, updated_at
-        FROM holdings
+        SELECT holding_id, demat_account_id, instrument_id, quantity, average_price, created_at_date, updated_at
+        FROM trading.holdings
         WHERE demat_account_id = #{accountId}
         ORDER BY holding_id
         """)
@@ -70,8 +70,8 @@ public interface HoldingMapper {
      * @return the holding, or empty if not found
      */
     @Select("""
-        SELECT holding_id, demat_account_id, instrument_id, quantity, average_price, created_at, updated_at
-        FROM holdings
+        SELECT holding_id, demat_account_id, instrument_id, quantity, average_price, created_at_date, updated_at
+        FROM trading.holdings
         WHERE demat_account_id = #{accountId} AND instrument_id = #{instrumentId}
         """)
     @ConstructorArgs({
@@ -91,7 +91,7 @@ public interface HoldingMapper {
      * @return number of rows affected
      */
     @Update("""
-        UPDATE holdings
+        UPDATE trading.holdings
         SET quantity = #{quantity}, average_price = #{averagePrice}, updated_at = CURRENT_TIMESTAMP
         WHERE holding_id = #{holdingId}
         """)
@@ -103,7 +103,7 @@ public interface HoldingMapper {
      * @return number of rows affected
      */
     @Delete("""
-        DELETE FROM holdings
+        DELETE FROM trading.holdings
         WHERE holding_id = #{holdingId}
         """)
     int deleteHolding(@Param("holdingId") Long holdingId);

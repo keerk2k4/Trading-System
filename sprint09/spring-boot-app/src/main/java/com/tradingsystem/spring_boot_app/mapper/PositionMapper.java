@@ -23,8 +23,8 @@ public interface PositionMapper {
      * @return number of rows affected
      */
     @Insert("""
-        INSERT INTO positions (position_id, trading_account_id, instrument_id, product_type, quantity, average_price, realized_pnl, position_status, opened_at, updated_at, as_of_date, trade_type)
-        VALUES (#{position.positionId}, #{position.account.accountId}, #{position.instrument.instrumentId}, #{position.productType}, #{position.quantity}, #{position.averagePrice}, 0, 'OPEN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_DATE, 'LONG')
+        INSERT INTO trading.positions (position_id, trading_account_id, instrument_id, product_type, quantity, average_price, realized_pnl, position_status, opened_at, updated_at)
+        VALUES (#{position.positionId}, #{position.account.accountId}, #{position.instrument.instrumentId}, #{position.productType}, #{position.quantity}, #{position.averagePrice}, 0, 'OPEN', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """)
     @Options(useGeneratedKeys = true, keyProperty = "position.positionId")
     int insertPosition(@Param("position") Position position);
@@ -36,7 +36,7 @@ public interface PositionMapper {
      */
     @Select("""
         SELECT position_id, trading_account_id, instrument_id, product_type, quantity, average_price, realized_pnl, position_status, opened_at, closed_at, updated_at
-        FROM positions
+        FROM trading.positions
         WHERE position_id = #{positionId}
         """)
     @Results({
@@ -58,7 +58,7 @@ public interface PositionMapper {
      */
     @Select("""
         SELECT position_id, trading_account_id, instrument_id, product_type, quantity, average_price, realized_pnl, position_status, opened_at, closed_at, updated_at
-        FROM positions
+        FROM trading.positions
         WHERE trading_account_id = #{accountId}
         ORDER BY position_id
         """)
@@ -106,7 +106,7 @@ public interface PositionMapper {
      */
     @Select("""
         SELECT position_id, trading_account_id, instrument_id, product_type, quantity, average_price, realized_pnl, position_status, opened_at, closed_at, updated_at
-        FROM positions
+        FROM trading.positions
         WHERE trading_account_id = #{accountId} AND position_status = 'OPEN'
         ORDER BY position_id
         """)
@@ -129,7 +129,7 @@ public interface PositionMapper {
      * @return number of rows affected
      */
     @Update("""
-        UPDATE positions
+        UPDATE trading.positions
         SET quantity = #{quantity}, average_price = #{averagePrice}, updated_at = CURRENT_TIMESTAMP
         WHERE position_id = #{positionId}
         """)
@@ -141,7 +141,7 @@ public interface PositionMapper {
      * @return number of rows affected
      */
     @Update("""
-        UPDATE positions
+        UPDATE trading.positions
         SET position_status = 'CLOSED', closed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
         WHERE position_id = #{positionId}
         """)

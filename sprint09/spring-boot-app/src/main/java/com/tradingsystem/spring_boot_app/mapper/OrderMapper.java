@@ -26,7 +26,7 @@ public interface OrderMapper {
      * @return number of rows affected
      */
     @Insert("""
-        INSERT INTO orders (order_id, trading_account_id, instrument_id, order_type, side, product_type, quantity, limit_price, stop_price, status, idempotency_key, created_at, updated_at)
+        INSERT INTO trading.orders (order_id, trading_account_id, instrument_id, order_type, side, product_type, quantity, limit_price, stop_price, status, idempotency_key, created_at, updated_at)
         VALUES (#{order.orderId}, #{order.account.accountId}, #{order.instrument.instrumentId}, #{order.orderType}, #{order.side}, #{order.productType}, #{order.quantity}, #{order.limitPrice}, NULL, 'NEW', #{order.idempotencykey}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """)
     @Options(useGeneratedKeys = true, keyProperty = "order.orderId")
@@ -57,7 +57,7 @@ public interface OrderMapper {
     @Result(property = "status", column = "status")
     Optional<Order> findOrderById(@Param("orderId") Long orderId);
 
-    @Select("SELECT COUNT(*) > 0 FROM orders WHERE idempotency_key = #{idempotencyKey}")
+    @Select("SELECT COUNT(*) > 0 FROM trading.orders WHERE idempotency_key = #{idempotencyKey}")
     boolean existsByIdempotencyKey(@Param("idempotencyKey") String idempotencyKey);
     
     /**
@@ -189,14 +189,14 @@ public interface OrderMapper {
      * @return number of rows affected
      */
     @Update("""
-        UPDATE orders
+        UPDATE trading.orders
         SET status = #{status}, updated_at = CURRENT_TIMESTAMP
         WHERE order_id = #{orderId}
         """)
     int updateOrderStatus(@Param("orderId") Long orderId, @Param("status") OrderStatus status);
 
     @Update("""
-        UPDATE orders
+        UPDATE trading.orders
         SET status = #{nextStatus}, updated_at = CURRENT_TIMESTAMP
         WHERE order_id = #{orderId} AND status = #{expectedStatus}
         """)

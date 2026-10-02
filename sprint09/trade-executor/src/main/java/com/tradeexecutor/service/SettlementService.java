@@ -1,12 +1,15 @@
 package com.tradeexecutor.service;
 
 import com.tradingsystem.domain.entities.Account;
+import com.tradingsystem.domain.entities.Holding;
 import com.tradingsystem.domain.entities.Order;
 import com.tradingsystem.domain.entities.Position;
 import com.tradingsystem.domain.enums.OrderSide;
+import com.tradingsystem.domain.enums.ProductType;
 import com.tradeexecutor.execution.ExecutionResult;
 import com.tradeexecutor.kafka.KafkaProducer;
 import com.tradeexecutor.mapper.AccountMapper;
+import com.tradeexecutor.mapper.HoldingMapper;
 import com.tradeexecutor.mapper.OrderMapper;
 import com.tradeexecutor.mapper.PositionMapper;
 import com.tradeexecutor.model.TradeEvent;
@@ -43,6 +46,7 @@ public class SettlementService {
     private final OrderMapper orderMapper;
     private final AccountMapper accountMapper;
     private final PositionMapper positionMapper;
+    private final HoldingMapper holdingMapper;
     private final KafkaProducer kafkaProducer;
     
     @Value("${app.settlement.optimistic-lock-retries:3}")
@@ -51,10 +55,12 @@ public class SettlementService {
     public SettlementService(OrderMapper orderMapper,
                              AccountMapper accountMapper,
                              PositionMapper positionMapper,
+                             HoldingMapper holdingMapper,
                              KafkaProducer kafkaProducer) {
         this.orderMapper = orderMapper;
         this.accountMapper = accountMapper;
         this.positionMapper = positionMapper;
+        this.holdingMapper = holdingMapper;
         this.kafkaProducer = kafkaProducer;
     }
     
@@ -110,7 +116,7 @@ public class SettlementService {
     }
     
     /**
-     * Settle a filled order: update status, move cash, and update position.
+     * Settle a filled order: update status, move cash, and update position/holding.
      */
     private void settleFilled(Long orderId, Long accountId, BigDecimal executionPrice,
                              int quantity, OrderSide side) {
@@ -135,10 +141,23 @@ public class SettlementService {
         updateAccountCashWithOptimisticLocking(accountId, executionPrice, quantity, side);
         logger.info("  ✓ Account cash balance updated");
         
-        // Step 3: Update position
-        logger.info("  Updating position for account {}...", accountId);
-        updatePosition(accountId, orderId, executionPrice, quantity, side);
-        logger.info("  ✓ Position updated");
+        // Step 3: Update position or holding based on product type
+        Order order = orderMapper.findOrderById(orderId)
+            .orElseThrow(() -> new IllegalArgumentException("Order " + orderId + " not found for settlement"));
+        
+        if (order.getProductType() == ProductType.DELIVERY) {
+            logger.info("  Updating holding for account {} (DELIVERY product)...", accountId);
+            updateHolding(accountId, orderId, executionPrice, quantity, side);
+            logger.info("  ✓ Holding updated");
+            
+            logger.info("  Updating position for account {} (DELIVERY product)...", accountId);
+            updatePosition(accountId, orderId, executionPrice, quantity, side);
+            logger.info("  ✓ Position updated");
+        } else {
+            logger.info("  Updating position for account {} (INTRADAY product)...", accountId);
+            updatePosition(accountId, orderId, executionPrice, quantity, side);
+            logger.info("  ✓ Position updated");
+        }
     }
     
     /**
@@ -302,6 +321,81 @@ public class SettlementService {
 
         logger.info("    ✓ New position created (positionId={}, quantity={}, avgPrice={})",
             newPosition.getPositionId(), quantity, newPosition.getAveragePrice());
+    }
+    
+    /**
+     * Update or create a holding for DELIVERY product type (equity holdings in demat account).
+     * 
+     * BUY: Add quantity to existing holding or create new holding
+     * SELL: Reduce quantity from existing holding (validates sufficient quantity)
+     */
+    private void updateHolding(Long accountId, Long orderId, BigDecimal executionPrice,
+                              int quantity, OrderSide side) {
+        Order order = orderMapper.findOrderById(orderId)
+            .orElseThrow(() -> new IllegalArgumentException("Order " + orderId + " not found for holding update"));
+
+        Long instrumentId = order.getInstrument().getInstrumentId();
+        Optional<Holding> existingHolding = holdingMapper.findHoldingByAccountAndInstrument(accountId, instrumentId);
+
+        if (existingHolding.isPresent()) {
+            Holding current = existingHolding.get();
+            int updatedQuantity;
+            BigDecimal updatedAveragePrice;
+
+            if (side == OrderSide.BUY) {
+                updatedQuantity = current.getQuantity() + quantity;
+                if (updatedQuantity <= 0) {
+                    throw new IllegalStateException("Invalid holding quantity after BUY for order " + orderId);
+                }
+
+                BigDecimal existingNotional = current.getAveragePrice()
+                    .multiply(BigDecimal.valueOf(current.getQuantity()));
+                BigDecimal incomingNotional = executionPrice
+                    .multiply(BigDecimal.valueOf(quantity));
+
+                updatedAveragePrice = existingNotional.add(incomingNotional)
+                    .divide(BigDecimal.valueOf(updatedQuantity), 2, RoundingMode.HALF_UP);
+            } else {
+                updatedQuantity = current.getQuantity() - quantity;
+                if (updatedQuantity < 0) {
+                    throw new IllegalStateException("Insufficient holding quantity for SELL on order " + orderId);
+                }
+                // SELL preserves weighted average cost basis; only quantity changes.
+                updatedAveragePrice = current.getAveragePrice().setScale(2, RoundingMode.HALF_UP);
+            }
+
+            int updated = holdingMapper.updateHolding(current.getHoldingId(), updatedQuantity, updatedAveragePrice);
+            if (updated == 0) {
+                throw new IllegalStateException("Failed to update holding for account " + accountId + " and instrument " + instrumentId);
+            }
+
+            logger.info("    ✓ Existing holding updated (holdingId={}, quantity={}, avgPrice={})",
+                current.getHoldingId(), updatedQuantity, updatedAveragePrice);
+            return;
+        }
+
+        if (side == OrderSide.SELL) {
+            throw new IllegalStateException("No existing holding to SELL for account " + accountId + " and instrument " + instrumentId);
+        }
+
+        Account account = accountMapper.findAccountById(accountId)
+            .orElseThrow(() -> new IllegalArgumentException("Account " + accountId + " not found for holding insert"));
+
+        Holding newHolding = new Holding(
+            System.nanoTime(),  // Generate holding ID
+            account,
+            order.getInstrument(),
+            quantity,
+            executionPrice.setScale(2, RoundingMode.HALF_UP)
+        );
+
+        int inserted = holdingMapper.insertHolding(newHolding);
+        if (inserted == 0) {
+            throw new IllegalStateException("Failed to create holding for account " + accountId + " and instrument " + instrumentId);
+        }
+
+        logger.info("    ✓ New holding created (holdingId={}, quantity={}, avgPrice={})",
+            newHolding.getHoldingId(), quantity, newHolding.getAveragePrice());
     }
     
     /**
