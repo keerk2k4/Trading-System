@@ -19,10 +19,9 @@ public interface UserMapper {
 
     /**
      * Loads an account holder. Users are registered by the auth service into
-     * auth.users (trading.users is never written for new users). auth.users
-     * keeps new users at PENDING even after KYC approval, since approval only
-     * activates the trading account, so PENDING maps to ACTIVE here and KYC
-     * is enforced by the account's trading status instead.
+     * auth.users with status PENDING (awaiting KYC). When KYC is approved,
+     * status is updated to ACTIVE. BLOCKED and DEACTIVATED statuses are
+     * preserved; any other status is mapped to ACTIVE for trading purposes.
      */
     @Select("""
         SELECT user_id::text AS user_id, first_name, last_name, email, phone, password_hash,

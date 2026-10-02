@@ -289,6 +289,10 @@ export class KycController {
 
       let accountId: number | undefined;
       if (request.status === KycReviewStatus.APPROVED) {
+        // Update user status to ACTIVE (they passed KYC)
+        await this.userRepository.updateStatus(request.userId, "ACTIVE");
+        
+        // Activate their trading account
         const account = await this.tradeApiClient.activateAccount(request.userId);
         accountId = account.accountId;
       }

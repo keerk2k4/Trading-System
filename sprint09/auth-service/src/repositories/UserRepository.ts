@@ -59,6 +59,13 @@ export class UserRepository {
     return result.rows.map((row: { role: string }) => row.role);
   }
 
+  async updateStatus(userId: string, status: string): Promise<void> {
+    await this.databaseService.query(
+      "UPDATE auth.users SET status = $1 WHERE user_id = $2",
+      [status, userId],
+    );
+  }
+
   async hasRole(userId: string, role: string): Promise<boolean> {
     const result = await this.databaseService.query(
       "SELECT 1 FROM auth.user_roles WHERE user_id = $1 AND role = $2 LIMIT 1",

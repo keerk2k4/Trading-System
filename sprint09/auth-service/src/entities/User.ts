@@ -6,5 +6,5 @@ export interface User {
   phone: string | null;
   firstName: string;
   lastName: string;
-  status: string; // ACTIVE, BLOCKED, DEACTIVATED
+  status: string; // PENDING (awaiting KYC), ACTIVE, BLOCKED, DEACTIVATED
 }

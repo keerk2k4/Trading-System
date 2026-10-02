@@ -1,7 +1,8 @@
 package com.tradingsystem.domain.enums;
 
 public enum UserStatus {
-    ACTIVE,
-    BLOCKED,
-    DEACTIVATED
+    PENDING,    // Awaiting KYC approval
+    ACTIVE,     // Approved and can trade
+    BLOCKED,    // Temporarily suspended
+    DEACTIVATED // Permanently deactivated
 }

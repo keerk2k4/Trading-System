@@ -26,7 +26,7 @@ ALTER TABLE users ALTER COLUMN last_name DROP DEFAULT;
 ALTER TABLE users ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE';
 
 ALTER TABLE users ADD CONSTRAINT chk_user_status
-    CHECK (status IN ('ACTIVE', 'BLOCKED', 'DEACTIVATED'));
+    CHECK (status IN ('PENDING', 'ACTIVE', 'BLOCKED', 'DEACTIVATED'));
 
 -- user_name is left in place, unused going forward, rather than dropped,
 -- so nothing that already reads it breaks.
