@@ -6,7 +6,7 @@
     "generators": {
       "auth-client": {
         "generatorName": "typescript-angular",
-        "inputSpec": "../contracts/auth-api.yaml",
+        "inputSpec": "../../Contracts/API-Schemas/auth-api.yaml",
         "output": "src/generated/auth-client",
         "skipValidateSpec": true,
         "additionalProperties": {
@@ -20,7 +20,7 @@
       },
       "trade-client": {
         "generatorName": "typescript-angular",
-        "inputSpec": "../contracts/trade-api.yaml",
+        "inputSpec": "../../Contracts/API-Schemas/trade-api.yaml",
         "output": "src/generated/trade-client",
         "skipValidateSpec": true,
         "additionalProperties": {
