@@ -26,14 +26,23 @@ export class RefreshTokenService {
     return bcrypt.hash(token, this.BCRYPT_COST);
   }
 
-  // Better query?
+  /**
+   * Create a deterministic lookup hash for fast indexed token queries.
+   * Uses HMAC-SHA256 (not for security, only for indexing).
+   */
+  private createLookupHash(token: string): string {
+    const secret = process.env.TOKEN_LOOKUP_SECRET || 'default-lookup-secret-change-in-prod';
+    return crypto.createHmac('sha256', secret).update(token).digest('hex');
+  }
+
   private async findRefreshTokenRow(token: string): Promise<RefreshTokenRow | null> {
     return this.refreshTokenRepository.findByPlainToken(token);
   }
 
-  async storeRefreshToken(userId: string, tokenHash: string): Promise<{ id: number; expiresAt: Date }> {
+  async storeRefreshToken(userId: string, tokenHash: string, plainToken: string): Promise<{ id: number; expiresAt: Date }> {
     const expiresAt = new Date(Date.now() + this.tokenService.getRefreshTokenExpiry() * 1000);
-    const result = await this.refreshTokenRepository.create(userId, tokenHash, expiresAt);
+    const lookupHash = this.createLookupHash(plainToken);
+    const result = await this.refreshTokenRepository.create(userId, tokenHash, lookupHash, expiresAt);
 
     return { id: result.id, expiresAt: result.expires_at };
   }
@@ -80,7 +89,10 @@ export class RefreshTokenService {
     }
   }
 
-  // could have multiple refresh tokens 
+  /**
+   * Get the active token hash for a user (used for token rotation).
+   * A user can have multiple tokens, but we track the latest active one.
+   */
   async getActiveRefreshTokenForUser(userId: string): Promise<string | null> {
     return this.refreshTokenRepository.findActiveTokenHashByUserId(userId);
   }

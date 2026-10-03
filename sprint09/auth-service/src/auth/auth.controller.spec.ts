@@ -323,6 +323,7 @@ describe("AuthController", () => {
       expect(refreshTokenService.storeRefreshToken).toHaveBeenCalledWith(
         USER_ID,
         "hashed-refresh-token",
+        "refresh-token",
       );
       expect(refreshTokenService.revokeAllRefreshTokensForUser).toHaveBeenCalledWith(USER_ID);
       expect(throttleService.resetThrottle).toHaveBeenCalledWith(user.userName);

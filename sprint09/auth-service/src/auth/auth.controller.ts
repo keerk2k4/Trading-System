@@ -223,11 +223,10 @@ export class AuthController {
 
       const accessToken = this.tokenService.createAccessToken(user.userId, account.accountId, ["CUSTOMER"]);
 
-      
       await this.refreshTokenService.revokeAllRefreshTokensForUser(user.userId);
       const refreshToken = this.refreshTokenService.generateRefreshToken();
       const tokenHash = await this.refreshTokenService.hashRefreshToken(refreshToken);
-      await this.refreshTokenService.storeRefreshToken(user.userId, tokenHash);
+      await this.refreshTokenService.storeRefreshToken(user.userId, tokenHash, refreshToken);
       
       this.throttleService.resetThrottle(loginRequest.username);
 
@@ -307,7 +306,7 @@ export class AuthController {
       await this.refreshTokenService.revokeAllRefreshTokensForUser(user.userId);
       const refreshToken = this.refreshTokenService.generateRefreshToken();
       const tokenHash = await this.refreshTokenService.hashRefreshToken(refreshToken);
-      await this.refreshTokenService.storeRefreshToken(user.userId, tokenHash);
+      await this.refreshTokenService.storeRefreshToken(user.userId, tokenHash, refreshToken);
 
       this.throttleService.resetThrottle(loginRequest.username);
 
@@ -384,7 +383,7 @@ export class AuthController {
 
       const newRefreshToken = this.refreshTokenService.generateRefreshToken();
       const newTokenHash = await this.refreshTokenService.hashRefreshToken(newRefreshToken);
-      await this.refreshTokenService.storeRefreshToken(user.userId, newTokenHash);
+      await this.refreshTokenService.storeRefreshToken(user.userId, newTokenHash, newRefreshToken);
 
       const response: TokenResponse = {
         accessToken: newAccessToken,

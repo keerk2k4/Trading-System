@@ -20,6 +20,7 @@ function makeFakeDatabaseService() {
     id: number;
     user_id: string;
     token_hash: string;
+    lookup_hash?: string;
     is_revoked: boolean;
     created_at: Date;
     expires_at: Date;
@@ -30,11 +31,20 @@ function makeFakeDatabaseService() {
     rows,
     async query(text: string, params: any[] = []) {
       if (text.includes("INSERT INTO auth.refresh_tokens")) {
-        const [userId, tokenHash, expiresAt] = params;
+        // New signature: userId, tokenHash, lookupHash, expiresAt
+        // Old signature: userId, tokenHash, expiresAt (from legacy tests)
+        const [userId, tokenHash, thirdParam, fourthParam] = params;
+        
+        // Determine if this is the new signature (with lookup_hash) or old
+        const hasLookupHash = params.length === 4;
+        const lookupHash = hasLookupHash ? thirdParam : undefined;
+        const expiresAt = hasLookupHash ? fourthParam : thirdParam;
+        
         const row = {
           id: nextId++,
           user_id: userId,
           token_hash: tokenHash,
+          lookup_hash: lookupHash,
           is_revoked: false,
           created_at: new Date(),
           expires_at: new Date(expiresAt),
@@ -42,7 +52,16 @@ function makeFakeDatabaseService() {
         rows.push(row);
         return { rows: [{ id: row.id, expires_at: row.expires_at }], rowCount: 1 };
       }
+      if (text.includes("WHERE lookup_hash")) {
+        // New query with lookup_hash WHERE clause
+        const [lookupHash] = params;
+        const matches = rows.filter(
+          r => r.lookup_hash === lookupHash && !r.is_revoked && new Date(r.expires_at) > new Date()
+        );
+        return { rows: matches, rowCount: matches.length };
+      }
       if (text.includes("SELECT id, user_id, token_hash, is_revoked, expires_at")) {
+        // Legacy query without WHERE lookup_hash (for backward compatibility)
         // bcrypt hashes are salted: matching is done by the service via
         // bcrypt.compare, so the fake returns every candidate row.
         return { rows: [...rows], rowCount: rows.length };
@@ -151,7 +170,7 @@ describe("Auth refresh rotation", () => {
   async function issueInitialRefreshToken(): Promise<string> {
     const token = refreshService.generateRefreshToken();
     const hash = await refreshService.hashRefreshToken(token);
-    await refreshService.storeRefreshToken(USER_ID, hash);
+    await refreshService.storeRefreshToken(USER_ID, hash, token);
     return token;
   }
 

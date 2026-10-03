@@ -8,6 +8,7 @@ function makeTokenRow(overrides: Partial<{
   id: number;
   user_id: string;
   token_hash: string;
+  lookup_hash?: string;
   is_revoked: boolean;
   expires_at: Date;
 }> = {}) {
@@ -15,6 +16,7 @@ function makeTokenRow(overrides: Partial<{
     id: 1,
     user_id: USER_ID,
     token_hash: "unused-hash",
+    lookup_hash: "lookup-hash-value",
     is_revoked: false,
     expires_at: new Date(Date.now() + 60_000),
     ...overrides,
@@ -58,21 +60,22 @@ describe("RefreshTokenService", () => {
   });
 
   describe("storeRefreshToken", () => {
-    it("stores the hash with an expiry derived from TokenService", async () => {
+    it("stores the hash with lookup_hash and expiry derived from TokenService", async () => {
       const expiry = new Date("2030-01-02T03:04:05.000Z");
+      const plainToken = "plaintext-refresh-token-for-lookup";
       query.mockResolvedValueOnce({ rows: [{ id: 9, expires_at: expiry }], rowCount: 1 });
 
-      const result = await service.storeRefreshToken(USER_ID, "hashed-token");
+      const result = await service.storeRefreshToken(USER_ID, "hashed-token", plainToken);
 
       expect(tokenService.getRefreshTokenExpiry).toHaveBeenCalledTimes(1);
       expect(result).toEqual({ id: 9, expiresAt: expiry });
       expect(query).toHaveBeenCalledWith(
-        `INSERT INTO auth.refresh_tokens (user_id, token_hash, is_revoked, created_at, expires_at)
-       VALUES ($1, $2, FALSE, CURRENT_TIMESTAMP, $3)
+        `INSERT INTO auth.refresh_tokens (user_id, token_hash, lookup_hash, is_revoked, created_at, expires_at)
+       VALUES ($1, $2, $3, FALSE, CURRENT_TIMESTAMP, $4)
        RETURNING id, expires_at`,
-        [USER_ID, "hashed-token", expect.any(Date)],
+        [USER_ID, "hashed-token", expect.any(String), expect.any(Date)],
       );
-      const storedExpiry = query.mock.calls[0][1][2] as Date;
+      const storedExpiry = query.mock.calls[0][1][3] as Date;
       expect(storedExpiry.getTime()).toBeGreaterThan(Date.now() + 604800 * 1000 - 5000);
     });
   });
