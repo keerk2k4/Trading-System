@@ -80,7 +80,7 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                 </dl>
                 <div class="tp-actions">
                   <a class="tp-btn tp-btn-primary" routerLink="/orders/history" data-testid="order-view-orders">View orders</a>
-                  <button class="tp-btn tp-btn-secondary" type="button" (click)="resetForm()">Place another order</button>
+                  <button class="tp-btn tp-btn-secondary" type="button" data-testid="order-place-another" (click)="resetForm()">Place another order</button>
                 </div>
               </div>
             } @else {
@@ -112,7 +112,7 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                     <label for="side-sell" class="is-sell" data-testid="order-side-sell">Sell</label>
                   </div>
                   @if (sideError(); as message) {
-                    <p class="tp-field-error" id="side-error">{{ message }}</p>
+                    <p class="tp-field-error" id="side-error" data-testid="order-error-side">{{ message }}</p>
                   }
                 </fieldset>
 
@@ -132,7 +132,7 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                     [attr.aria-describedby]="symbolError() ? 'symbol-error' : 'symbol-hint'"
                   />
                   @if (symbolError(); as message) {
-                    <p class="tp-field-error" id="symbol-error">{{ message }}</p>
+                    <p class="tp-field-error" id="symbol-error" data-testid="order-error-symbol">{{ message }}</p>
                   } @else {
                     <p class="tp-hint" id="symbol-hint">For example AAPL, MSFT or GOOGL.</p>
                   }
@@ -174,7 +174,7 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                       [attr.aria-describedby]="priceError() ? 'price-error' : null"
                     />
                     @if (priceError(); as message) {
-                      <p class="tp-field-error" id="price-error">{{ message }}</p>
+                      <p class="tp-field-error" id="price-error" data-testid="order-error-price">{{ message }}</p>
                     }
                   </div>
                 </div>
@@ -205,19 +205,19 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
           <div class="tp-panel-body">
             <dl class="tp-details">
               <div><dt>Account</dt><dd class="tp-num" data-testid="order-account">{{ accountId() || '—' }}</dd></div>
-              <div><dt>Symbol</dt><dd>{{ summarySymbol() || '—' }}</dd></div>
+              <div><dt>Symbol</dt><dd data-testid="order-summary-symbol">{{ summarySymbol() || '—' }}</dd></div>
               <div>
                 <dt>Side</dt>
-                <dd [class.tp-positive]="values().side === 'BUY'" [class.tp-negative]="values().side === 'SELL'">
+                <dd data-testid="order-summary-side" [class.tp-positive]="values().side === 'BUY'" [class.tp-negative]="values().side === 'SELL'">
                   {{ values().side === 'BUY' ? 'Buy' : values().side === 'SELL' ? 'Sell' : '—' }}
                 </dd>
               </div>
-              <div><dt>Quantity</dt><dd class="tp-num">{{ (values().quantity | number) ?? '—' }}</dd></div>
-              <div><dt>Limit price</dt><dd class="tp-num">{{ (values().price | currency) ?? '—' }}</dd></div>
+              <div><dt>Quantity</dt><dd class="tp-num" data-testid="order-summary-quantity">{{ (values().quantity | number) ?? '—' }}</dd></div>
+              <div><dt>Limit price</dt><dd class="tp-num" data-testid="order-summary-price">{{ (values().price | currency) ?? '—' }}</dd></div>
             </dl>
             <div class="estimate">
               <p class="tp-stat-label">Estimated value</p>
-              <p class="tp-stat-value">{{ (estimate() | currency) ?? '—' }}</p>
+              <p class="tp-stat-value" data-testid="order-estimate">{{ (estimate() | currency) ?? '—' }}</p>
             </div>
           </div>
         </section>

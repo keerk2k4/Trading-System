@@ -32,7 +32,7 @@ const DOCUMENT_TYPES = [
           <div class="tp-panel-header">
             <h2 id="kyc-heading">Your details</h2>
             @if (kycStatus()) {
-              <app-status-badge [status]="kycStatus()" />
+              <app-status-badge data-testid="kyc-status" [status]="kycStatus()" />
             }
           </div>
 
@@ -42,7 +42,7 @@ const DOCUMENT_TYPES = [
             } @else {
               <div class="tp-form">
                 @if (isUpdateMode()) {
-                  <div class="tp-alert tp-alert-info" [attr.role]="justSubmitted() ? 'status' : null">
+                  <div class="tp-alert tp-alert-info" data-testid="kyc-info" [attr.role]="justSubmitted() ? 'status' : null">
                     <span>
                       @if (justSubmitted()) {
                         <strong>Your KYC details were updated.</strong>
@@ -56,7 +56,7 @@ const DOCUMENT_TYPES = [
 
                 <form class="tp-form" [formGroup]="form" (ngSubmit)="onSubmit()">
                 @if (kycStatus() === 'REJECTED') {
-                  <div class="tp-alert tp-alert-error">
+                  <div class="tp-alert tp-alert-error" data-testid="kyc-rejected">
                     <span>
                       <strong>Your previous application was rejected.</strong>
                       {{ rejectionReason || 'Check your details and submit again, or contact support.' }}
@@ -64,7 +64,7 @@ const DOCUMENT_TYPES = [
                   </div>
                 }
                 @if (errorMessage(); as message) {
-                  <div class="tp-alert tp-alert-error" role="alert"><span>{{ message }}</span></div>
+                  <div class="tp-alert tp-alert-error" role="alert" data-testid="kyc-error"><span>{{ message }}</span></div>
                 }
 
                 <div>
@@ -72,6 +72,7 @@ const DOCUMENT_TYPES = [
                   <input
                     class="tp-input"
                     id="dob"
+                    data-testid="kyc-dob"
                     type="date"
                     formControlName="dateOfBirth"
                     autocomplete="bday"
@@ -80,7 +81,7 @@ const DOCUMENT_TYPES = [
                     [attr.aria-describedby]="showError('dateOfBirth') ? 'dob-error' : null"
                   />
                   @if (showError('dateOfBirth')) {
-                    <p class="tp-field-error" id="dob-error">Enter your date of birth.</p>
+                    <p class="tp-field-error" id="dob-error" data-testid="dob-error">Enter your date of birth.</p>
                   }
                 </div>
 
@@ -90,6 +91,7 @@ const DOCUMENT_TYPES = [
                     <select
                       class="tp-input"
                       id="docType"
+                      data-testid="kyc-doc-type"
                       formControlName="documentType"
                       aria-required="true"
                       [attr.aria-invalid]="showError('documentType') ? 'true' : null"
@@ -101,7 +103,7 @@ const DOCUMENT_TYPES = [
                       }
                     </select>
                     @if (showError('documentType')) {
-                      <p class="tp-field-error" id="docType-error">Choose a document type.</p>
+                      <p class="tp-field-error" id="docType-error" data-testid="docType-error">Choose a document type.</p>
                     }
                   </div>
 
@@ -110,6 +112,7 @@ const DOCUMENT_TYPES = [
                     <input
                       class="tp-input"
                       id="docNum"
+                      data-testid="kyc-doc-number"
                       type="text"
                       formControlName="documentNumber"
                       autocomplete="off"
@@ -119,13 +122,13 @@ const DOCUMENT_TYPES = [
                       [attr.aria-describedby]="showError('documentNumber') ? 'docNum-error' : null"
                     />
                     @if (showError('documentNumber')) {
-                      <p class="tp-field-error" id="docNum-error">Enter the document number.</p>
+                      <p class="tp-field-error" id="docNum-error" data-testid="docNum-error">Enter the document number.</p>
                     }
                   </div>
                 </div>
 
                 <div>
-                  <button class="tp-btn tp-btn-primary" type="submit" [attr.aria-disabled]="isLoading() ? 'true' : null">
+                  <button class="tp-btn tp-btn-primary" data-testid="kyc-submit" type="submit" [attr.aria-disabled]="isLoading() ? 'true' : null">
                     @if (isLoading()) {
                       <span class="tp-spinner" aria-hidden="true"></span>
                       {{ isUpdateMode() ? 'Updating…' : 'Submitting…' }}
@@ -138,7 +141,7 @@ const DOCUMENT_TYPES = [
               </form>
 
               <div class="tp-actions">
-                <button class="tp-btn tp-btn-secondary" type="button" (click)="goToDashboard()">Go to dashboard</button>
+                <button class="tp-btn tp-btn-secondary" type="button" data-testid="kyc-go-dashboard" (click)="goToDashboard()">Go to dashboard</button>
               </div>
             </div>
             }

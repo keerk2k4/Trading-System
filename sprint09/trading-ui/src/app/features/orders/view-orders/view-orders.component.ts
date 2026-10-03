@@ -38,11 +38,12 @@ export const POLL_MAX_DURATION_MS = 5 * 60_000;
             data-icon
             type="button"
             [attr.aria-disabled]="isRefreshing() ? 'true' : null"
+            data-testid="orders-refresh"
             (click)="refreshOrders()"
           >
             {{ isRefreshing() ? 'Refreshing…' : 'Refresh' }}
           </button>
-          <a class="tp-btn tp-btn-primary tp-btn-icon-plus" data-icon routerLink="/orders/new">New order</a>
+          <a class="tp-btn tp-btn-primary tp-btn-icon-plus" data-icon routerLink="/orders/new" data-testid="orders-new">New order</a>
         </div>
       </header>
 
@@ -50,7 +51,7 @@ export const POLL_MAX_DURATION_MS = 5 * 60_000;
         <div class="tp-panel-header">
           <div>
             <h2 id="orders-heading">Order blotter</h2>
-            <p class="tp-num" role="status">
+            <p class="tp-num" role="status" data-testid="orders-count">
               {{ isRefreshing() ? 'Loading orders…' : orders().length + (orders().length === 1 ? ' order' : ' orders') }}
             </p>
           </div>
@@ -65,7 +66,7 @@ export const POLL_MAX_DURATION_MS = 5 * 60_000;
                   [value]="filter.value"
                   [formControl]="statusFilter"
                 />
-                <label [for]="'status-' + (filter.value || 'all')">{{ filter.label }}</label>
+                <label [for]="'status-' + (filter.value || 'all')" [attr.data-testid]="'orders-filter-' + (filter.value || 'ALL')">{{ filter.label }}</label>
               }
             </div>
           </fieldset>
@@ -73,11 +74,11 @@ export const POLL_MAX_DURATION_MS = 5 * 60_000;
 
         @if (errorMessage(); as message) {
           <div class="tp-panel-body">
-            <div class="tp-alert tp-alert-error" role="alert"><span>{{ message }}</span></div>
+            <div class="tp-alert tp-alert-error" role="alert" data-testid="orders-error"><span>{{ message }}</span></div>
           </div>
         } @else if (orders().length === 0) {
           @if (!isRefreshing()) {
-            <div class="tp-empty">
+            <div class="tp-empty" data-testid="orders-empty">
               @if (statusFilter.value) {
                 <strong>No {{ statusFilter.value.toLowerCase() }} orders</strong>
                 Try another status filter.

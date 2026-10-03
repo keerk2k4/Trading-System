@@ -50,6 +50,7 @@ const ADMIN_NAV: NavItem[] = [
                 <a
                   class="sh-nav-link"
                   [routerLink]="item.link"
+                  [attr.data-testid]="'nav' + item.link.split('/').join('-')"
                   routerLinkActive="is-active"
                   ariaCurrentWhenActive="page"
                   [style.--icon]="item.icon"
@@ -66,8 +67,8 @@ const ADMIN_NAV: NavItem[] = [
           <div class="sh-account">
             <span class="sh-avatar" aria-hidden="true">{{ initial() }}</span>
             <span class="sh-who">
-              <span class="sh-name">{{ username() }}</span>
-              <span class="sh-role">{{ roleLabel() }}</span>
+              <span class="sh-name" data-testid="shell-username">{{ username() }}</span>
+              <span class="sh-role" data-testid="shell-role">{{ roleLabel() }}</span>
             </span>
           </div>
           <div class="sh-tools">

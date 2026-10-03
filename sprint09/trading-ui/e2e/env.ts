@@ -27,10 +27,29 @@ export const env = {
   },
   get symbol(): string {
     return requireEnv('E2E_SYMBOL');
+  },
+  get adminUsername(): string {
+    return requireEnv('E2E_ADMIN_USERNAME');
+  },
+  get adminPassword(): string {
+    return requireEnv('E2E_ADMIN_PASSWORD');
   }
 };
 
-// The UI renders order statuses as words ("NEW" -> "New").
+// The UI renders statuses as words ("NEW" -> "New").
 export const PLACED_ORDER_STATUSES = ['NEW', 'FILLED', 'REJECTED'];
 export const PLACED_ORDER_LABELS = ['New', 'Filled', 'Rejected'];
 export const ALL_STATUS_LABELS = ['New', 'Filled', 'Rejected', 'Cancelled'];
+
+// Messages from ErrorMappingService, so a spec asserts what a trader reads.
+export const MESSAGES = {
+  'ACC-404': 'The account could not be found.',
+  'INS-404': 'The instrument cannot be traded.',
+  'ORD-400': 'There is not enough cash to place this order.',
+  'ORD-409': 'There are not enough holdings to sell, or this order has already been placed.',
+  'AUTH-409': 'This username is already taken. Please choose another.',
+  badLogin: 'Incorrect username or password. Check your details and try again.'
+} as const;
+
+// Every route behind mockAuthGuard + kycApprovalGuard.
+export const TRADING_ROUTES = ['/dashboard', '/orders/new', '/orders/history', '/funds', '/watchlist'];

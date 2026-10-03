@@ -41,7 +41,7 @@ import { safeReturnUrl } from '../../../shared/guards/safe-return-url';
             [attr.aria-describedby]="usernameError() ? 'login-username-error' : null"
           />
           @if (usernameError(); as message) {
-            <p class="tp-field-error" id="login-username-error">{{ message }}</p>
+            <p class="tp-field-error" id="login-username-error" data-testid="login-username-error">{{ message }}</p>
           }
         </div>
 
@@ -63,12 +63,13 @@ import { safeReturnUrl } from '../../../shared/guards/safe-return-url';
               class="tp-input-action"
               type="button"
               [class.is-active]="passwordVisible()"
+              data-testid="login-toggle-password"
               [attr.aria-label]="passwordVisible() ? 'Hide password' : 'Show password'"
               (click)="togglePasswordVisibility()"
             ></button>
           </div>
           @if (passwordError(); as message) {
-            <p class="tp-field-error" id="login-password-error">{{ message }}</p>
+            <p class="tp-field-error" id="login-password-error" data-testid="login-password-error">{{ message }}</p>
           }
         </div>
 
@@ -93,9 +94,9 @@ import { safeReturnUrl } from '../../../shared/guards/safe-return-url';
         </p>
       } @else {
         <p class="tp-form-footer">
-          Don't have an account? <a class="tp-link" routerLink="/register">Create one</a>
+          Don't have an account? <a class="tp-link" routerLink="/register" data-testid="login-register-link">Create one</a>
         </p>
-        <p class="tp-form-footer"><a class="tp-link" routerLink="/admin-login">Admin sign in</a></p>
+        <p class="tp-form-footer"><a class="tp-link" routerLink="/admin-login" data-testid="login-admin-link">Admin sign in</a></p>
       }
     </app-auth-shell>
   `

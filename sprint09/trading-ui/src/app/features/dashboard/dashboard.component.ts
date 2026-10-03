@@ -25,7 +25,7 @@ interface PortfolioSummary {
     <div class="tp-page">
       <header class="tp-page-header">
         <div>
-          <h1>Welcome back, {{ user()?.username }}</h1>
+          <h1 data-testid="dashboard-welcome">Welcome back, {{ user()?.username }}</h1>
           <p>Your cash, holdings and account at a glance.</p>
         </div>
         <div class="tp-actions">
@@ -35,7 +35,7 @@ interface PortfolioSummary {
       </header>
 
       @if (errorMessage(); as message) {
-        <div class="tp-alert tp-alert-error" role="alert"><span>{{ message }}</span></div>
+        <div class="tp-alert tp-alert-error" role="alert" data-testid="dashboard-error"><span>{{ message }}</span></div>
       }
 
       <section class="tp-grid tp-grid-3" aria-label="Portfolio summary" [attr.aria-busy]="isLoading()">
@@ -46,7 +46,7 @@ interface PortfolioSummary {
         </div>
         <div class="tp-panel tp-stat">
           <p class="tp-stat-label">Available cash</p>
-          <p class="tp-stat-value">{{ (summary()?.cash | currency: currency()) ?? '—' }}</p>
+          <p class="tp-stat-value" data-testid="dashboard-cash">{{ (summary()?.cash | currency: currency()) ?? '—' }}</p>
           <p class="tp-stat-meta">
             @if (summary()?.asOf; as asOf) {
               As of {{ asOf | date: 'MMM d, h:mm a' }}
@@ -58,7 +58,7 @@ interface PortfolioSummary {
         <div class="tp-panel tp-stat">
           <p class="tp-stat-label">Holdings value</p>
           <p class="tp-stat-value">{{ (summary()?.holdings | currency: currency()) ?? '—' }}</p>
-          <p class="tp-stat-meta">{{ positions().length }} open {{ positions().length === 1 ? 'position' : 'positions' }}</p>
+          <p class="tp-stat-meta" data-testid="dashboard-position-count">{{ positions().length }} open {{ positions().length === 1 ? 'position' : 'positions' }}</p>
         </div>
       </section>
 
@@ -89,7 +89,7 @@ interface PortfolioSummary {
                 </thead>
                 <tbody>
                   @for (position of positions(); track position.symbol) {
-                    <tr>
+                    <tr data-testid="position-row" [attr.data-symbol]="position.symbol">
                       <td><strong>{{ position.symbol }}</strong></td>
                       <td class="num">{{ position.quantity | number }}</td>
                       <td class="num">{{ position.averageCost | currency: currency() }}</td>
@@ -111,11 +111,11 @@ interface PortfolioSummary {
             @if (account(); as acc) {
               <div><dt>Holder</dt><dd>{{ acc.holderName }}</dd></div>
             }
-            <div><dt>Account ID</dt><dd class="tp-num">{{ user()?.accountId || '—' }}</dd></div>
+            <div><dt>Account ID</dt><dd class="tp-num" data-testid="dashboard-account-id">{{ user()?.accountId || '—' }}</dd></div>
             @if (account(); as acc) {
-              <div><dt>Status</dt><dd><app-status-badge [status]="acc.status" /></dd></div>
+              <div><dt>Status</dt><dd><app-status-badge data-testid="dashboard-account-status" [status]="acc.status" /></dd></div>
             }
-            <div><dt>Verification</dt><dd><app-status-badge [status]="kycStatus()" /></dd></div>
+            <div><dt>Verification</dt><dd><app-status-badge data-testid="dashboard-kyc-status" [status]="kycStatus()" /></dd></div>
             <div><dt>User ID</dt><dd class="tp-mono">{{ user()?.id }}</dd></div>
           </dl>
         </section>

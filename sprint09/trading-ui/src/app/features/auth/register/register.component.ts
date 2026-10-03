@@ -36,18 +36,18 @@ function matchesPassword(control: AbstractControl): ValidationErrors | null {
     <app-auth-shell [heading]="heading()" [subtitle]="subtitle()">
       @if (registeredUsername(); as username) {
         <div class="tp-form">
-          <div class="tp-alert tp-alert-success" role="status">
+          <div class="tp-alert tp-alert-success" role="status" data-testid="register-success">
             <span>
               The account <strong>{{ username }}</strong> is ready. Sign in with your new username and
               password to continue.
             </span>
           </div>
-          <a class="tp-btn tp-btn-primary tp-btn-block" routerLink="/login">Continue to sign in</a>
+          <a class="tp-btn tp-btn-primary tp-btn-block" routerLink="/login" data-testid="register-continue">Continue to sign in</a>
         </div>
       } @else {
         <form class="tp-form" [formGroup]="form" (ngSubmit)="onSubmit()">
           @if (errorMessage(); as message) {
-            <div class="tp-alert tp-alert-error" role="alert">
+            <div class="tp-alert tp-alert-error" role="alert" data-testid="register-error">
               <span>{{ message }}</span>
             </div>
           }
@@ -57,6 +57,7 @@ function matchesPassword(control: AbstractControl): ValidationErrors | null {
             <input
               class="tp-input"
               id="register-username"
+              data-testid="register-username"
               type="text"
               formControlName="username"
               autocomplete="username"
@@ -67,7 +68,7 @@ function matchesPassword(control: AbstractControl): ValidationErrors | null {
               [attr.aria-describedby]="usernameError() ? 'register-username-error' : 'register-username-hint'"
             />
             @if (usernameError(); as message) {
-              <p class="tp-field-error" id="register-username-error">{{ message }}</p>
+              <p class="tp-field-error" id="register-username-error" data-testid="register-username-error">{{ message }}</p>
             } @else {
               <p class="tp-hint" id="register-username-hint">
                 3–64 characters: letters, numbers, dots, dashes and underscores.
@@ -80,6 +81,7 @@ function matchesPassword(control: AbstractControl): ValidationErrors | null {
             <input
               class="tp-input"
               id="register-email"
+              data-testid="register-email"
               type="email"
               formControlName="email"
               autocomplete="email"
@@ -90,7 +92,7 @@ function matchesPassword(control: AbstractControl): ValidationErrors | null {
               [attr.aria-describedby]="emailError() ? 'register-email-error' : null"
             />
             @if (emailError(); as message) {
-              <p class="tp-field-error" id="register-email-error">{{ message }}</p>
+              <p class="tp-field-error" id="register-email-error" data-testid="register-email-error">{{ message }}</p>
             }
           </div>
 
@@ -99,6 +101,7 @@ function matchesPassword(control: AbstractControl): ValidationErrors | null {
             <input
               class="tp-input"
               id="register-first-name"
+              data-testid="register-first-name"
               type="text"
               formControlName="firstName"
               autocomplete="given-name"
@@ -107,7 +110,7 @@ function matchesPassword(control: AbstractControl): ValidationErrors | null {
               [attr.aria-describedby]="firstNameError() ? 'register-first-name-error' : null"
             />
             @if (firstNameError(); as message) {
-              <p class="tp-field-error" id="register-first-name-error">{{ message }}</p>
+              <p class="tp-field-error" id="register-first-name-error" data-testid="register-first-name-error">{{ message }}</p>
             }
           </div>
 
@@ -116,6 +119,7 @@ function matchesPassword(control: AbstractControl): ValidationErrors | null {
             <input
               class="tp-input"
               id="register-last-name"
+              data-testid="register-last-name"
               type="text"
               formControlName="lastName"
               autocomplete="family-name"
@@ -124,7 +128,7 @@ function matchesPassword(control: AbstractControl): ValidationErrors | null {
               [attr.aria-describedby]="lastNameError() ? 'register-last-name-error' : null"
             />
             @if (lastNameError(); as message) {
-              <p class="tp-field-error" id="register-last-name-error">{{ message }}</p>
+              <p class="tp-field-error" id="register-last-name-error" data-testid="register-last-name-error">{{ message }}</p>
             }
           </div>
 
@@ -133,6 +137,7 @@ function matchesPassword(control: AbstractControl): ValidationErrors | null {
             <input
               class="tp-input"
               id="register-phone"
+              data-testid="register-phone"
               type="tel"
               formControlName="phone"
               autocomplete="tel"
@@ -141,7 +146,7 @@ function matchesPassword(control: AbstractControl): ValidationErrors | null {
               [attr.aria-describedby]="phoneError() ? 'register-phone-error' : null"
             />
             @if (phoneError(); as message) {
-              <p class="tp-field-error" id="register-phone-error">{{ message }}</p>
+              <p class="tp-field-error" id="register-phone-error" data-testid="register-phone-error">{{ message }}</p>
             }
           </div>
 
@@ -151,6 +156,7 @@ function matchesPassword(control: AbstractControl): ValidationErrors | null {
               <input
                 class="tp-input"
                 id="register-password"
+                data-testid="register-password"
                 [type]="passwordsVisible() ? 'text' : 'password'"
                 formControlName="password"
                 autocomplete="new-password"
@@ -162,12 +168,13 @@ function matchesPassword(control: AbstractControl): ValidationErrors | null {
                 class="tp-input-action"
                 type="button"
                 [class.is-active]="passwordsVisible()"
+                data-testid="register-toggle-password"
                 [attr.aria-label]="passwordsVisible() ? 'Hide passwords' : 'Show passwords'"
                 (click)="togglePasswordVisibility()"
               ></button>
             </div>
             @if (passwordError(); as message) {
-              <p class="tp-field-error" id="register-password-error">{{ message }}</p>
+              <p class="tp-field-error" id="register-password-error" data-testid="register-password-error">{{ message }}</p>
             } @else {
               <p class="tp-hint" [class.is-met]="passwordLongEnough()" id="register-password-hint">
                 At least 12 characters.
@@ -180,6 +187,7 @@ function matchesPassword(control: AbstractControl): ValidationErrors | null {
             <input
               class="tp-input"
               id="register-confirm-password"
+              data-testid="register-confirm-password"
               [type]="passwordsVisible() ? 'text' : 'password'"
               formControlName="confirmPassword"
               autocomplete="new-password"
@@ -188,11 +196,11 @@ function matchesPassword(control: AbstractControl): ValidationErrors | null {
               [attr.aria-describedby]="confirmPasswordError() ? 'register-confirm-password-error' : null"
             />
             @if (confirmPasswordError(); as message) {
-              <p class="tp-field-error" id="register-confirm-password-error">{{ message }}</p>
+              <p class="tp-field-error" id="register-confirm-password-error" data-testid="register-confirm-password-error">{{ message }}</p>
             }
           </div>
 
-          <button class="tp-btn tp-btn-primary tp-btn-block" type="submit" [attr.aria-disabled]="isLoading() ? 'true' : null">
+          <button class="tp-btn tp-btn-primary tp-btn-block" data-testid="register-submit" type="submit" [attr.aria-disabled]="isLoading() ? 'true' : null">
             @if (isLoading()) {
               <span class="tp-spinner" aria-hidden="true"></span>
               Creating account…

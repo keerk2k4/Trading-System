@@ -1,8 +1,21 @@
 import { defineConfig, devices } from '@playwright/test';
+import path from 'node:path';
+
+// Loads the E2E_* variables from .env.local (gitignored) next to this file,
+// so the tests work from any terminal and from the VS Code Testing panel.
+// Variables already set in the environment are not overwritten. With no
+// .env.local (e.g. CI) the real environment is used as it is.
+try {
+  process.loadEnvFile(path.join(__dirname, '.env.local'));
+} catch (error) {
+  if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+    throw error;
+  }
+}
 
 // The journeys run against the real, already-running stack (UI, auth service,
 // Trade REST API, executor, Postgres, Kafka). Nothing is started here and
-// nothing is mocked. Export the E2E_* variables first - see e2e/README.md.
+// nothing is mocked.
 export default defineConfig({
   testDir: './e2e',
   // One test at a time: the Trade REST API allocates order IDs with

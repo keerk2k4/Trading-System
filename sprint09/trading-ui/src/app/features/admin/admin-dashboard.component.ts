@@ -18,14 +18,14 @@ import { KycSubmission } from '../../shared/models/kyc.models';
           <p>Signed in as {{ user()?.username }}. Review customer verification requests.</p>
         </div>
         <div class="tp-actions">
-          <a class="tp-btn tp-btn-primary" routerLink="/admin/kyc-review">Open KYC review</a>
+          <a class="tp-btn tp-btn-primary" routerLink="/admin/kyc-review" data-testid="admin-open-review">Open KYC review</a>
         </div>
       </header>
 
       <section class="tp-grid tp-grid-3" aria-label="Summary" [attr.aria-busy]="isLoading()">
         <div class="tp-panel tp-stat tp-stat-primary">
           <p class="tp-stat-label">Pending KYC</p>
-          <p class="tp-stat-value">{{ isLoading() ? '—' : pending().length }}</p>
+          <p class="tp-stat-value" data-testid="admin-pending-count">{{ isLoading() ? '—' : pending().length }}</p>
           <p class="tp-stat-meta">Waiting for a decision</p>
         </div>
         <div class="tp-panel tp-stat">

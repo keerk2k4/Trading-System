@@ -33,10 +33,10 @@ function validMoney(value: number | null): boolean {
       </header>
 
       @if (errorMessage(); as message) {
-        <div class="tp-alert tp-alert-error" role="alert"><span>{{ message }}</span></div>
+        <div class="tp-alert tp-alert-error" role="alert" data-testid="funds-error"><span>{{ message }}</span></div>
       }
       @if (successMessage(); as message) {
-        <div class="tp-alert tp-alert-success" role="status"><span>{{ message }}</span></div>
+        <div class="tp-alert tp-alert-success" role="status" data-testid="funds-success"><span>{{ message }}</span></div>
       }
 
       <div class="tp-grid tp-grid-main-side">
@@ -52,6 +52,7 @@ function validMoney(value: number | null): boolean {
               <input
                 class="tp-input tp-num"
                 id="amount"
+                data-testid="funds-amount"
                 type="number"
                 min="0.01"
                 step="0.01"
@@ -62,14 +63,14 @@ function validMoney(value: number | null): boolean {
                 [attr.aria-describedby]="amountError() ? 'amount-error' : 'amount-hint'"
               />
               @if (amountError(); as message) {
-                <p class="tp-field-error" id="amount-error">{{ message }}</p>
+                <p class="tp-field-error" id="amount-error" data-testid="amount-error">{{ message }}</p>
               } @else {
                 <p class="tp-hint" id="amount-hint">Enter a value with up to 2 decimal places.</p>
               }
             </div>
 
             <div class="tp-actions">
-              <button class="tp-btn tp-btn-primary" type="submit" [attr.aria-disabled]="isLoading() ? 'true' : null">
+              <button class="tp-btn tp-btn-primary" data-testid="funds-deposit" type="submit" [attr.aria-disabled]="isLoading() ? 'true' : null">
                 @if (isLoading()) {
                   <span class="tp-spinner" aria-hidden="true"></span>
                   Processing…
@@ -80,6 +81,7 @@ function validMoney(value: number | null): boolean {
               <button
                 class="tp-btn tp-btn-secondary"
                 type="button"
+                data-testid="funds-withdraw"
                 (click)="onWithdraw()"
                 [attr.aria-disabled]="isLoading() ? 'true' : null"
               >
@@ -96,8 +98,8 @@ function validMoney(value: number | null): boolean {
           </div>
           <div class="tp-panel-body">
             <dl class="tp-details">
-              <div><dt>Account</dt><dd class="tp-num">{{ accountId() || '—' }}</dd></div>
-              <div><dt>Available cash</dt><dd class="tp-num">{{ (balance() | currency: currency()) ?? '—' }}</dd></div>
+              <div><dt>Account</dt><dd class="tp-num" data-testid="funds-account">{{ accountId() || '—' }}</dd></div>
+              <div><dt>Available cash</dt><dd class="tp-num" data-testid="funds-balance">{{ (balance() | currency: currency()) ?? '—' }}</dd></div>
               <div>
                 <dt>Last update</dt>
                 <dd>
@@ -113,7 +115,7 @@ function validMoney(value: number | null): boolean {
             @if (previewBalance() !== null) {
               <div class="tp-stat">
                 <p class="tp-stat-label">Balance after action</p>
-                <p class="tp-stat-value">{{ previewBalance() | currency: currency() }}</p>
+                <p class="tp-stat-value" data-testid="funds-preview">{{ previewBalance() | currency: currency() }}</p>
               </div>
             }
           </div>

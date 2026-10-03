@@ -21,6 +21,7 @@ import { KycSubmission } from '../../../shared/models/kyc.models';
             data-icon
             type="button"
             [attr.aria-disabled]="isRefreshing() ? 'true' : null"
+            data-testid="kyc-review-refresh"
             (click)="refreshSubmissions()"
           >
             {{ isRefreshing() ? 'Refreshing…' : 'Refresh' }}
@@ -28,7 +29,7 @@ import { KycSubmission } from '../../../shared/models/kyc.models';
         </div>
       </header>
 
-      <p class="sr-only" role="status">{{ statusMessage() }}</p>
+      <p class="sr-only" role="status" data-testid="kyc-review-status">{{ statusMessage() }}</p>
 
       @if (pendingSubmissions().length === 0) {
         <div class="tp-panel tp-empty">
@@ -42,7 +43,7 @@ import { KycSubmission } from '../../../shared/models/kyc.models';
       }
 
       @for (kyc of pendingSubmissions(); track kyc.id) {
-        <section class="tp-panel" [attr.aria-labelledby]="'kyc-' + kyc.id">
+        <section class="tp-panel" data-testid="kyc-submission" [attr.data-user-id]="kyc.userId" [attr.aria-labelledby]="'kyc-' + kyc.id">
           <div class="tp-panel-header">
             <div>
               <h2 [id]="'kyc-' + kyc.id">Submission {{ kyc.id }}</h2>
@@ -65,6 +66,7 @@ import { KycSubmission } from '../../../shared/models/kyc.models';
                 class="tp-input"
                 rows="3"
                 [id]="'reason-' + kyc.id"
+                data-testid="kyc-reason"
                 [value]="rejectionReasons[kyc.id || ''] || ''"
                 (input)="setReason(kyc, $event)"
               ></textarea>
@@ -73,6 +75,7 @@ import { KycSubmission } from '../../../shared/models/kyc.models';
                   class="tp-btn tp-btn-primary"
                   type="button"
                   [attr.aria-disabled]="isProcessing() ? 'true' : null"
+                  data-testid="kyc-approve"
                   (click)="approveKyc(kyc)"
                 >
                   {{ processingId() === kyc.id ? 'Processing…' : 'Approve' }}
@@ -81,6 +84,7 @@ import { KycSubmission } from '../../../shared/models/kyc.models';
                   class="tp-btn tp-btn-danger"
                   type="button"
                   [attr.aria-disabled]="isProcessing() ? 'true' : null"
+                  data-testid="kyc-reject"
                   (click)="rejectKyc(kyc)"
                 >
                   Reject
