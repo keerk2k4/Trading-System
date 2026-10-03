@@ -39,7 +39,6 @@ export const env = {
 // The UI renders statuses as words ("NEW" -> "New").
 export const PLACED_ORDER_STATUSES = ['NEW', 'FILLED', 'REJECTED'];
 export const PLACED_ORDER_LABELS = ['New', 'Filled', 'Rejected'];
-export const ALL_STATUS_LABELS = ['New', 'Filled', 'Rejected', 'Cancelled'];
 
 // Messages from ErrorMappingService, so a spec asserts what a trader reads.
 export const MESSAGES = {

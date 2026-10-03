@@ -111,12 +111,6 @@ export async function rejectIfPending(request: APIRequestContext, userId: string
   }
 }
 
-export async function getBalance(request: APIRequestContext, accessToken: string): Promise<number> {
-  const res = await request.get(`${env.tradeApi}/api/v1/accounts/me/balance`, { headers: bearer(accessToken) });
-  expect(res.ok()).toBe(true);
-  return Number((await res.json()).cashBalance);
-}
-
 export async function getOrderStatus(request: APIRequestContext, accessToken: string, orderId: string): Promise<string> {
   const res = await request.get(`${env.tradeApi}/api/v1/accounts/me/orders`, { headers: bearer(accessToken) });
   expect(res.ok()).toBe(true);

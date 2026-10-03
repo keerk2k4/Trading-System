@@ -80,8 +80,3 @@ export async function placeValidBuyOrder(page: Page): Promise<{ orderId: string;
   expect(response.ok(), `POST /api/v1/orders answered ${response.status()}`).toBe(true);
   return response.json();
 }
-
-/** "$1,234.50" -> 1234.5 */
-export function parseMoney(text: string | null): number {
-  return Number((text ?? '').replace(/[^0-9.-]/g, ''));
-}

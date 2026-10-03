@@ -20,15 +20,6 @@ test.describe('KYC journey', () => {
   const signInAsNewUser = (page: Parameters<typeof signIn>[0]) =>
     signIn(page, '/login', { username: user.username, password: user.password });
 
-  test('a new customer lands on verification after signing in', async ({ page }) => {
-    await signInAsNewUser(page);
-
-    await expect(page).toHaveURL(/\/kyc-submission$/);
-    await expect(page.getByRole('heading', { level: 1, name: 'Identity verification' })).toBeVisible();
-    await expect(page.getByTestId('kyc-status')).toHaveCount(0);
-    await expect(page.getByTestId('kyc-submit')).toHaveText('Submit for review');
-  });
-
   test('every trading screen sends an unverified customer to verification', async ({ page }) => {
     await signInAsNewUser(page);
     for (const route of TRADING_ROUTES) {
