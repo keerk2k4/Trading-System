@@ -8,6 +8,8 @@ import com.tradingsystem.spring_boot_app.dto.PositionResponse;
 import com.tradingsystem.spring_boot_app.dto.UpdateBalanceRequest;
 import com.tradingsystem.spring_boot_app.service.AccountService;
 import com.tradingsystem.spring_boot_app.service.AuthService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -28,6 +30,7 @@ import java.util.List;
 
 
 @RestController
+@Tag(name = "Accounts", description = "The signed-in trader's account, balance, positions and order history")
 @RequestMapping("/api/v1/accounts")
 @Validated
 public class AccountController {
@@ -40,6 +43,7 @@ public class AccountController {
         this.authService = authService;
     }
 
+    @Operation(summary = "Get the signed-in trader's account (path id is resolved from the token)")
     @GetMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<AccountResponse> getAccount(
             @PathVariable("id") @Min(1) long id,
@@ -49,6 +53,7 @@ public class AccountController {
         return ResponseEntity.ok(account);
     }
 
+    @Operation(summary = "Get the signed-in trader's account")
     @GetMapping(value = "/me", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<AccountResponse> getMyAccount(HttpServletRequest request) {
         long accountId = authService.authenticatedAccountId(request);
@@ -56,6 +61,7 @@ public class AccountController {
         return ResponseEntity.ok(account);
     }
 
+    @Operation(summary = "Get the signed-in trader's cash balance (path id is resolved from the token)")
     @GetMapping(value = "/{id}/balance", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<BalanceResponse> getBalance(
             @PathVariable("id") @Min(1) long id,
@@ -65,6 +71,7 @@ public class AccountController {
         return ResponseEntity.ok(balance);
     }
 
+    @Operation(summary = "Get the signed-in trader's cash balance")
     @GetMapping(value = "/me/balance", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<BalanceResponse> getMyBalance(HttpServletRequest request) {
         long accountId = authService.authenticatedAccountId(request);
@@ -72,6 +79,7 @@ public class AccountController {
         return ResponseEntity.ok(balance);
     }
 
+    @Operation(summary = "Set the signed-in trader's cash balance")
     @PatchMapping(value = "/balance", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<BalanceResponse> updateBalance(
@@ -82,6 +90,7 @@ public class AccountController {
         return ResponseEntity.ok(balance);
     }
 
+    @Operation(summary = "Set the signed-in trader's cash balance")
     @PatchMapping(value = "/me/balance", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<BalanceResponse> updateMyBalance(
@@ -92,6 +101,7 @@ public class AccountController {
         return ResponseEntity.ok(balance);
     }
 
+    @Operation(summary = "List the signed-in trader's positions (path id is resolved from the token)")
     @GetMapping(value = "/{id}/positions", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<List<PositionResponse>> getPositions(
             @PathVariable("id") @Min(1) long id,
@@ -101,6 +111,7 @@ public class AccountController {
         return ResponseEntity.ok(positions);
     }
 
+    @Operation(summary = "List the signed-in trader's positions")
     @GetMapping(value = "/me/positions", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<List<PositionResponse>> getMyPositions(HttpServletRequest request) {
         long accountId = authService.authenticatedAccountId(request);
@@ -108,6 +119,7 @@ public class AccountController {
         return ResponseEntity.ok(positions);
     }
 
+    @Operation(summary = "List the signed-in trader's orders, optionally filtered by status and time range (path id is resolved from the token)")
     @GetMapping(value = "/{id}/orders", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<List<OrderHistoryEntry>> getOrders(
             @PathVariable("id") @Min(1) long id,
@@ -122,6 +134,7 @@ public class AccountController {
         return ResponseEntity.ok(orders);
     }
 
+    @Operation(summary = "List the signed-in trader's orders, optionally filtered by status and time range")
     @GetMapping(value = "/me/orders", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<List<OrderHistoryEntry>> getMyOrders(
             @RequestParam(value = "status", required = false) OrderStatus status,

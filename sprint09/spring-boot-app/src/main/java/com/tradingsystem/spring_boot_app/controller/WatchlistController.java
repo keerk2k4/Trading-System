@@ -7,6 +7,8 @@ import com.tradingsystem.spring_boot_app.dto.WatchlistResponse;
 import com.tradingsystem.spring_boot_app.dto.WatchlistStockResponse;
 import com.tradingsystem.spring_boot_app.service.AuthService;
 import com.tradingsystem.spring_boot_app.service.WatchlistService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
+@Tag(name = "Watchlists", description = "The signed-in trader's watchlists and the instruments on them")
 @RequestMapping("/api/v1/watchlists")
 public class WatchlistController {
 
@@ -28,12 +31,14 @@ public class WatchlistController {
         this.authService = authService;
     }
 
+    @Operation(summary = "List the signed-in trader's watchlists")
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<List<WatchlistResponse>> getWatchlists(HttpServletRequest request) {
         long accountId = authService.authenticatedAccountId(request);
         return ResponseEntity.ok(watchlists.getWatchlists(accountId));
     }
 
+    @Operation(summary = "Create a watchlist")
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<WatchlistResponse> createWatchlist(
             @Valid @RequestBody CreateWatchlistRequest body,
@@ -43,6 +48,7 @@ public class WatchlistController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
+    @Operation(summary = "Get a watchlist with its instruments and latest prices")
     @GetMapping(value = "/{watchlistId}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<WatchlistDetailResponse> getWatchlist(
             @PathVariable("watchlistId") long watchlistId,
@@ -51,6 +57,7 @@ public class WatchlistController {
         return ResponseEntity.ok(watchlists.getWatchlist(accountId, watchlistId));
     }
 
+    @Operation(summary = "Delete a watchlist")
     @DeleteMapping("/{watchlistId}")
     public ResponseEntity<Void> deleteWatchlist(
             @PathVariable("watchlistId") long watchlistId,
@@ -60,6 +67,7 @@ public class WatchlistController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "Add an instrument to a watchlist")
     @PostMapping(value = "/{watchlistId}/instruments",
             consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<WatchlistStockResponse> addInstrument(
@@ -71,6 +79,7 @@ public class WatchlistController {
         return ResponseEntity.status(HttpStatus.CREATED).body(added);
     }
 
+    @Operation(summary = "Remove an instrument from a watchlist")
     @DeleteMapping("/{watchlistId}/instruments/{symbol}")
     public ResponseEntity<Void> removeInstrument(
             @PathVariable("watchlistId") long watchlistId,

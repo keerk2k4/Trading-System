@@ -98,6 +98,22 @@ is awkward to consume, wrap it in a service of your own outside it. A file insid
 tree that the generator did not write is a hand-written client hiding in machine output, and a
 generated client that nothing outside the tree imports is a build step rather than a client.
 
+## OpenAPI served by the running services
+
+Each backend generates its own OpenAPI document from its controllers at runtime, so the served
+document always describes the code that is actually running. Start the service and open:
+
+| Service | Human page (Swagger UI) | JSON document |
+|---|---|---|
+| Trade REST API (`spring-boot-app`, springdoc) | http://localhost:8080/swagger-ui | http://localhost:8080/api-docs |
+| Auth service (`auth-service`, `@nestjs/swagger`) | http://localhost:3000/docs | http://localhost:3000/docs-json |
+
+Both pages are public, but every operation on them still needs a bearer token: use
+**Authorize** in Swagger UI and paste an access token from `POST /auth/login`. The Trade API
+publishes only its `/api/v1/**` routes; the service-to-service `/internal/**` routes are left
+out of the document on purpose. The hand-written contracts in `contracts/` remain the source the
+typed clients are generated from; compare the served document against them before the review.
+
 ## The interceptor, and the half of it that is a security control
 
 One functional interceptor, registered once in `withInterceptors`, is the only place in this

@@ -4,6 +4,8 @@ import com.tradingsystem.spring_boot_app.dto.InstrumentResponse;
 import com.tradingsystem.spring_boot_app.dto.WatchlistStockResponse;
 import com.tradingsystem.spring_boot_app.service.AuthService;
 import com.tradingsystem.spring_boot_app.service.WatchlistService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
+@Tag(name = "Instruments", description = "Search tradable instruments")
 @RequestMapping("/api/v1/instruments")
 public class InstrumentController {
 
@@ -23,6 +26,7 @@ public class InstrumentController {
         this.authService = authService;
     }
 
+    @Operation(summary = "Search instruments by symbol or name")
     @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<List<InstrumentResponse>> searchInstruments(
             @RequestParam(value = "search", required = false) String search,

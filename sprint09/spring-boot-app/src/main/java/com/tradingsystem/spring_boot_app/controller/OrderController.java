@@ -5,6 +5,8 @@ import com.tradingsystem.exception.InvalidOrderArgumentException;
 import com.tradingsystem.spring_boot_app.dto.OrderResponse;
 import com.tradingsystem.spring_boot_app.service.OrderService;
 import com.tradingsystem.spring_boot_app.service.AuthService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 @RestController
+@Tag(name = "Orders", description = "Place and cancel limit orders")
 @RequestMapping("/api/v1/orders")
 @Validated
 public class OrderController {
@@ -32,6 +35,7 @@ public class OrderController {
         this.authService = authService;
     }
 
+    @Operation(summary = "Place a limit order for the signed-in trader's account")
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<OrderResponse> placeOrder(
@@ -49,6 +53,7 @@ public class OrderController {
         return ResponseEntity.ok(order);
     }
 
+    @Operation(summary = "Cancel an order that has not yet been filled")
     @DeleteMapping(value = "/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<OrderResponse> cancelOrder(
             @PathVariable("id") String id,
