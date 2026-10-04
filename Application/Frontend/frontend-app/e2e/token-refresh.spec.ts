@@ -1,149 +1,134 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 import { env } from './env';
 import { signIn } from './helpers';
 
 /**
- * Token Refresh Journey: Verify that when an access token expires (401),
- * it is silently refreshed using the refresh token and the original request
- * is retried automatically.
+ * Token journeys for the in-memory access token + HttpOnly refresh cookie.
  *
- * Note: In a real test environment, you would need to:
- * 1. Wait for token to naturally expire (15 minutes), OR
- * 2. Use an admin endpoint to manually expire the token, OR
- * 3. Manipulate localStorage to use an expired token
+ * Tokens are no longer in localStorage, so an expired access token cannot be
+ * planted from the test. Instead the next Trade API calls are answered with
+ * the 401 an expired token gets, and the real refresh path does the rest.
+ * Every page load runs one bootstrap refresh (restoreSession) before the
+ * routes load, which the refresh counts below include.
  */
-test.describe('Token Refresh journey', () => {
-  test('a 401 triggers silent token refresh and automatic retry', async ({ page, request }) => {
-    // 1. Sign in to establish valid tokens
+
+const REFRESH_URL = `${env.authApi}/auth/refresh`;
+
+function countRefreshes(page: Page): { count: number } {
+  const counter = { count: 0 };
+  page.on('request', (req) => {
+    if (req.method() === 'POST' && req.url() === REFRESH_URL) {
+      counter.count++;
+    }
+  });
+  return counter;
+}
+
+// Answers the next `times` Trade API calls with 401, exactly what an expired
+// access token receives. CORS headers are needed or the browser hides the 401.
+async function expireNextTradeCalls(page: Page, times: number): Promise<void> {
+  let remaining = times;
+  const uiOrigin = new URL(page.url()).origin;
+  await page.route(`${env.tradeApi}/api/v1/**`, (route) => {
+    if (route.request().method() !== 'OPTIONS' && remaining > 0) {
+      remaining--;
+      return route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        headers: { 'access-control-allow-origin': uiOrigin },
+        body: JSON.stringify({ errorCode: 'AUTH-401', message: 'Unauthorised' })
+      });
+    }
+    return route.continue();
+  });
+}
+
+async function refreshCookie(page: Page) {
+  const cookies = await page.context().cookies(`${env.authApi}/auth/refresh`);
+  return cookies.find((c) => c.name === 'refresh_token');
+}
+
+test.describe('Token journeys (in-memory access token, HttpOnly refresh cookie)', () => {
+  test('no token is kept in web storage and the refresh token is an HttpOnly cookie', async ({ page }) => {
     await signIn(page);
+    await expect(page.getByTestId('dashboard-cash')).not.toHaveText('—');
 
-    // 2. Capture network requests to monitor token refresh
-    const refreshRequests: string[] = [];
-    page.on('request', (req) => {
-      if (req.url().includes('/auth/refresh')) {
-        refreshRequests.push(req.url());
-      }
-    });
+    const storage = await page.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }));
+    expect(storage).not.toContain('auth_token');
+    expect(storage).not.toContain('refresh_token');
+    expect(storage, 'no JWT in web storage').not.toContain('eyJ');
 
-    // 3. Verify we can make a successful API call
-    const dashboardCash = page.getByTestId('dashboard-cash');
-    await expect(dashboardCash).not.toHaveText('—');
+    const cookie = await refreshCookie(page);
+    expect(cookie, 'refresh_token cookie').toBeDefined();
+    expect(cookie?.httpOnly).toBe(true);
+    expect(cookie?.sameSite).toBe('Strict');
+    expect(cookie?.path).toBe('/auth');
+    // HttpOnly: page scripts cannot read it.
+    expect(await page.evaluate(() => document.cookie)).not.toContain('refresh_token');
+  });
 
-    // 4. Get the current token
-    const tokenBefore = await page.evaluate(() => localStorage.getItem('auth_token'));
-    expect(tokenBefore).toBeTruthy();
+  test('a reload keeps the user signed in through one silent refresh', async ({ page }) => {
+    await signIn(page);
+    await expect(page.getByTestId('dashboard-cash')).not.toHaveText('—');
+    const refreshes = countRefreshes(page);
 
-    // 5. Simulate token expiration by setting an expired token
-    // (This forces the next API call to get a 401)
-    const expiredToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2IiwiYWNjb3VudElkIjoiNiIsInJvbGVzIjpbIkNVU1RPTUVSIl0sImlhdCI6MTAwMCwiZXhwIjoxMDAxLCJpc3MiOiJhdXRoLXNlcnZpY2UifQ.test';
-    await page.evaluate((token) => {
-      localStorage.setItem('auth_token', token);
-    }, expiredToken);
+    await page.reload();
 
-    // 6. Navigate to force new API calls (which will get 401 with expired token)
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page.getByTestId('dashboard-cash')).not.toHaveText('—');
+    expect(refreshes.count).toBe(1);
+  });
+
+  test('a 401 triggers a silent refresh and the request is retried', async ({ page }) => {
+    await signIn(page);
+    await expect(page.getByTestId('dashboard-cash')).not.toHaveText('—');
+    const refreshes = countRefreshes(page);
+    await expireNextTradeCalls(page, 1);
+
     await page.goto('/orders/history');
-    
-    // 7. Wait for the page to load (this triggers the 401 and refresh flow)
     await page.waitForLoadState('networkidle');
 
-    // 8. After the page stabilizes, verify:
-    //    - Token was refreshed (localStorage changed)
-    //    - User remains authenticated
-    //    - No redirect to /login happened
-    const tokenAfter = await page.evaluate(() => localStorage.getItem('auth_token'));
-    expect(tokenAfter).toBeTruthy();
-    expect(tokenAfter).not.toBe(expiredToken); // Token should have changed
-    
-    // Verify we're still on orders page (not redirected to login)
+    // One bootstrap refresh plus one for the expired call.
+    expect(refreshes.count).toBe(2);
     await expect(page).toHaveURL(/\/orders\/history$/);
-    
-    // Verify the page loaded successfully
     await expect(page.getByTestId('orders-refresh')).toBeVisible();
   });
 
-  test('when refresh fails with 401, user is sent back to /login', async ({ page }) => {
-    // 1. Sign in
+  test('concurrent 401s share a single refresh call', async ({ page }) => {
     await signIn(page);
+    await expect(page.getByTestId('dashboard-cash')).not.toHaveText('—');
+    const refreshes = countRefreshes(page);
+    // The dashboard loads its data in parallel, so its first calls fail together.
+    await expireNextTradeCalls(page, 2);
 
-    // 2. Expiry token and navigate to force API calls
-    const expiredToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2IiwiYWNjb3VudElkIjoiNiIsInJvbGVzIjpbIkNVU1RPTUVSIl0sImlhdCI6MTAwMCwiZXhwIjoxMDAxLCJpc3MiOiJhdXRoLXNlcnZpY2UifQ.test';
-    
-    // 3. Also corrupt the refresh token so refresh will fail
-    await page.evaluate((token) => {
-      localStorage.setItem('auth_token', token);
-      localStorage.setItem('refresh_token', 'corrupted-refresh-token');
-    }, expiredToken);
-
-    // 4. Navigate (this will trigger 401 and failed refresh)
-    await page.goto('/orders/history');
-    
-    // 5. Wait for redirect to login
-    await page.waitForURL(/\/login/);
-    
-    // 6. Verify we're on login screen
-    await expect(page).toHaveURL(/\/login/);
-    expect(await page.evaluate(() => localStorage.getItem('auth_token'))).toBeNull();
-    expect(await page.evaluate(() => localStorage.getItem('refresh_token'))).toBeNull();
-  });
-
-  test('concurrent requests share a single refresh call', async ({ page, request }) => {
-    // This test verifies the deduplication logic: when multiple requests
-    // get 401 simultaneously, only ONE refresh call is made.
-    
-    // 1. Sign in
-    await signIn(page);
-
-    // 2. Count refresh calls
-    let refreshCallCount = 0;
-    page.on('request', (req) => {
-      if (req.url().includes('/auth/refresh')) {
-        refreshCallCount++;
-      }
-    });
-
-    // 3. Expire the token
-    const expiredToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2IiwiYWNjb3VudElkIjoiNiIsInJvbGVzIjpbIkNVU1RPTUVSIl0sImlhdCI6MTAwMCwiZXhwIjoxMDAxLCJpc3MiOiJhdXRoLXNlcnZpY2UifQ.test';
-    await page.evaluate((token) => {
-      localStorage.setItem('auth_token', token);
-    }, expiredToken);
-
-    // 4. Navigate to a page that makes multiple API calls
-    // (dashboard calls balance AND positions endpoints)
-    await page.goto('/dashboard');
+    await page.reload();
     await page.waitForLoadState('networkidle');
 
-    // 5. Verify:
-    //    - Only ONE refresh call was made (deduplication worked!)
-    //    - Page loaded successfully (not redirected)
-    expect(refreshCallCount).toBe(1, 'Should deduplicate refresh calls');
+    expect(refreshes.count, 'bootstrap refresh + one shared refresh').toBe(2);
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByTestId('dashboard-cash')).not.toHaveText('—');
   });
 
-  test('after token refresh, all stored tokens are updated', async ({ page }) => {
-    // Verify that after a refresh, localStorage has NEW tokens
-    
-    // 1. Sign in and capture initial tokens
+  test('without a valid refresh cookie a reload ends at /login', async ({ page }) => {
     await signIn(page);
-    const tokenBefore = await page.evaluate(() => localStorage.getItem('auth_token'));
-    const refreshTokenBefore = await page.evaluate(() => localStorage.getItem('refresh_token'));
+    await expect(page.getByTestId('dashboard-cash')).not.toHaveText('—');
 
-    // 2. Expire the access token
-    const expiredToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2IiwiYWNjb3VudElkIjoiNiIsInJvbGVzIjpbIkNVU1RPTUVSIl0sImlhdCI6MTAwMCwiZXhwIjoxMDAxLCJpc3MiOiJhdXRoLXNlcnZpY2UifQ.test';
-    await page.evaluate((token) => {
-      localStorage.setItem('auth_token', token);
-    }, expiredToken);
+    await page.context().clearCookies();
+    await page.goto('/orders/history');
 
-    // 3. Navigate to trigger refresh
-    await page.goto('/funds');
-    await page.waitForLoadState('networkidle');
+    await page.waitForURL(/\/login/);
+    expect(await page.evaluate(() => localStorage.getItem('current_user'))).toBeNull();
+  });
 
-    // 4. Verify tokens changed
-    const tokenAfter = await page.evaluate(() => localStorage.getItem('auth_token'));
-    const refreshTokenAfter = await page.evaluate(() => localStorage.getItem('refresh_token'));
+  test('signing out revokes and removes the refresh cookie', async ({ page }) => {
+    await signIn(page);
+    await expect(page.getByTestId('dashboard-cash')).not.toHaveText('—');
+    expect(await refreshCookie(page)).toBeDefined();
 
-    expect(tokenAfter).not.toBe(expiredToken);
-    // Note: refresh token might be rotated by backend (single-use tokens)
-    expect(refreshTokenAfter).toBeTruthy();
+    const logout = page.waitForResponse((r) => r.url() === `${env.authApi}/auth/logout`);
+    await page.getByTestId('nav-sign-out').click();
+    expect((await logout).status()).toBe(204);
+
+    expect(await refreshCookie(page)).toBeUndefined();
   });
 });

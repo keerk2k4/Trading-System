@@ -34,13 +34,14 @@ test.describe('Session journey', () => {
       await page.goto(route);
       await page.waitForLoadState('networkidle');
     }
-    const token = await page.evaluate(() => localStorage.getItem('auth_token'));
     const api = requests.filter((r) => r.method !== 'OPTIONS');
 
+    // The access token lives in memory only, so read it off the wire. Each
+    // page.goto reloads and silently refreshes it, so check the shape.
     const tradeCalls = api.filter((r) => r.url.startsWith(`${env.tradeApi}/`));
     expect(tradeCalls.length).toBeGreaterThan(0);
     for (const call of tradeCalls) {
-      expect(call.auth, `${call.method} ${call.url}`).toBe(`Bearer ${token}`);
+      expect(call.auth, `${call.method} ${call.url}`).toMatch(/^Bearer [\w-]+\.[\w-]+\.[\w-]+$/);
     }
 
     const protectedAuthCalls = api.filter((r) => /\/(auth\/me|kyc)(\?|$)/.test(r.url) && r.url.startsWith(env.authApi));

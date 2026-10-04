@@ -7,8 +7,11 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Allow the Angular UI (served from a different origin) to call this API.
+  // credentials: true lets the browser store and send the HttpOnly refresh
+  // cookie on cross-origin calls; that requires an explicit origin, never "*".
   app.enableCors({
     origin: process.env.UI_ORIGIN || "http://localhost:4200",
+    credentials: true,
   });
 
   // Enable validation pipe globally

@@ -83,8 +83,16 @@ function makeFakeDatabaseService() {
 }
 
 function mockRes() {
-  const state: { status?: number; body?: any } = {};
+  const state: { status?: number; body?: any; cookie?: string; cleared?: boolean } = {};
   const res: any = {
+    cookie: (_name: string, value: string) => {
+      state.cookie = value;
+      return res;
+    },
+    clearCookie: () => {
+      state.cleared = true;
+      return res;
+    },
     status: (code: number) => ({
       json: (body: any) => {
         state.status = code;
@@ -178,7 +186,7 @@ describe("Auth refresh rotation", () => {
     const first = await issueInitialRefreshToken();
     const { res, state } = mockRes();
 
-    await controller.refresh({ refreshToken: first } as any, res);
+    await controller.refresh({ refreshToken: first } as any, {} as any, res);
 
     expect(state.status).toBe(200);
     expect(state.body.accessToken).toBeDefined();
@@ -197,12 +205,12 @@ describe("Auth refresh rotation", () => {
   it("# the newly issued refresh token works", async () => {
     const first = await issueInitialRefreshToken();
     const firstCall = mockRes();
-    await controller.refresh({ refreshToken: first } as any, firstCall.res);
+    await controller.refresh({ refreshToken: first } as any, {} as any, firstCall.res);
     expect(firstCall.state.status).toBe(200);
 
     const second = firstCall.state.body.refreshToken;
     const secondCall = mockRes();
-    await controller.refresh({ refreshToken: second } as any, secondCall.res);
+    await controller.refresh({ refreshToken: second } as any, {} as any, secondCall.res);
 
     expect(secondCall.state.status).toBe(200);
     expect(secondCall.state.body.accessToken).toBeDefined();
@@ -227,14 +235,46 @@ describe("Auth refresh rotation", () => {
   it("# the declared revocation behaviour holds: an exchanged token is refused on replay", async () => {
     const first = await issueInitialRefreshToken();
     const firstCall = mockRes();
-    await controller.refresh({ refreshToken: first } as any, firstCall.res);
+    await controller.refresh({ refreshToken: first } as any, {} as any, firstCall.res);
     expect(firstCall.state.status).toBe(200);
 
     // The presented token was revoked during rotation, so replaying it is theft/reuse.
     const replay = mockRes();
-    await controller.refresh({ refreshToken: first } as any, replay.res);
+    await controller.refresh({ refreshToken: first } as any, {} as any, replay.res);
 
     expect(replay.state.status).toBe(401);
     expect(replay.state.body.errorCode).toBe("AUTH-401");
+  });
+
+  it("# refreshes from the HttpOnly cookie alone and rotates the cookie", async () => {
+    const first = await issueInitialRefreshToken();
+    const req: any = { headers: { cookie: `theme=dark; refresh_token=${encodeURIComponent(first)}` } };
+    const { res, state } = mockRes();
+
+    await controller.refresh({} as any, req, res);
+
+    expect(state.status).toBe(200);
+    expect(state.cookie).toBe(state.body.refreshToken);
+    expect(state.cookie).not.toBe(first);
+  });
+
+  it("# prefers the cookie over a refresh token in the body", async () => {
+    const first = await issueInitialRefreshToken();
+    const req: any = { headers: { cookie: `refresh_token=${encodeURIComponent(first)}` } };
+    const { res, state } = mockRes();
+
+    await controller.refresh({ refreshToken: "stale-body-token" } as any, req, res);
+
+    expect(state.status).toBe(200);
+  });
+
+  it("# refuses a refresh with neither cookie nor body token and clears the cookie", async () => {
+    const { res, state } = mockRes();
+
+    await controller.refresh({} as any, { headers: {} } as any, res);
+
+    expect(state.status).toBe(401);
+    expect(state.body.errorCode).toBe("AUTH-401");
+    expect(state.cleared).toBe(true);
   });
 });

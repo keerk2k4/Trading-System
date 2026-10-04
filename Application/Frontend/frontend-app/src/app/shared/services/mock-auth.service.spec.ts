@@ -62,12 +62,13 @@ describe('MockAuthService', () => {
     expect(service.getCurrentUser()).toBeNull();
   });
 
-  it('stores both tokens on login and loads the user from /auth/me', () => {
+  it('keeps the access token in memory only on login and loads the user from /auth/me', () => {
     let response: AuthResponse | undefined;
     service.login({ username: 'gaurang123', password: 'pw' }).subscribe((r) => (response = r));
 
     const login = http.expectOne(`${AUTH_API_BASE_URL}/auth/login`);
     expect(login.request.headers.has('Authorization')).toBe(false);
+    expect(login.request.withCredentials).toBe(true);
     login.flush(TOKENS);
 
     const me = http.expectOne(`${AUTH_API_BASE_URL}/auth/me`);
@@ -79,7 +80,12 @@ describe('MockAuthService', () => {
     expect(service.getCurrentUser()).toEqual(user);
     expect(service.isAuthenticated()).toBe(true);
     expect(service.getToken()).toBe(CUSTOMER_TOKEN);
-    expect(service.getRefreshToken()).toBe('refresh-1');
+    // The refresh token is the HttpOnly cookie: only a non-secret marker is visible.
+    expect(service.getRefreshToken()).toBeTruthy();
+    expect(service.getRefreshToken()).not.toBe('refresh-1');
+    expect(localStorage.getItem('auth_token')).toBeNull();
+    expect(localStorage.getItem('refresh_token')).toBeNull();
+    expect(JSON.stringify(localStorage)).not.toContain(CUSTOMER_TOKEN);
   });
 
   it('falls back to the token claims when /auth/me is unavailable', () => {
@@ -130,7 +136,8 @@ describe('MockAuthService', () => {
 
     service.logout();
     const logout = http.expectOne(`${AUTH_API_BASE_URL}/auth/logout`);
-    expect(logout.request.body).toEqual({ refreshToken: 'refresh-1' });
+    expect(logout.request.body).toEqual({});
+    expect(logout.request.withCredentials).toBe(true);
     logout.flush(null, { status: 204, statusText: 'No Content' });
 
     expect(service.isAuthenticated()).toBe(false);
@@ -159,7 +166,8 @@ describe('MockAuthService', () => {
       http.expectOne(positionsUrl).flush(UNAUTHORISED, { status: 401, statusText: 'Unauthorized' });
 
       const refresh = http.expectOne(`${AUTH_API_BASE_URL}/auth/refresh`);
-      expect(refresh.request.body).toEqual({ refreshToken: 'refresh-1' });
+      expect(refresh.request.body).toEqual({});
+      expect(refresh.request.withCredentials).toBe(true);
       expect(refresh.request.headers.has('Authorization')).toBe(false);
       refresh.flush({ ...TOKENS, accessToken: 'new-access', refreshToken: 'refresh-2' });
 
@@ -171,7 +179,8 @@ describe('MockAuthService', () => {
       positions.flush([]);
 
       expect(results).toEqual([{ cash: 100 }, []]);
-      expect(service.getRefreshToken()).toBe('refresh-2');
+      expect(service.getToken()).toBe('new-access');
+      expect(localStorage.getItem('refresh_token')).toBeNull();
     });
 
     it('ends the session and returns to /login when the refresh is refused', () => {
@@ -187,5 +196,79 @@ describe('MockAuthService', () => {
       expect(service.getRefreshToken()).toBeNull();
       expect(navigate).toHaveBeenCalledWith(['/login'], { queryParams: { returnUrl: '/' } });
     });
+  });
+});
+
+describe('MockAuthService session restore (in-memory access token)', () => {
+  const USER = { id: 'user-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] };
+
+  function create(): { service: MockAuthService; http: HttpTestingController } {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(withInterceptors([authTokenInterceptor])), provideHttpClientTesting()]
+    });
+    return { service: TestBed.inject(MockAuthService), http: TestBed.inject(HttpTestingController) };
+  }
+
+  beforeEach(() => localStorage.clear());
+  afterEach(() => localStorage.clear());
+
+  it('starts with no access token and purges tokens left in localStorage by older builds', () => {
+    localStorage.setItem('auth_token', CUSTOMER_TOKEN);
+    localStorage.setItem('refresh_token', 'refresh-1');
+    const { service, http } = create();
+
+    expect(service.getToken()).toBeNull();
+    expect(service.isAuthenticated()).toBe(false);
+    expect(localStorage.getItem('auth_token')).toBeNull();
+    expect(localStorage.getItem('refresh_token')).toBeNull();
+    http.verify();
+  });
+
+  it('re-populates the access token from the refresh cookie for a returning user', () => {
+    localStorage.setItem('current_user', JSON.stringify(USER));
+    const { service, http } = create();
+    let done = false;
+
+    service.restoreSession().subscribe(() => (done = true));
+
+    const refresh = http.expectOne(`${AUTH_API_BASE_URL}/auth/refresh`);
+    expect(refresh.request.method).toBe('POST');
+    expect(refresh.request.body).toEqual({});
+    expect(refresh.request.withCredentials).toBe(true);
+    expect(refresh.request.headers.has('Authorization')).toBe(false);
+    refresh.flush({ ...TOKENS, accessToken: 'restored-access' });
+
+    expect(done).toBe(true);
+    expect(service.getToken()).toBe('restored-access');
+    expect(service.isAuthenticated()).toBe(true);
+    expect(service.getCurrentUser()).toEqual(USER);
+    http.verify();
+  });
+
+  it('completes without signing in and clears the stale user when the cookie is refused', () => {
+    localStorage.setItem('current_user', JSON.stringify(USER));
+    localStorage.setItem('kyc_status', 'APPROVED');
+    const { service, http } = create();
+    let done = false;
+
+    service.restoreSession().subscribe({ next: () => (done = true), error: fail });
+    http.expectOne(`${AUTH_API_BASE_URL}/auth/refresh`).flush(UNAUTHORISED, { status: 401, statusText: 'Unauthorized' });
+
+    expect(done).toBe(true);
+    expect(service.isAuthenticated()).toBe(false);
+    expect(service.getCurrentUser()).toBeNull();
+    expect(localStorage.length).toBe(0);
+    http.verify();
+  });
+
+  it('makes no request when nobody was signed in', () => {
+    const { service, http } = create();
+    let done = false;
+
+    service.restoreSession().subscribe(() => (done = true));
+
+    expect(done).toBe(true);
+    http.expectNone(`${AUTH_API_BASE_URL}/auth/refresh`);
+    http.verify();
   });
 });

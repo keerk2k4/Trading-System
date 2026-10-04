@@ -48,6 +48,8 @@ function makeResponse() {
       state.body = body;
       return res;
     }),
+    cookie: jest.fn(() => res),
+    clearCookie: jest.fn(() => res),
   };
   return { res, state };
 }
@@ -90,6 +92,7 @@ describe("AuthController", () => {
     tokenService = {
       createAccessToken: jest.fn(),
       getAccessTokenExpiry: jest.fn().mockReturnValue(900),
+      getRefreshTokenExpiry: jest.fn().mockReturnValue(604800),
     };
     passwordService = {
       hashPassword: jest.fn(),
@@ -311,6 +314,13 @@ describe("AuthController", () => {
           tokenType: "Bearer",
           expiresIn: 900,
         },
+      });
+      expect(res.cookie).toHaveBeenCalledWith("refresh_token", "refresh-token", {
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+        path: "/auth",
+        maxAge: 604800 * 1000,
       });
       expect(userRepository.findByUsername).toHaveBeenCalledWith(user.userName);
       expect(passwordService.verifyPassword).toHaveBeenCalledWith(
@@ -590,10 +600,23 @@ describe("AuthController", () => {
         return res;
       });
 
-      await controller.logout({ refreshToken: "refresh-token" }, res);
+      await controller.logout({ refreshToken: "refresh-token" }, {} as any, res);
 
       expect(refreshTokenService.revokeRefreshToken).toHaveBeenCalledWith("refresh-token");
       expect(state.status).toBe(204);
+      expect(res.clearCookie).toHaveBeenCalledWith("refresh_token", expect.objectContaining({ path: "/auth" }));
+    });
+
+    it("revokes the token from the HttpOnly cookie when the body is empty", async () => {
+      refreshTokenService.revokeRefreshToken.mockResolvedValue(1);
+      const { res, state } = makeResponse();
+      (res as any).send = jest.fn(() => res);
+
+      await controller.logout({}, { headers: { cookie: "refresh_token=cookie-token" } } as any, res);
+
+      expect(refreshTokenService.revokeRefreshToken).toHaveBeenCalledWith("cookie-token");
+      expect(state.status).toBe(204);
+      expect(res.clearCookie).toHaveBeenCalled();
     });
 
     it("maps revocation failures to 422", async () => {
@@ -601,7 +624,7 @@ describe("AuthController", () => {
       const { res, state } = makeResponse();
       (res as any).send = jest.fn(() => res);
 
-      await controller.logout({ refreshToken: "refresh-token" }, res);
+      await controller.logout({ refreshToken: "refresh-token" }, {} as any, res);
 
       expect(state).toEqual({
         status: 422,

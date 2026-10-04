@@ -2,6 +2,7 @@ import { EnvironmentProviders } from '@angular/core';
 import { provideApi as provideAuthApi } from '../../../generated/auth-client';
 import { provideApi as provideTradeApi } from '../../../generated/trade-client';
 import { environment } from '../../../environments/environment';
+import { accessTokenStore } from '../services/access-token.store';
 
 // The only place the app configures the generated OpenAPI clients
 // (src/generated/, never edited by hand). Services under shared/services/
@@ -11,9 +12,9 @@ import { environment } from '../../../environments/environment';
 export const AUTH_API_BASE_URL = environment.AUTH_API_BASE_URL;
 export const TRADE_API_BASE_URL = environment.TRADE_API_BASE_URL;
 
-// Read on every request, so a token stored after login is picked up
-// without re-creating the clients.
-const readAccessToken = (): string | undefined => localStorage.getItem('auth_token') ?? undefined;
+// Read on every request, so a token obtained after login or refresh is picked
+// up without re-creating the clients. In memory only, never localStorage.
+const readAccessToken = (): string | undefined => accessTokenStore() ?? undefined;
 
 export function provideApiClients(): EnvironmentProviders[] {
   return [

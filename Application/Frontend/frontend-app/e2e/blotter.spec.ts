@@ -31,7 +31,10 @@ test.describe('Blotter journey', () => {
       .not.toBe('NEW')
       .catch(() => test.skip(true, 'The executor did not settle the order in time.'));
 
-    await page.goto('/orders/history');
+    // The API login above revoked the browser's refresh cookie (a new login
+    // ends the user's other sessions), and a reload re-authenticates from that
+    // cookie. Sign the browser in again rather than reloading into /login.
+    await signIn(page, '/login?returnUrl=%2Forders%2Fhistory');
     const row = page.locator(`[data-testid="order-row"][data-order-id="${orderId}"]`);
     await expect(row.getByTestId('order-status')).toHaveText('Rejected');
   });

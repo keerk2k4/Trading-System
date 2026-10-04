@@ -69,7 +69,11 @@ test.describe('Sign-in journey', () => {
     await signIn(page);
 
     await expect(page).toHaveURL(/\/dashboard$/);
-    expect(await page.evaluate(() => localStorage.getItem('auth_token'))).toBeTruthy();
+    // The session is the in-memory access token plus the HttpOnly refresh
+    // cookie; nothing token-shaped is written to web storage.
+    expect(await page.evaluate(() => localStorage.getItem('auth_token'))).toBeNull();
+    const cookies = await page.context().cookies(`${env.authApi}/auth/refresh`);
+    expect(cookies.find((c) => c.name === 'refresh_token')?.httpOnly).toBe(true);
     await expect(page.getByTestId('nav-sign-out')).toBeVisible();
     await expect(page.getByTestId('shell-username')).toHaveText(env.username);
     await expect(page.getByTestId('shell-role')).toHaveText(`Account ${env.accountId}`);

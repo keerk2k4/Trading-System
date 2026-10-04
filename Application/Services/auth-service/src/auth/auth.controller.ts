@@ -7,9 +7,10 @@ import {
   HttpStatus,
   UseGuards,
   Request,
+  Req,
   Res,
 } from "@nestjs/common";
-import { Response } from "express";
+import { CookieOptions, Request as ExpressRequest, Response } from "express";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import { RegisterRequest } from "../dtos/RegisterRequest";
 import { LoginRequest } from "../dtos/LoginRequest";
@@ -28,6 +29,36 @@ import { ThrottleService } from "../services/ThrottleService";
 import { AccountProvisioningEventService } from "../services/AccountProvisioningEventService";
 import { NotificationService } from "../services/NotificationService";
 
+// The refresh token travels in an HttpOnly cookie so page scripts (and any
+// injected XSS payload) can never read it. Scoped to /auth so the browser
+// only sends it to /auth/refresh and /auth/logout, never to /kyc or the
+// Trade API. The body still carries it during the transition period.
+export const REFRESH_COOKIE_NAME = "refresh_token";
+const REFRESH_COOKIE_OPTIONS: CookieOptions = {
+  httpOnly: true,
+  secure: true,
+  sameSite: "strict",
+  path: "/auth",
+};
+
+function readCookie(req: ExpressRequest, name: string): string | undefined {
+  const header = req.headers?.cookie;
+  if (!header) {
+    return undefined;
+  }
+  for (const part of header.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator !== -1 && part.slice(0, separator).trim() === name) {
+      try {
+        return decodeURIComponent(part.slice(separator + 1).trim());
+      } catch {
+        return undefined;
+      }
+    }
+  }
+  return undefined;
+}
+
 @Controller("auth")
 export class AuthController {
   constructor(
@@ -40,6 +71,23 @@ export class AuthController {
     private accountProvisioningEventService: AccountProvisioningEventService,
     private notificationService: NotificationService,
   ) { }
+
+  private setRefreshCookie(res: Response, refreshToken: string): void {
+    res.cookie(REFRESH_COOKIE_NAME, refreshToken, {
+      ...REFRESH_COOKIE_OPTIONS,
+      maxAge: this.tokenService.getRefreshTokenExpiry() * 1000,
+    });
+  }
+
+  private clearRefreshCookie(res: Response): void {
+    res.clearCookie(REFRESH_COOKIE_NAME, REFRESH_COOKIE_OPTIONS);
+  }
+
+  // The cookie wins; the body is the transition-period fallback for clients
+  // that still send { refreshToken }.
+  private presentedRefreshToken(req: ExpressRequest, body: RefreshRequest | undefined): string | undefined {
+    return readCookie(req, REFRESH_COOKIE_NAME) ?? body?.refreshToken;
+  }
 
   @Post("register")
   @ApiTags("Auth")
@@ -237,6 +285,7 @@ export class AuthController {
         expiresIn: this.tokenService.getAccessTokenExpiry(),
       };
 
+      this.setRefreshCookie(res, refreshToken);
       res.status(200).json(response);
     } catch (error) {
       console.error("Login error:", error);
@@ -317,6 +366,7 @@ export class AuthController {
         expiresIn: this.tokenService.getAccessTokenExpiry(),
       };
 
+      this.setRefreshCookie(res, refreshToken);
       res.status(200).json(response);
     } catch (error) {
       console.error("Admin login error:", error);
@@ -335,30 +385,38 @@ export class AuthController {
   @ApiResponse({ status: 200, description: "A new token pair.", type: TokenResponse })
   @ApiResponse({ status: 401, description: "Unauthorised", type: ErrorResponse })
   @ApiResponse({ status: 422, description: "Invalid input", type: ErrorResponse })
-  async refresh(@Body() refreshRequest: RefreshRequest, @Res() res: Response): Promise<void> {
+  async refresh(@Body() refreshRequest: RefreshRequest, @Req() req: ExpressRequest, @Res() res: Response): Promise<void> {
+    const unauthorised = (): void => {
+      // A refused refresh ends the session, so drop the cookie too.
+      this.clearRefreshCookie(res);
+      const response: ErrorResponse = {
+        errorCode: "AUTH-401",
+        message: "Unauthorised",
+      };
+      res.status(401).json(response);
+    };
+
     try {
-      const validation = await this.refreshTokenService.validateRefreshToken(refreshRequest.refreshToken);
+      const presentedToken = this.presentedRefreshToken(req, refreshRequest);
+      if (!presentedToken) {
+        unauthorised();
+        return;
+      }
+
+      const validation = await this.refreshTokenService.validateRefreshToken(presentedToken);
 
       if (!validation.valid) {
-        const response: ErrorResponse = {
-          errorCode: "AUTH-401",
-          message: "Unauthorised",
-        };
-        res.status(401).json(response);
+        unauthorised();
         return;
       }
 
       const userId = validation.userId!;
 
-      await this.refreshTokenService.revokeRefreshToken(refreshRequest.refreshToken);
+      await this.refreshTokenService.revokeRefreshToken(presentedToken);
 
       const user = await this.userRepository.findByUserId(userId);
       if (!user) {
-        const response: ErrorResponse = {
-          errorCode: "AUTH-401",
-          message: "Unauthorised",
-        };
-        res.status(401).json(response);
+        unauthorised();
         return;
       }
 
@@ -392,6 +450,7 @@ export class AuthController {
         expiresIn: this.tokenService.getAccessTokenExpiry(),
       };
 
+      this.setRefreshCookie(res, newRefreshToken);
       res.status(200).json(response);
     } catch (error) {
       console.error("Refresh error:", error);
@@ -409,9 +468,13 @@ export class AuthController {
   @ApiOperation({ summary: "Log out and revoke the provided refresh token" })
   @ApiResponse({ status: 204, description: "Logged out." })
   @ApiResponse({ status: 422, description: "Invalid input", type: ErrorResponse })
-  async logout(@Body() refreshRequest: RefreshRequest, @Res() res: Response): Promise<void> {
+  async logout(@Body() refreshRequest: RefreshRequest, @Req() req: ExpressRequest, @Res() res: Response): Promise<void> {
     try {
-      await this.refreshTokenService.revokeRefreshToken(refreshRequest.refreshToken);
+      const presentedToken = this.presentedRefreshToken(req, refreshRequest);
+      if (presentedToken) {
+        await this.refreshTokenService.revokeRefreshToken(presentedToken);
+      }
+      this.clearRefreshCookie(res);
       res.status(204).send();
     } catch (error) {
       console.error("Logout error:", error);

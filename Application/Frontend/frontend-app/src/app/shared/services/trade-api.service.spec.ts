@@ -3,6 +3,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TradeApiService, TRADE_API_BASE_URL } from './trade-api.service';
 import { MockAuthService } from './mock-auth.service';
+import { accessTokenStore } from './access-token.store';
 import { authTokenInterceptor } from '../interceptors/auth-token.interceptor';
 import { PlaceOrderRequest, TradeApiError } from '../models/order.models';
 import { KycSubmission } from '../models/kyc.models';
@@ -183,8 +184,8 @@ describe('authTokenInterceptor', () => {
         provideHttpClientTesting()
       ]
     });
-    localStorage.setItem('auth_token', 'test.jwt.token');
     const auth = TestBed.inject(MockAuthService);
+    accessTokenStore.set('test.jwt.token');
     const http = TestBed.inject(HttpTestingController);
 
     auth
@@ -210,7 +211,7 @@ describe('authTokenInterceptor', () => {
     });
     req.flush({});
     http.verify();
-    localStorage.removeItem('auth_token');
+    accessTokenStore.set(null);
   });
 });
 
@@ -223,10 +224,12 @@ describe('generated auth client wiring (provideApiClients)', () => {
         ...provideApiClients()
       ]
     });
-    localStorage.setItem('auth_token', 'user.jwt.token');
+    // Construct the auth service first: it resets the in-memory token on creation.
+    TestBed.inject(MockAuthService);
+    accessTokenStore.set('user.jwt.token');
   });
 
-  afterEach(() => localStorage.removeItem('auth_token'));
+  afterEach(() => accessTokenStore.set(null));
 
   it('sends the bearer token on GET+PUT /kyc and maps the contract response', () => {
     const kyc = TestBed.inject(MockKycService);
