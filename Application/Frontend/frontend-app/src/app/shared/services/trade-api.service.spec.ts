@@ -98,9 +98,11 @@ describe('TradeApiService', () => {
     expect(param('status')).toBe('FILLED');
     expect(param('from')).toBe('2026-01-01T00:00:00.000Z');
     expect(param('to')).toBe('2026-02-01T00:00:00.000Z');
+    // Encoded exactly once (":" -> "%3A", never "%253A"); the Trade API
+    // decodes it back to the same instant.
     expect(req.request.urlWithParams).toBe(
       `${TRADE_API_BASE_URL}/api/v1/accounts/me/orders` +
-        '?status=FILLED&from=2026-01-01T00:00:00.000Z&to=2026-02-01T00:00:00.000Z'
+        '?status=FILLED&from=2026-01-01T00%3A00%3A00.000Z&to=2026-02-01T00%3A00%3A00.000Z'
     );
     req.flush([]);
   });

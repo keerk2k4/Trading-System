@@ -1,9 +1,16 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { catchError } from 'rxjs/operators';
-import { OrdersService } from '../../../generated/trade-client';
+import { catchError, map } from 'rxjs/operators';
+import {
+  AccountsService,
+  InstrumentResponse,
+  OrdersService,
+  WatchlistDetailResponse,
+  WatchlistResponse,
+  WatchlistStockResponse,
+  WatchlistsService
+} from '../../../generated/trade-client';
 import {
   Account,
   Balance,
@@ -22,63 +29,58 @@ export { TRADE_API_BASE_URL };
 
 /**
  * Thin wrapper over the clients generated from contracts/trade-api.yaml.
- * Request/response shapes come from the generated models, so a contract
- * change that breaks a caller fails the build instead of failing at runtime.
+ * Every call goes through a generated service, and request/response shapes
+ * come from the generated models, so a contract change that breaks a caller
+ * fails the build instead of failing at runtime.
  * The Authorization header is added by authTokenInterceptor.
  */
 @Injectable({
   providedIn: 'root'
 })
 export class TradeApiService {
-  private http = inject(HttpClient);
   private orders = inject(OrdersService);
+  private accounts = inject(AccountsService);
+  private watchlists = inject(WatchlistsService);
 
   // GET /api/v1/accounts/me
   getAccount(): Observable<Account> {
-    return this.http
-      .get<Account>(`${TRADE_API_BASE_URL}/api/v1/accounts/me`)
+    return this.accounts
+      .getMyAccount()
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
   // GET /api/v1/accounts/me/balance
   getBalance(): Observable<Balance> {
-    return this.http
-      .get<Balance>(`${TRADE_API_BASE_URL}/api/v1/accounts/me/balance`)
+    return this.accounts
+      .getMyBalance()
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
   // GET /api/v1/accounts/me/positions
   getPositions(): Observable<Position[]> {
-    return this.http
-      .get<Position[]>(`${TRADE_API_BASE_URL}/api/v1/accounts/me/positions`)
+    return this.accounts
+      .getMyPositions()
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
   // GET /api/v1/accounts/me/orders, optionally narrowed by status
   // and/or an ISO date-time range.
+  // Unset filters stay undefined, which the generated client leaves out of
+  // the query string.
   getOrders(filter: OrderHistoryFilter = {}): Observable<Order[]> {
-    const params: Record<string, string> = {};
-    if (filter.status) {
-      params['status'] = filter.status;
-    }
-    if (filter.from) {
-      params['from'] = new Date(filter.from).toISOString();
-    }
-    if (filter.to) {
-      params['to'] = new Date(filter.to).toISOString();
-    }
+    const status = filter.status || undefined;
+    const from = filter.from ? new Date(filter.from).toISOString() : undefined;
+    const to = filter.to ? new Date(filter.to).toISOString() : undefined;
 
-    return this.http
-      .get<Order[]>(`${TRADE_API_BASE_URL}/api/v1/accounts/me/orders`, {
-        params,
-      })
+    return this.accounts
+      .getMyOrders(status, from, to)
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
   // PATCH /api/v1/accounts/me/balance
   updateBalance(request: BalanceUpdateRequest): Observable<Balance> {
-    return this.http
-      .patch<Balance>(`${TRADE_API_BASE_URL}/api/v1/accounts/me/balance`, request)
+    return this.accounts
+      .updateMyBalance(request)
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
@@ -90,53 +92,54 @@ export class TradeApiService {
   }
 
   // GET /api/v1/watchlists
-  getWatchlists(): Observable<import('../models/watchlist.models').Watchlist[]> {
-    return this.http
-      .get<import('../models/watchlist.models').Watchlist[]>(`${TRADE_API_BASE_URL}/api/v1/watchlists`)
+  getWatchlists(): Observable<WatchlistResponse[]> {
+    return this.watchlists
+      .getWatchlists()
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
   // POST /api/v1/watchlists
-  createWatchlist(name: string): Observable<import('../models/watchlist.models').Watchlist> {
-    return this.http
-      .post<import('../models/watchlist.models').Watchlist>(`${TRADE_API_BASE_URL}/api/v1/watchlists`, { name })
+  createWatchlist(name: string): Observable<WatchlistResponse> {
+    return this.watchlists
+      .createWatchlist({ name })
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
   // GET /api/v1/watchlists/{id}
-  getWatchlistDetail(id: number | string): Observable<import('../models/watchlist.models').WatchlistDetail> {
-    return this.http
-      .get<import('../models/watchlist.models').WatchlistDetail>(`${TRADE_API_BASE_URL}/api/v1/watchlists/${id}`)
+  getWatchlistDetail(id: number | string): Observable<WatchlistDetailResponse> {
+    return this.watchlists
+      .getWatchlist(Number(id))
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
   // DELETE /api/v1/watchlists/{id}
   deleteWatchlist(id: number | string): Observable<void> {
-    return this.http
-      .delete<void>(`${TRADE_API_BASE_URL}/api/v1/watchlists/${id}`)
-      .pipe(catchError((err) => this.rethrowServerError(err)));
+    return this.watchlists.deleteWatchlist(Number(id)).pipe(
+      map(() => undefined),
+      catchError((err) => this.rethrowServerError(err))
+    );
   }
 
   // POST /api/v1/watchlists/{id}/instruments
-  addWatchlistInstrument(id: number | string, symbol: string): Observable<import('../models/watchlist.models').WatchlistStock> {
-    return this.http
-      .post<import('../models/watchlist.models').WatchlistStock>(
-        `${TRADE_API_BASE_URL}/api/v1/watchlists/${id}/instruments`, { symbol })
+  addWatchlistInstrument(id: number | string, symbol: string): Observable<WatchlistStockResponse> {
+    return this.watchlists
+      .addWatchlistInstrument(Number(id), { symbol })
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
   // DELETE /api/v1/watchlists/{id}/instruments/{symbol}
+  // The generated client encodes the symbol into the path itself.
   removeWatchlistInstrument(id: number | string, symbol: string): Observable<void> {
-    return this.http
-      .delete<void>(`${TRADE_API_BASE_URL}/api/v1/watchlists/${id}/instruments/${encodeURIComponent(symbol)}`)
-      .pipe(catchError((err) => this.rethrowServerError(err)));
+    return this.watchlists.removeWatchlistInstrument(Number(id), symbol).pipe(
+      map(() => undefined),
+      catchError((err) => this.rethrowServerError(err))
+    );
   }
 
   // GET /api/v1/instruments?search=
-  searchInstruments(query: string): Observable<import('../models/watchlist.models').WatchlistStock[]> {
-    return this.http
-      .get<import('../models/watchlist.models').WatchlistStock[]>(
-        `${TRADE_API_BASE_URL}/api/v1/instruments`, { params: { search: query } })
+  searchInstruments(query: string): Observable<InstrumentResponse[]> {
+    return this.watchlists
+      .searchInstruments(query)
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 

@@ -2,13 +2,13 @@ import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { DEFAULT_WATCHLIST_NAME, WatchlistService } from './watchlist.service';
 import { TradeApiService } from './trade-api.service';
-import { Watchlist } from '../models/watchlist.models';
+import { WatchlistResponse } from '../../../generated/trade-client';
 
 describe('WatchlistService (backend-backed)', () => {
   let service: WatchlistService;
   let tradeApi: jasmine.SpyObj<TradeApiService>;
 
-  const defaultList: Watchlist = { id: 1, name: DEFAULT_WATCHLIST_NAME, isDefault: true, symbols: ['AAPL'] };
+  const defaultList: WatchlistResponse = { id: 1, name: DEFAULT_WATCHLIST_NAME, isDefault: true, symbols: ['AAPL'] };
 
   function configure(): void {
     tradeApi = jasmine.createSpyObj<TradeApiService>('TradeApiService', [

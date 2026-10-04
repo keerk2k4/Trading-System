@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { AUTH_API_BASE_URL, MockAuthService } from './mock-auth.service';
 import { TRADE_API_BASE_URL } from './trade-api.service';
 import { authTokenInterceptor } from '../interceptors/auth-token.interceptor';
+import { provideApiClients } from '../api/api-clients';
 import { AuthError, AuthResponse } from '../models/auth.models';
 
 // Builds an unsigned JWT whose payload is base64url, like the real tokens.
@@ -24,7 +25,12 @@ describe('MockAuthService', () => {
   beforeEach(() => {
     localStorage.clear();
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(withInterceptors([authTokenInterceptor])), provideHttpClientTesting()]
+      providers: [
+        provideHttpClient(withInterceptors([authTokenInterceptor])),
+        provideHttpClientTesting(),
+        // Configure the generated clients exactly as app.config.ts does.
+        ...provideApiClients()
+      ]
     });
     service = TestBed.inject(MockAuthService);
     http = TestBed.inject(HttpTestingController);
@@ -204,7 +210,12 @@ describe('MockAuthService session restore (in-memory access token)', () => {
 
   function create(): { service: MockAuthService; http: HttpTestingController } {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(withInterceptors([authTokenInterceptor])), provideHttpClientTesting()]
+      providers: [
+        provideHttpClient(withInterceptors([authTokenInterceptor])),
+        provideHttpClientTesting(),
+        // Configure the generated clients exactly as app.config.ts does.
+        ...provideApiClients()
+      ]
     });
     return { service: TestBed.inject(MockAuthService), http: TestBed.inject(HttpTestingController) };
   }

@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse } from '@angular/common/http';
 import {
   AuthError,
   AuthResponse,
@@ -14,6 +14,7 @@ import {
 import { Observable, of, throwError } from 'rxjs';
 import { catchError, finalize, map, shareReplay, switchMap, tap } from 'rxjs/operators';
 import { AUTH_API_BASE_URL } from '../api/api-clients';
+import { AuthService as AuthApi, ProfileService } from '../../../generated/auth-client';
 import { accessTokenStore } from './access-token.store';
 
 // Base URL of the real Sprint 8/9 auth-service, set per build in
@@ -42,7 +43,10 @@ const UNAUTHORISED: AuthError = { errorCode: 'AUTH-401', message: 'Unauthorised'
   providedIn: 'root'
 })
 export class MockAuthService {
-  private readonly http = inject(HttpClient);
+  // Generated from contracts/auth-api.yaml. Configured in api-clients.ts with
+  // withCredentials, so the HttpOnly refresh cookie is stored and sent.
+  private readonly authApi = inject(AuthApi);
+  private readonly profileApi = inject(ProfileService);
 
   // In memory only: null on every page load until login or the bootstrap
   // silent refresh (restoreSession) fills it.
@@ -65,8 +69,8 @@ export class MockAuthService {
   // No tokens and no accountId come back here - registration only creates
   // the user; the trading account is provisioned asynchronously afterwards.
   register(data: RegisterRequest): Observable<UserResponseData> {
-    return this.http
-      .post<UserResponseData>(`${AUTH_API_BASE_URL}/auth/register`, {
+    return this.authApi
+      .register({
         username: data.username,
         email: data.email,
         firstName: data.firstName,
@@ -79,23 +83,18 @@ export class MockAuthService {
 
   // Real backend: POST /auth/login (or /auth/admin/login for the admin
   // sign-in screen) -> { accessToken, refreshToken, tokenType, expiresIn },
-  // plus the refresh token as an HttpOnly cookie. withCredentials is what
-  // lets the browser store that cross-origin cookie; the body's refreshToken
-  // is ignored here. There is no embedded `user` object in the real
+  // plus the refresh token as an HttpOnly cookie. The auth client's
+  // withCredentials is what lets the browser store that cross-origin cookie;
+  // the body's refreshToken is ignored here. There is no embedded `user` object in the real
   // response. The user is first reconstructed from the JWT's own claims
   // (sub/accountId/roles) so the session is usable straight away, then
   // replaced by GET /auth/me.
   login(data: LoginRequest, asAdmin = false): Observable<AuthResponse> {
-    const endpoint = asAdmin ? 'admin/login' : 'login';
-    return this.http
-      .post<TokenResponse>(
-        `${AUTH_API_BASE_URL}/auth/${endpoint}`,
-        {
-          username: data.username,
-          password: data.password,
-        },
-        { withCredentials: true }
-      )
+    const credentials = { username: data.username, password: data.password };
+    const request: Observable<TokenResponse> = asAdmin
+      ? this.authApi.loginAdmin(credentials)
+      : this.authApi.login(credentials);
+    return request
       .pipe(
         catchError((err) => this.rethrowServerError(err)),
         tap((tokens) => {
@@ -117,9 +116,10 @@ export class MockAuthService {
   }
 
   // Real backend: GET /auth/me -> { id, username, accountId, roles }.
-  // authTokenInterceptor adds the Authorization header.
+  // The contract marks it secured, so the generated client and
+  // authTokenInterceptor both attach the same bearer token.
   loadCurrentUser(): Observable<User> {
-    return this.http.get<User>(`${AUTH_API_BASE_URL}/auth/me`).pipe(
+    return this.profileApi.getCurrentUser().pipe(
       map((me) => ({
         id: me.id,
         // The backend sends an empty username when the user row is missing.
@@ -138,8 +138,8 @@ export class MockAuthService {
   // new access token. A refused refresh means the session is over, so it is
   // cleared; a request that never reached the backend leaves it alone.
   refreshAccessToken(): Observable<string> {
-    this.refreshInFlight ??= this.http
-      .post<TokenResponse>(`${AUTH_API_BASE_URL}/auth/refresh`, {}, { withCredentials: true })
+    this.refreshInFlight ??= this.authApi
+      .refresh({})
       .pipe(
         tap((tokens) => this.storeTokens(tokens)),
         map((tokens) => tokens.accessToken),
@@ -188,8 +188,8 @@ export class MockAuthService {
   // Always calls the backend: the page cannot see whether a refresh cookie
   // exists, and only the server can revoke it and clear it.
   logout(): void {
-    this.http
-      .post<void>(`${AUTH_API_BASE_URL}/auth/logout`, {}, { withCredentials: true })
+    this.authApi
+      .logout({})
       .pipe(
         catchError(() => of(void 0)),
         finalize(() => this.clearSession())

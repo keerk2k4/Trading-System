@@ -699,11 +699,14 @@ components:
     RefreshRequest:
       type: object
       additionalProperties: false
-      required: [refreshToken]
+      description: |
+        Browsers send `{}`: the refresh token travels in the HttpOnly `refresh_token` cookie
+        (Path=/auth, Secure, SameSite=Strict) set by login and refresh, and the cookie wins
+        when both are present. The body field remains for non-browser clients.
       properties:
         refreshToken:
           type: string
-          description: The refresh token issued by the previous login or refresh.
+          description: The refresh token issued by the previous login or refresh. Omit it when the refresh_token cookie is sent.
 
     TokenResponse:
       type: object

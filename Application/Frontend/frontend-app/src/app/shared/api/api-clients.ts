@@ -20,8 +20,13 @@ export function provideApiClients(): EnvironmentProviders[] {
   return [
     // The auth client adds `Authorization: Bearer <token>` itself, but only on
     // operations the contract marks as secured (/kyc, /auth/me), never on
-    // register/login/refresh.
-    provideAuthApi({ basePath: AUTH_API_BASE_URL, credentials: { bearerAuth: readAccessToken } }),
+    // register/login/refresh. withCredentials lets the browser store and send
+    // the HttpOnly refresh_token cookie (Path=/auth) on these cross-origin calls.
+    provideAuthApi({
+      basePath: AUTH_API_BASE_URL,
+      credentials: { bearerAuth: readAccessToken },
+      withCredentials: true
+    }),
     // Trade API requests get their bearer token from authTokenInterceptor.
     provideTradeApi(TRADE_API_BASE_URL),
   ];

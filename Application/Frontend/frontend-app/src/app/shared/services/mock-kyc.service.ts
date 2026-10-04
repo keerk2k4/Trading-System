@@ -1,18 +1,19 @@
 import { Injectable, signal, inject } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse } from '@angular/common/http';
 import { KycSubmission, KycStatus } from '../models/kyc.models';
 import { Observable, of, throwError } from 'rxjs';
 import { catchError, map, switchMap, tap } from 'rxjs/operators';
 import { MockAuthService } from './mock-auth.service';
-import { KycResponse } from '../../../generated/auth-client';
-import { AUTH_API_BASE_URL } from './mock-auth.service';
+import { CreateKycRequest, KycResponse, KYCService } from '../../../generated/auth-client';
 
 @Injectable({
   providedIn: 'root'
 })
 export class MockKycService {
   private kycStatus = signal<KycStatus | null>(null);
-  private http = inject(HttpClient);
+  // Generated from contracts/auth-api.yaml; every /kyc operation is secured,
+  // so it attaches the bearer token (as does authTokenInterceptor).
+  private kycApi = inject(KYCService);
   private authService = inject(MockAuthService);
 
   constructor() {
@@ -25,17 +26,17 @@ export class MockKycService {
       return throwError(() => ({ errorCode: 'AUTH-401', message: 'Sign in first' }));
     }
 
-    const payload = {
+    const payload: CreateKycRequest = {
       dateOfBirth: data.dateOfBirth,
       documentType: data.documentType,
       documentNumber: data.documentNumber,
     };
 
-    return this.http.get<KycResponse>(`${AUTH_API_BASE_URL}/kyc`).pipe(
-      switchMap(() => this.http.put<KycResponse>(`${AUTH_API_BASE_URL}/kyc`, payload)),
+    return this.kycApi.getMyKyc().pipe(
+      switchMap(() => this.kycApi.updateMyKyc(payload)),
       catchError((err: HttpErrorResponse) => {
         if (err.status === 404) {
-          return this.http.post<KycResponse>(`${AUTH_API_BASE_URL}/kyc`, payload);
+          return this.kycApi.submitKyc(payload);
         }
         return throwError(() => err);
       }),
@@ -52,7 +53,7 @@ export class MockKycService {
 
   // Get KYC status for current user from backend.
   getKycStatus(userId: string): Observable<KycSubmission | null> {
-    return this.http.get<KycResponse>(`${AUTH_API_BASE_URL}/kyc`).pipe(
+    return this.kycApi.getMyKyc().pipe(
       map((response) => this.toKycSubmission(response)),
       tap((kyc) => {
         this.kycStatus.set(kyc.status);
@@ -80,7 +81,7 @@ export class MockKycService {
 
   // Get all pending KYC submissions (admin only)
   getPendingKycSubmissions(): Observable<KycSubmission[]> {
-    return this.http.get<KycResponse[]>(`${AUTH_API_BASE_URL}/kyc/pending`).pipe(
+    return this.kycApi.getPendingKyc().pipe(
       map((rows) => rows.map((row) => this.toKycSubmission(row))),
       catchError((err: HttpErrorResponse) =>
         throwError(() => err.error ?? { errorCode: 'AUTH-500', message: 'Unexpected error' })
@@ -90,8 +91,8 @@ export class MockKycService {
 
   // Review/approve KYC (admin only)
   reviewKyc(userId: string, approved: boolean, reason?: string): Observable<KycSubmission> {
-    return this.http
-      .patch<KycResponse>(`${AUTH_API_BASE_URL}/kyc`, {
+    return this.kycApi
+      .reviewKyc({
         userId,
         status: approved ? 'APPROVED' : 'REJECTED',
         rejectionReason: approved ? undefined : reason,

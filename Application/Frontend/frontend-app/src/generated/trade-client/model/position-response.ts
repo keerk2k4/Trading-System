@@ -9,7 +9,7 @@
  */
 
 
-export interface PositionResponse {
+export interface PositionResponse { 
     accountId: number;
     symbol: string;
     /**
@@ -17,7 +17,7 @@ export interface PositionResponse {
      */
     quantity: number;
     /**
-     * Weighted average cost basis per unit. A buy recalculates it. A sell reduces quantity and leaves it unchanged, which is what makes realised profit and loss computable later.
+     * Weighted average cost basis per unit. A buy recalculates it. A sell reduces quantity and leaves it unchanged, which is what makes realised profit and loss computable later. 
      */
     averageCost: number;
     /**

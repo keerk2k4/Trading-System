@@ -9,10 +9,13 @@
  */
 
 
+/**
+ * Browsers send `{}`: the refresh token travels in the HttpOnly `refresh_token` cookie (Path=/auth, Secure, SameSite=Strict) set by login and refresh, and the cookie wins when both are present. The body field remains for non-browser clients. 
+ */
 export interface RefreshRequest { 
     /**
-     * The refresh token issued by the previous login or refresh.
+     * The refresh token issued by the previous login or refresh. Omit it when the refresh_token cookie is sent.
      */
-    refreshToken: string;
+    refreshToken?: string;
 }
 
