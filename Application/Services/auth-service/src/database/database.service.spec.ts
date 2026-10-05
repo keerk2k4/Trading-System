@@ -1,9 +1,17 @@
 import { Pool } from "pg";
-import * as fs from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { DatabaseService } from "./database.service";
 
 jest.mock("pg", () => ({
   Pool: jest.fn(),
+}));
+
+// Mocked through Jest's module registry rather than jest.spyOn: spying on the
+// real fs would also hand the fake readFileSync to Node's own module loader.
+jest.mock("node:fs", () => ({
+  ...jest.requireActual("node:fs"),
+  existsSync: jest.fn(),
+  readFileSync: jest.fn(),
 }));
 
 describe("DatabaseService", () => {
@@ -15,6 +23,10 @@ describe("DatabaseService", () => {
     end: jest.Mock;
   };
   let service: DatabaseService;
+  // Tests about queries and shutdown only need the service to start.
+  const configureValidUrl = () => {
+    process.env.AUTH_DB_URL = "postgresql://test-user:test-pass@db.test:5432/trading";
+  };
 
   beforeEach(() => {
     delete process.env.AUTH_DB_URL;
@@ -26,8 +38,8 @@ describe("DatabaseService", () => {
     };
     (Pool as unknown as jest.Mock).mockReset();
     (Pool as unknown as jest.Mock).mockImplementation(() => pool);
-    jest.spyOn(fs, "existsSync").mockReturnValue(false);
-    jest.spyOn(fs, "readFileSync").mockImplementation(() => Buffer.from(""));
+    jest.mocked(existsSync).mockReset().mockReturnValue(false);
+    jest.mocked(readFileSync).mockReset().mockImplementation(() => Buffer.from(""));
     service = new DatabaseService();
     jest.spyOn(console, "log").mockImplementation(() => undefined);
     jest.spyOn(console, "warn").mockImplementation(() => undefined);
@@ -70,8 +82,8 @@ describe("DatabaseService", () => {
 
   it("falls back to .env when the inherited AUTH_DB_URL omits the password", async () => {
     process.env.AUTH_DB_URL = "postgresql://test-user@db.test:5432/trading";
-    jest.spyOn(fs, "existsSync").mockReturnValue(true);
-    jest.spyOn(fs, "readFileSync").mockReturnValue(Buffer.from("AUTH_DB_URL=postgresql://file-user:file-pass@db.test:5432/trading\n"));
+    jest.mocked(existsSync).mockReturnValue(true);
+    jest.mocked(readFileSync).mockReturnValue(Buffer.from("AUTH_DB_URL=postgresql://file-user:file-pass@db.test:5432/trading\n"));
 
     await service.onModuleInit();
 
@@ -96,6 +108,7 @@ describe("DatabaseService", () => {
   it("delegates queries and preserves the caller's parameters", async () => {
     const result = { rows: [{ value: 1 }], rowCount: 1 };
     pool.query.mockResolvedValue(result);
+    configureValidUrl();
     await service.onModuleInit();
 
     await expect(service.query("SELECT $1::int", [1])).resolves.toBe(result);
@@ -106,12 +119,14 @@ describe("DatabaseService", () => {
   it("propagates query failures to the caller", async () => {
     const failure = new Error("database unavailable");
     pool.query.mockRejectedValue(failure);
+    configureValidUrl();
     await service.onModuleInit();
 
     await expect(service.query("SELECT 1")).rejects.toBe(failure);
   });
 
   it("closes the initialized pool during shutdown", async () => {
+    configureValidUrl();
     await service.onModuleInit();
 
     await service.onModuleDestroy();

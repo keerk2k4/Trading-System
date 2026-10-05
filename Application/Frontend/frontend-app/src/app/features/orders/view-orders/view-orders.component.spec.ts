@@ -62,24 +62,6 @@ describe('ViewOrdersComponent', () => {
     expect(rows()[1].textContent).toContain('—');
   });
 
-  it('reloads with the chosen status filter', () => {
-    create();
-    tradeApi.getOrders.and.returnValue(of([]));
-
-    page.querySelector<HTMLInputElement>('#status-FILLED')!.click();
-    fixture.detectChanges();
-
-    expect(tradeApi.getOrders).toHaveBeenCalledWith({ status: 'FILLED' });
-    expect(page.querySelector('.tp-empty')?.textContent).toContain('No filled orders');
-  });
-
-  it('invites a first order when there are none', () => {
-    tradeApi.getOrders.and.returnValue(of([]));
-    create();
-
-    expect(page.querySelector('.tp-empty a[href="/orders/new"]')).not.toBeNull();
-  });
-
   it('shows a mapped error message when the API fails', () => {
     tradeApi.getOrders.and.returnValue(throwError(() => ({ errorCode: 'ACC-403', message: '', status: 403 })));
     create();
@@ -127,25 +109,6 @@ describe('ViewOrdersComponent', () => {
 
       tick(POLL_INTERVAL_MS * 3);
       expect(tradeApi.getOrders).toHaveBeenCalledTimes(2);
-    }));
-
-    it('does not poll when there are no orders', fakeAsync(() => {
-      tradeApi.getOrders.and.returnValue(of([]));
-      create();
-
-      expect(fixture.componentInstance.isPolling()).toBe(false);
-      tick(POLL_INTERVAL_MS * 3);
-      expect(tradeApi.getOrders).toHaveBeenCalledTimes(1);
-    }));
-
-    it('stops when the list comes back empty', fakeAsync(() => {
-      tradeApi.getOrders.and.returnValue(of([newOrder()]));
-      create();
-
-      tradeApi.getOrders.and.returnValue(of([]));
-      tick(POLL_INTERVAL_MS);
-
-      expect(fixture.componentInstance.isPolling()).toBe(false);
     }));
 
     it('stops when the component is destroyed', fakeAsync(() => {

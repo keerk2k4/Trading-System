@@ -42,7 +42,6 @@ export const PLACED_ORDER_LABELS = ['New', 'Filled', 'Rejected'];
 
 // Messages from ErrorMappingService, so a spec asserts what a trader reads.
 export const MESSAGES = {
-  'ACC-404': 'The account could not be found.',
   'INS-404': 'The instrument cannot be traded.',
   'ORD-400': 'There is not enough cash to place this order.',
   'ORD-409': 'There are not enough holdings to sell, or this order has already been placed.',

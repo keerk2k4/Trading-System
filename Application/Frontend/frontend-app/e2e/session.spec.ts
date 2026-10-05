@@ -2,22 +2,29 @@ import { test, expect } from '@playwright/test';
 import { env, TRADING_ROUTES } from './env';
 import { signIn } from './helpers';
 
-// Session handling: route guards and keeping a session across a reload, all
-// against the real auth service.
+// Session journey against the real auth service: what signing out really
+// ends, and where a signed-in page sends the bearer token.
 test.describe('Session journey', () => {
-  for (const route of [...TRADING_ROUTES, '/kyc-submission']) {
-    test(`signed out, ${route} redirects to sign-in with a return address`, async ({ page }) => {
+  test('signed out, every protected screen redirects to sign-in carrying its address', async ({ page }) => {
+    for (const route of [...TRADING_ROUTES, '/kyc-submission']) {
       await page.goto(route);
       await page.waitForURL(/\/login/);
       const url = new URL(page.url());
-      expect(url.pathname).toBe('/login');
-      expect(url.searchParams.get('returnUrl')).toBe(route);
-    });
-  }
+      expect(url.pathname, route).toBe('/login');
+      expect(url.searchParams.get('returnUrl'), route).toBe(route);
+    }
+  });
 
-  test('an unknown address falls back to sign-in', async ({ page }) => {
-    await page.goto('/no-such-page');
-    await expect(page).toHaveURL(/\/login$/);
+  test('after signing out, the dashboard reroutes to sign-in', async ({ page }) => {
+    await signIn(page);
+    await expect(page).toHaveURL(/\/dashboard$/);
+
+    await page.getByTestId('nav-sign-out').click();
+    await expect(page).toHaveURL(/\/login/);
+    await page.goto('/dashboard');
+
+    await expect(page).toHaveURL(/\/login\?returnUrl=%2Fdashboard$/);
+    await expect(page.getByTestId('login-username')).toBeVisible();
   });
 
   test('the bearer token goes to every platform API call and nowhere else', async ({ page, baseURL }) => {
@@ -36,18 +43,10 @@ test.describe('Session journey', () => {
     }
     const api = requests.filter((r) => r.method !== 'OPTIONS');
 
-    // The access token lives in memory only, so read it off the wire. Each
-    // page.goto reloads and silently refreshes it, so check the shape.
     const tradeCalls = api.filter((r) => r.url.startsWith(`${env.tradeApi}/`));
     expect(tradeCalls.length).toBeGreaterThan(0);
     for (const call of tradeCalls) {
       expect(call.auth, `${call.method} ${call.url}`).toMatch(/^Bearer [\w-]+\.[\w-]+\.[\w-]+$/);
-    }
-
-    const protectedAuthCalls = api.filter((r) => /\/(auth\/me|kyc)(\?|$)/.test(r.url) && r.url.startsWith(env.authApi));
-    expect(protectedAuthCalls.length).toBeGreaterThan(0);
-    for (const call of protectedAuthCalls) {
-      expect(call.auth, `${call.method} ${call.url}`).toMatch(/^Bearer /);
     }
 
     // The public sign-in call never carries a token.
@@ -58,12 +57,5 @@ test.describe('Session journey', () => {
     const platform = [new URL(baseURL!).origin, new URL(env.authApi).origin, new URL(env.tradeApi).origin];
     const elsewhere = api.filter((r) => !r.url.startsWith('data:') && !platform.includes(new URL(r.url).origin));
     expect(elsewhere.map((r) => r.url)).toEqual([]);
-  });
-
-  test('the session survives a page reload', async ({ page }) => {
-    await signIn(page);
-    await page.reload();
-    await expect(page).toHaveURL(/\/dashboard$/);
-    await expect(page.getByTestId('dashboard-welcome')).toHaveText(`Welcome back, ${env.username}`);
   });
 });

@@ -121,7 +121,7 @@ export async function getOrderStatus(request: APIRequestContext, accessToken: st
 export async function placeOrderViaApi(
   request: APIRequestContext,
   accessToken: string,
-  order: { side: 'BUY' | 'SELL'; quantity: number; price: number; symbol?: string }
+  order: { side: 'BUY' | 'SELL'; quantity: number; price: number; symbol?: string; idempotencyKey?: string }
 ) {
   return request.post(`${env.tradeApi}/api/v1/orders`, {
     headers: bearer(accessToken),
@@ -131,7 +131,7 @@ export async function placeOrderViaApi(
       side: order.side,
       quantity: order.quantity,
       price: order.price,
-      idempotencyKey: randomUUID()
+      idempotencyKey: order.idempotencyKey ?? randomUUID()
     }
   });
 }

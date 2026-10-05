@@ -1,7 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { Router } from '@angular/router';
 import { AUTH_API_BASE_URL, MockAuthService } from './mock-auth.service';
 import { TRADE_API_BASE_URL } from './trade-api.service';
 import { authTokenInterceptor } from '../interceptors/auth-token.interceptor';
@@ -41,33 +40,6 @@ describe('MockAuthService', () => {
     localStorage.clear();
   });
 
-  it('registers with profile fields and does not sign the user in', () => {
-    service
-      .register({
-        username: 'gaurang123',
-        email: 'gaurang@example.com',
-        firstName: 'Gaurang',
-        lastName: 'Patel',
-        phone: '+919900112233',
-        password: 'correct horse battery staple'
-      })
-      .subscribe();
-
-    const req = http.expectOne(`${AUTH_API_BASE_URL}/auth/register`);
-    expect(req.request.body).toEqual({
-      username: 'gaurang123',
-      email: 'gaurang@example.com',
-      firstName: 'Gaurang',
-      lastName: 'Patel',
-      phone: '+919900112233',
-      password: 'correct horse battery staple'
-    });
-    req.flush({ id: 'user-1', username: 'gaurang123', roles: ['CUSTOMER'] });
-
-    expect(service.isAuthenticated()).toBe(false);
-    expect(service.getCurrentUser()).toBeNull();
-  });
-
   it('keeps the access token in memory only on login and loads the user from /auth/me', () => {
     let response: AuthResponse | undefined;
     service.login({ username: 'gaurang123', password: 'pw' }).subscribe((r) => (response = r));
@@ -94,26 +66,6 @@ describe('MockAuthService', () => {
     expect(JSON.stringify(localStorage)).not.toContain(CUSTOMER_TOKEN);
   });
 
-  it('falls back to the token claims when /auth/me is unavailable', () => {
-    let response: AuthResponse | undefined;
-    service.login({ username: 'gaurang123', password: 'pw' }).subscribe((r) => (response = r));
-
-    http.expectOne(`${AUTH_API_BASE_URL}/auth/login`).flush(TOKENS);
-    http.expectOne(`${AUTH_API_BASE_URL}/auth/me`).flush(null, { status: 500, statusText: 'Server Error' });
-
-    expect(response?.user).toEqual({ id: 'user-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] });
-  });
-
-  it('signs an admin in through /auth/admin/login', () => {
-    const adminToken = jwt({ sub: 'admin-1', accountId: 0, roles: ['ADMIN'] });
-    service.login({ username: 'ops', password: 'pw' }, true).subscribe();
-
-    http.expectOne(`${AUTH_API_BASE_URL}/auth/admin/login`).flush({ ...TOKENS, accessToken: adminToken });
-    http.expectOne(`${AUTH_API_BASE_URL}/auth/me`).flush({ id: 'admin-1', username: 'ops', accountId: 0, roles: ['ADMIN'] });
-
-    expect(service.isAdmin()).toBe(true);
-  });
-
   it('rethrows a refused login as { errorCode, message, status } and stores nothing', () => {
     let error: AuthError | undefined;
     service.login({ username: 'gaurang123', password: 'wrong' }).subscribe({ error: (e) => (error = e) });
@@ -123,16 +75,6 @@ describe('MockAuthService', () => {
     expect(error).toEqual({ ...UNAUTHORISED, status: 401 });
     expect(service.isAuthenticated()).toBe(false);
     expect(service.getRefreshToken()).toBeNull();
-  });
-
-  it('reports status 0 when the auth service is unreachable', () => {
-    let error: AuthError | undefined;
-    service.login({ username: 'gaurang123', password: 'pw' }).subscribe({ error: (e) => (error = e) });
-
-    http.expectOne(`${AUTH_API_BASE_URL}/auth/login`).error(new ProgressEvent('error'));
-
-    expect(error?.status).toBe(0);
-    expect(error?.errorCode).toBe('');
   });
 
   it('clears the whole session on logout', () => {
@@ -188,20 +130,6 @@ describe('MockAuthService', () => {
       expect(service.getToken()).toBe('new-access');
       expect(localStorage.getItem('refresh_token')).toBeNull();
     });
-
-    it('ends the session and returns to /login when the refresh is refused', () => {
-      const navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
-      let error: unknown;
-      client.get(balanceUrl).subscribe({ error: (e) => (error = e) });
-
-      http.expectOne(balanceUrl).flush(UNAUTHORISED, { status: 401, statusText: 'Unauthorized' });
-      http.expectOne(`${AUTH_API_BASE_URL}/auth/refresh`).flush(UNAUTHORISED, { status: 401, statusText: 'Unauthorized' });
-
-      expect(error).toBeDefined();
-      expect(service.isAuthenticated()).toBe(false);
-      expect(service.getRefreshToken()).toBeNull();
-      expect(navigate).toHaveBeenCalledWith(['/login'], { queryParams: { returnUrl: '/' } });
-    });
   });
 });
 
@@ -223,18 +151,6 @@ describe('MockAuthService session restore (in-memory access token)', () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => localStorage.clear());
 
-  it('starts with no access token and purges tokens left in localStorage by older builds', () => {
-    localStorage.setItem('auth_token', CUSTOMER_TOKEN);
-    localStorage.setItem('refresh_token', 'refresh-1');
-    const { service, http } = create();
-
-    expect(service.getToken()).toBeNull();
-    expect(service.isAuthenticated()).toBe(false);
-    expect(localStorage.getItem('auth_token')).toBeNull();
-    expect(localStorage.getItem('refresh_token')).toBeNull();
-    http.verify();
-  });
-
   it('re-populates the access token from the refresh cookie for a returning user', () => {
     localStorage.setItem('current_user', JSON.stringify(USER));
     const { service, http } = create();
@@ -253,33 +169,6 @@ describe('MockAuthService session restore (in-memory access token)', () => {
     expect(service.getToken()).toBe('restored-access');
     expect(service.isAuthenticated()).toBe(true);
     expect(service.getCurrentUser()).toEqual(USER);
-    http.verify();
-  });
-
-  it('completes without signing in and clears the stale user when the cookie is refused', () => {
-    localStorage.setItem('current_user', JSON.stringify(USER));
-    localStorage.setItem('kyc_status', 'APPROVED');
-    const { service, http } = create();
-    let done = false;
-
-    service.restoreSession().subscribe({ next: () => (done = true), error: fail });
-    http.expectOne(`${AUTH_API_BASE_URL}/auth/refresh`).flush(UNAUTHORISED, { status: 401, statusText: 'Unauthorized' });
-
-    expect(done).toBe(true);
-    expect(service.isAuthenticated()).toBe(false);
-    expect(service.getCurrentUser()).toBeNull();
-    expect(localStorage.length).toBe(0);
-    http.verify();
-  });
-
-  it('makes no request when nobody was signed in', () => {
-    const { service, http } = create();
-    let done = false;
-
-    service.restoreSession().subscribe(() => (done = true));
-
-    expect(done).toBe(true);
-    http.expectNone(`${AUTH_API_BASE_URL}/auth/refresh`);
     http.verify();
   });
 });

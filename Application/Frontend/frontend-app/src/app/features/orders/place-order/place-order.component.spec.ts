@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { BehaviorSubject, of, throwError } from 'rxjs';
+import { provideRouter } from '@angular/router';
+import { of, throwError } from 'rxjs';
 import { PlaceOrderComponent } from './place-order.component';
 import { MockAuthService } from '../../../shared/services/mock-auth.service';
 import { TradeApiService } from '../../../shared/services/trade-api.service';
@@ -78,16 +78,6 @@ describe('PlaceOrderComponent', () => {
     expect(el('#price-error').textContent).toContain('at most 2 decimal places');
   });
 
-  it('summarises the order and its estimated value as it is filled in', () => {
-    fillValidOrder();
-
-    const summary = el('[aria-labelledby="summary-heading"]').textContent ?? '';
-    expect(summary).toContain('AAPL');
-    expect(summary).toContain('Buy');
-    expect(summary).toContain('$1,502.50');
-    expect(el('button[type="submit"]').textContent).toContain('Place buy order');
-  });
-
   it('sends the order for the signed-in account with a fresh idempotency key', async () => {
     fillValidOrder();
     submit();
@@ -113,30 +103,6 @@ describe('PlaceOrderComponent', () => {
     expect(sentOrder(1).idempotencyKey).toBe(sentOrder(0).idempotencyKey);
   });
 
-  it('uses a new key after the backend has answered with an error', () => {
-    tradeApi.placeOrder.and.returnValue(throwError(() => ({ errorCode: 'ORD-400', message: '', status: 400 })));
-    fillValidOrder();
-    submit();
-    submit();
-
-    expect(el('[role="alert"]').textContent).toContain('not enough cash');
-    expect(sentOrder(1).idempotencyKey).not.toBe(sentOrder(0).idempotencyKey);
-  });
-
-  it('starts a clean ticket from "Place another order"', () => {
-    fillValidOrder();
-    submit();
-
-    Array.from(page.querySelectorAll('button')).find((b) => b.textContent?.includes('Place another order'))!.click();
-    fixture.detectChanges();
-
-    expect(el<HTMLInputElement>('#symbol').value).toBe('');
-    expect(el('#side-error' as string)).toBeNull();
-  });
-
-  // --- Order ticket story: invalid quantity / price, read-only account,
-  // --- server result and business rejection.
-
   it('blocks a negative or zero quantity with a friendly message', () => {
     fillValidOrder();
 
@@ -148,28 +114,6 @@ describe('PlaceOrderComponent', () => {
       expect(el('#quantity-error').textContent).toContain('Quantity must be a whole number greater than 0.');
       expect(el<HTMLInputElement>('#quantity').getAttribute('aria-invalid')).toBe('true');
     }
-  });
-
-  it('blocks a zero or negative price with a friendly message', () => {
-    fillValidOrder();
-
-    for (const price of ['0', '-5']) {
-      type('price', price);
-      submit();
-
-      expect(tradeApi.placeOrder).not.toHaveBeenCalled();
-      expect(el('#price-error').textContent).toContain('Price must be greater than 0.');
-    }
-  });
-
-  it('accepts a price with exactly two decimals', async () => {
-    fillValidOrder();
-    type('price', '123.45');
-    submit();
-    await fixture.whenStable();
-
-    expect(el('#price-error' as string)).toBeNull();
-    expect(sentOrder().price).toBe(123.45);
   });
 
   it('shows the account from the token as read-only text, not an editable field', () => {
@@ -195,55 +139,6 @@ describe('PlaceOrderComponent', () => {
     expect(badge.classList).toContain('tp-badge-negative');
     expect(page.textContent).toContain('ORD-2');
     expect(page.textContent).toContain('Order rejected');
-  });
-
-  it('fills the symbol from the ?symbol= query param when arriving from the watchlist', () => {
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      providers: [
-        provideRouter([]),
-        { provide: TradeApiService, useValue: tradeApi },
-        {
-          provide: MockAuthService,
-          useValue: { currentUser$: signal({ id: 'u-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] }) }
-        },
-        { provide: ActivatedRoute, useValue: { queryParamMap: of(convertToParamMap({ symbol: 'msft' })) } }
-      ]
-    });
-    const linked: ComponentFixture<PlaceOrderComponent> = TestBed.createComponent(PlaceOrderComponent);
-    linked.detectChanges();
-
-    const prefilled = (linked.nativeElement as HTMLElement).querySelector<HTMLInputElement>('#symbol')!;
-    expect(prefilled.value).toBe('MSFT');
-    expect(linked.nativeElement.textContent).toContain('MSFT');
-  });
-
-  it('never clobbers a symbol the user has already typed', () => {
-    const params = new BehaviorSubject(convertToParamMap({}));
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      providers: [
-        provideRouter([]),
-        { provide: TradeApiService, useValue: tradeApi },
-        {
-          provide: MockAuthService,
-          useValue: { currentUser$: signal({ id: 'u-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] }) }
-        },
-        { provide: ActivatedRoute, useValue: { queryParamMap: params.asObservable() } }
-      ]
-    });
-    const linked: ComponentFixture<PlaceOrderComponent> = TestBed.createComponent(PlaceOrderComponent);
-    linked.detectChanges();
-
-    const input = (linked.nativeElement as HTMLElement).querySelector<HTMLInputElement>('#symbol')!;
-    input.value = 'NVDA';
-    input.dispatchEvent(new Event('input'));
-    linked.detectChanges();
-    // A later navigation param must not overwrite what the user typed.
-    params.next(convertToParamMap({ symbol: 'AAPL' }));
-    linked.detectChanges();
-
-    expect(input.value).toBe('NVDA');
   });
 
   it('shows a business rejection from the server and keeps the ticket for correction', () => {

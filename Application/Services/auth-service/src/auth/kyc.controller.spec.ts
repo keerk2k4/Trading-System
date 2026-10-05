@@ -63,6 +63,7 @@ describe("KycController", () => {
 
     userRepository = {
       findByUserId: jest.fn(),
+      updateStatus: jest.fn(),
     } as unknown as jest.Mocked<UserRepository>;
 
     tradeApiClient = {

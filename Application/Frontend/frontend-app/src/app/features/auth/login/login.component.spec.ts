@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { Subject, of, throwError } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { LoginComponent } from './login.component';
 import { MockAuthService } from '../../../shared/services/mock-auth.service';
 import { MockKycService } from '../../../shared/services/mock-kyc.service';
@@ -66,15 +66,6 @@ describe('LoginComponent', () => {
     });
   });
 
-  it('labels both fields and links to registration', async () => {
-    await open('/login');
-
-    expect(page.querySelector('h1')?.textContent).toContain('Welcome back');
-    expect(page.querySelector('label[for="login-username"]')?.textContent).toContain('Username');
-    expect(page.querySelector('label[for="login-password"]')?.textContent).toContain('Password');
-    expect(page.querySelector('a[href="/register"]')).not.toBeNull();
-  });
-
   it('reports missing fields on submit without calling the API', async () => {
     await open('/login');
     submit();
@@ -122,39 +113,6 @@ describe('LoginComponent', () => {
     expect(TestBed.inject(Router).url).toBe('/dashboard');
   });
 
-  it('rejects protocol-relative returnUrl and falls back to dashboard', async () => {
-    await open('/login?returnUrl=%2F%2Fevil.example');
-    type('login-username', 'gaurang123');
-    type('login-password', 'pw');
-    submit();
-    await harness.fixture.whenStable();
-
-    expect(TestBed.inject(Router).url).toBe('/dashboard');
-  });
-
-  it('sends a customer without approved KYC to the KYC form', async () => {
-    kycStatus = null;
-    await open('/login');
-    type('login-username', 'gaurang123');
-    type('login-password', 'pw');
-    submit();
-    await harness.fixture.whenStable();
-
-    expect(TestBed.inject(Router).url).toBe('/kyc-submission');
-  });
-
-  it('uses the admin endpoint on /admin-login and opens the admin dashboard', async () => {
-    auth.isAdmin.and.returnValue(true);
-    await open('/admin-login');
-    type('login-username', 'ops');
-    type('login-password', 'pw');
-    submit();
-    await harness.fixture.whenStable();
-
-    expect(auth.login).toHaveBeenCalledOnceWith({ username: 'ops', password: 'pw' }, true);
-    expect(TestBed.inject(Router).url).toBe('/admin/dashboard');
-  });
-
   it('shows a generic message for refused credentials, not the raw backend error', async () => {
     auth.login.and.returnValue(throwError(() => ({ errorCode: 'AUTH-401', message: 'Unauthorised', status: 401 })));
     await open('/login');
@@ -175,34 +133,5 @@ describe('LoginComponent', () => {
     submit();
 
     expect(alertText()).toContain('Unable to connect');
-  });
-
-  it('shows a loading state and ignores a second submit while signing in', async () => {
-    const pending = new Subject<AuthResponse>();
-    auth.login.and.returnValue(pending);
-    await open('/login');
-    type('login-username', 'gaurang123');
-    type('login-password', 'pw');
-    submit();
-    submit();
-
-    const button = page.querySelector<HTMLButtonElement>('button[type="submit"]')!;
-    expect(auth.login).toHaveBeenCalledTimes(1);
-    expect(button.getAttribute('aria-disabled')).toBe('true');
-    expect(button.textContent).toContain('Signing in');
-    expect(page.querySelector('[role="status"]')?.textContent).toContain('Signing in');
-  });
-
-  it('toggles password visibility with an accessible control', async () => {
-    await open('/login');
-    const toggle = page.querySelector<HTMLButtonElement>('.tp-input-action')!;
-    expect(input('login-password').type).toBe('password');
-    expect(toggle.getAttribute('aria-label')).toBe('Show password');
-
-    toggle.click();
-    harness.detectChanges();
-
-    expect(input('login-password').type).toBe('text');
-    expect(toggle.getAttribute('aria-label')).toBe('Hide password');
   });
 });

@@ -9,6 +9,7 @@
     "test": "ng test",
     "lint": "ng lint",
     "e2e": "playwright test",
+    "scan:bundle": "node scripts/scan-bundle.mjs",
     "generate:clients": "openapi-generator-cli generate"
   },
   "private": true,

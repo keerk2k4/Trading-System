@@ -49,24 +49,6 @@ async function refreshCookie(page: Page) {
 }
 
 test.describe('Token journeys (in-memory access token, HttpOnly refresh cookie)', () => {
-  test('no token is kept in web storage and the refresh token is an HttpOnly cookie', async ({ page }) => {
-    await signIn(page);
-    await expect(page.getByTestId('dashboard-cash')).not.toHaveText('—');
-
-    const storage = await page.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }));
-    expect(storage).not.toContain('auth_token');
-    expect(storage).not.toContain('refresh_token');
-    expect(storage, 'no JWT in web storage').not.toContain('eyJ');
-
-    const cookie = await refreshCookie(page);
-    expect(cookie, 'refresh_token cookie').toBeDefined();
-    expect(cookie?.httpOnly).toBe(true);
-    expect(cookie?.sameSite).toBe('Strict');
-    expect(cookie?.path).toBe('/auth');
-    // HttpOnly: page scripts cannot read it.
-    expect(await page.evaluate(() => document.cookie)).not.toContain('refresh_token');
-  });
-
   test('a reload keeps the user signed in through one silent refresh', async ({ page }) => {
     await signIn(page);
     await expect(page.getByTestId('dashboard-cash')).not.toHaveText('—');

@@ -19,6 +19,11 @@ export const mockAuthGuard: CanActivateFn = (route: ActivatedRouteSnapshot, stat
   const router = inject(Router);
 
   if (authService.isAuthenticated()) {
+    // Admins have no trading account or KYC, so the customer screens are not
+    // theirs: send them to their own overview rather than the KYC form.
+    if (authService.getCurrentUser()?.roles.includes('ADMIN')) {
+      return router.createUrlTree(['/admin/dashboard']);
+    }
     return true;
   }
 
