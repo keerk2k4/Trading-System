@@ -1,0 +1,95 @@
+%%{init: {'sequence': {'mirrorActors': false}}}%%
+sequenceDiagram
+
+    actor U as User
+    participant O as Order
+    participant V as OrderValidator
+    participant E as OrderExecutor
+    participant P as PositionUpdater
+    participant PS as Position
+    participant S as SettlementProcessor
+    participant SE as Settlement
+    participant H as Holding
+
+    %% =========================
+    %% CREATE ORDER
+    %% =========================
+
+    U->>O: createOrder()
+    O-->>U: order created
+
+
+    %% =========================
+    %% VALIDATE ORDER
+    %% =========================
+
+    O->>V: validate(order)
+
+
+
+
+    %% =========================
+    %% VALIDATION RESULT
+    %% =========================
+
+    alt Order is VALID
+
+        V-->>O: valid
+
+        %% =========================
+        %% EXECUTE ORDER
+        %% =========================
+
+        O->>E: execute(order)
+        E-->>O: order executed
+
+
+        %% =========================
+        %% UPDATE POSITION
+        %% =========================
+
+        O->>P: updatePosition(order)
+        P->>PS: updateQuantity(quantity)
+        PS-->>P: position updated
+        P-->>O: position updated
+
+
+        %% =========================
+        %% SETTLEMENT
+        %% =========================
+
+        O->>S: process(order)
+
+        S->>SE: createSettlement(order)
+        SE-->>S: settlement created
+
+        S->>SE: settle()
+        SE-->>S: settlement completed
+
+        S-->>O: settlement processed
+
+
+        %% =========================
+        %% UPDATE HOLDING
+        %% =========================
+
+        O->>H: updateQuantity(quantity)
+        H-->>O: holding updated
+
+        O-->>U: order completed
+
+
+    else Order is INVALID
+
+        V-->>O: invalid
+
+        %% =========================
+        %% REJECT ORDER
+        %% =========================
+
+        O->>E: markFailed(order)
+        E-->>O: order marked as FAILED
+
+        O-->>U: order rejected
+
+    end
