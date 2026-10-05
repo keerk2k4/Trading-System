@@ -8,8 +8,17 @@ import { TradeApiService } from '../../shared/services/trade-api.service';
 import { ErrorMappingService } from '../../shared/services/error-mapping.service';
 import { TradeApiError } from '../../shared/models/order.models';
 
+const MAX_INTEGER_DIGITS = 14;
+
+function hasValidIntegerDigits(value: number): boolean {
+  return Math.abs(value) < 10 ** MAX_INTEGER_DIGITS;
+}
+
 function validMoney(value: number | null): boolean {
   if (value === null || value <= 0) {
+    return false;
+  }
+  if (!hasValidIntegerDigits(value)) {
     return false;
   }
   const decimals = String(value).split('.')[1] ?? '';
@@ -55,6 +64,7 @@ function validMoney(value: number | null): boolean {
                 data-testid="funds-amount"
                 type="number"
                 min="0.01"
+                max="99999999999999.99"
                 step="0.01"
                 inputmode="decimal"
                 formControlName="amount"
@@ -188,6 +198,9 @@ export class FundsComponent implements OnInit {
     }
     if (amount <= 0) {
       return 'Amount must be greater than 0.';
+    }
+    if (!hasValidIntegerDigits(amount)) {
+      return 'Amount can have at most 14 digits before the decimal point.';
     }
     if (!validMoney(amount)) {
       return 'Amount can have at most 2 decimal places.';

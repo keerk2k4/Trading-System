@@ -60,4 +60,37 @@ describe('KycFormComponent', () => {
       documentNumber: 'PS123456789'
     });
   });
+
+  it('blocks submission when user is under 18', () => {
+    const underageYear = new Date().getFullYear() - 17;
+    set('dob', `${underageYear}-01-01`);
+    set('docType', 'PASSPORT', 'change');
+    set('docNum', 'PS123456789');
+    submit();
+
+    expect(kyc.submitKyc).not.toHaveBeenCalled();
+    expect(page.querySelector('[data-testid="dob-error"]')?.textContent).toContain('at least 18 years old');
+  });
+
+  it('shows a rejected marker on step 2 when KYC is rejected', () => {
+    kyc.getCurrentUserKyc.and.returnValue(
+      of({
+        userId: 'u-1',
+        dateOfBirth: '1990-05-15',
+        documentType: 'PASSPORT',
+        documentNumber: 'PS123456789',
+        status: 'REJECTED',
+        rejectionReason: 'Document mismatch'
+      })
+    );
+
+    fixture = TestBed.createComponent(KycFormComponent);
+    page = fixture.nativeElement;
+    fixture.detectChanges();
+
+    const stepTwo = page.querySelectorAll<HTMLLIElement>('.steps li')[1];
+    const stepThree = page.querySelectorAll<HTMLLIElement>('.steps li')[2];
+    expect(stepTwo.classList.contains('is-rejected')).toBeTrue();
+    expect(stepThree.classList.contains('is-rejected')).toBeFalse();
+  });
 });

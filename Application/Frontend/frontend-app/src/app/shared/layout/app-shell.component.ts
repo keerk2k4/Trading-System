@@ -117,8 +117,7 @@ export class AppShellComponent {
     if (this.isAdmin()) {
       return 'Administrator';
     }
-    const accountId = this.user()?.accountId;
-    return accountId ? `Account ${accountId}` : 'Customer';
+    return 'Customer';
   });
 
   protected focusMain(): void {

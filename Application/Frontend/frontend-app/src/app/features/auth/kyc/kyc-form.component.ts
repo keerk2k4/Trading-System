@@ -1,6 +1,6 @@
 import { Component, DestroyRef, ElementRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, NonNullableFormBuilder, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MockAuthService } from '../../../shared/services/mock-auth.service';
 import { MockKycService } from '../../../shared/services/mock-kyc.service';
@@ -14,6 +14,29 @@ const DOCUMENT_TYPES = [
   { value: 'DRIVER_LICENSE', label: 'Driver licence' },
   { value: 'PAN', label: 'PAN card' }
 ];
+
+function minimumAgeValidator(minimumAge: number): ValidatorFn {
+  return (control: AbstractControl): ValidationErrors | null => {
+    const value = control.value as string | null;
+    if (!value) {
+      return null;
+    }
+
+    const dob = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(dob.getTime())) {
+      return null;
+    }
+
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const monthDelta = today.getMonth() - dob.getMonth();
+    if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < dob.getDate())) {
+      age -= 1;
+    }
+
+    return age >= minimumAge ? null : { minimumAge: true };
+  };
+}
 
 @Component({
   selector: 'app-kyc-form',
@@ -81,7 +104,7 @@ const DOCUMENT_TYPES = [
                     [attr.aria-describedby]="showError('dateOfBirth') ? 'dob-error' : null"
                   />
                   @if (showError('dateOfBirth')) {
-                    <p class="tp-field-error" id="dob-error" data-testid="dob-error">Enter your date of birth.</p>
+                    <p class="tp-field-error" id="dob-error" data-testid="dob-error">{{ dobErrorMessage() }}</p>
                   }
                 </div>
 
@@ -164,20 +187,21 @@ const DOCUMENT_TYPES = [
             <li
               [class.is-done]="isStepTwoDone()"
               [class.is-waiting]="isStepTwoWaiting()"
+              [class.is-rejected]="isStepTwoRejected()"
               [class.is-current]="isStepTwoWaiting()"
               [attr.aria-current]="isStepTwoWaiting() ? 'step' : null"
             >
               <strong>
                 Administrator review
                 @if (isStepTwoDone()) {<span class="sr-only">(completed)</span>}
+                @if (isStepTwoRejected()) {<span class="sr-only">(rejected)</span>}
               </strong>
               <span>An administrator checks your document.</span>
             </li>
-            <li [class.is-done]="isStepThreeDone()" [class.is-rejected]="isRejected()">
+            <li [class.is-done]="isStepThreeDone()">
               <strong>
                 Start trading
                 @if (isStepThreeDone()) {<span class="sr-only">(completed)</span>}
-                @if (isRejected()) {<span class="sr-only">(rejected)</span>}
               </strong>
               <span>Your dashboard and order ticket unlock.</span>
             </li>
@@ -211,7 +235,7 @@ export class KycFormComponent implements OnInit {
 
   protected readonly documentTypes = DOCUMENT_TYPES;
   protected readonly form = inject(NonNullableFormBuilder).group({
-    dateOfBirth: ['', Validators.required],
+    dateOfBirth: ['', [Validators.required, minimumAgeValidator(18)]],
     documentType: ['', Validators.required],
     documentNumber: ['', Validators.required]
   });
@@ -228,6 +252,7 @@ export class KycFormComponent implements OnInit {
   protected readonly isStepOneDone = computed(() => this.hasUploadedKyc());
   protected readonly isStepTwoWaiting = computed(() => this.normalizedKycStatus() === 'PENDING');
   protected readonly isStepTwoDone = computed(() => this.normalizedKycStatus() === 'APPROVED');
+  protected readonly isStepTwoRejected = computed(() => this.normalizedKycStatus() === 'REJECTED');
   protected readonly isStepThreeDone = computed(() => this.normalizedKycStatus() === 'APPROVED');
   protected readonly isLoadingExistingKyc = signal(true);
   protected readonly justSubmitted = signal(false);
@@ -265,6 +290,17 @@ export class KycFormComponent implements OnInit {
   protected showError(name: 'dateOfBirth' | 'documentType' | 'documentNumber'): boolean {
     const control = this.form.controls[name];
     return control.invalid && (control.touched || this.submitted());
+  }
+
+  protected dobErrorMessage(): string {
+    const control = this.form.controls.dateOfBirth;
+    if (control.hasError('required')) {
+      return 'Enter your date of birth.';
+    }
+    if (control.hasError('minimumAge')) {
+      return 'You must be at least 18 years old.';
+    }
+    return 'Enter a valid date of birth.';
   }
 
   protected onSubmit(): void {

@@ -96,7 +96,6 @@ import { safeReturnUrl } from '../../../shared/guards/safe-return-url';
         <p class="tp-form-footer">
           Don't have an account? <a class="tp-link" routerLink="/register" data-testid="login-register-link">Create one</a>
         </p>
-        <p class="tp-form-footer"><a class="tp-link" routerLink="/admin-login" data-testid="login-admin-link">Admin sign in</a></p>
       }
     </app-auth-shell>
   `

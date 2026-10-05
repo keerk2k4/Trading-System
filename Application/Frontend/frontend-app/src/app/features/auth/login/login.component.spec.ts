@@ -78,6 +78,12 @@ describe('LoginComponent', () => {
     expect(document.activeElement).toBe(input('login-username'));
   });
 
+  it('does not show an admin sign-in shortcut on customer login', async () => {
+    await open('/login');
+
+    expect(page.querySelector('[data-testid="login-admin-link"]')).toBeNull();
+  });
+
   it('signs in through the auth service and opens the dashboard', async () => {
     await open('/login');
     type('login-username', 'gaurang123');

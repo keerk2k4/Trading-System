@@ -111,12 +111,10 @@ interface PortfolioSummary {
             @if (account(); as acc) {
               <div><dt>Holder</dt><dd>{{ acc.holderName }}</dd></div>
             }
-            <div><dt>Account ID</dt><dd class="tp-num" data-testid="dashboard-account-id">{{ user()?.accountId || '—' }}</dd></div>
             @if (account(); as acc) {
               <div><dt>Status</dt><dd><app-status-badge data-testid="dashboard-account-status" [status]="acc.status" /></dd></div>
             }
             <div><dt>Verification</dt><dd><app-status-badge data-testid="dashboard-kyc-status" [status]="kycStatus()" /></dd></div>
-            <div><dt>User ID</dt><dd class="tp-mono">{{ user()?.id }}</dd></div>
           </dl>
         </section>
       </div>
