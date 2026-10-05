@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { AUTH_API_BASE_URL, MockAuthService } from './mock-auth.service';
+import { AUTH_API_BASE_URL, MockAuthService } from './auth.service';
 import { TRADE_API_BASE_URL } from './trade-api.service';
 import { authTokenInterceptor } from '../interceptors/auth-token.interceptor';
 import { provideApiClients } from '../api/api-clients';

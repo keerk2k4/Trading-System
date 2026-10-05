@@ -4,8 +4,8 @@ import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { of, throwError } from 'rxjs';
 import { LoginComponent } from './login.component';
-import { MockAuthService } from '../../../shared/services/mock-auth.service';
-import { MockKycService } from '../../../shared/services/mock-kyc.service';
+import { MockAuthService } from '../../../shared/services/auth.service';
+import { MockKycService } from '../../../shared/services/kyc.service';
 import { AuthResponse } from '../../../shared/models/auth.models';
 import { KycStatus } from '../../../shared/models/kyc.models';
 

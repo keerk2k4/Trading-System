@@ -1,6 +1,6 @@
 import { Component, ElementRef, computed, inject, viewChild } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { MockAuthService } from '../services/mock-auth.service';
+import { MockAuthService } from '../services/auth.service';
 import { ThemeService } from '../services/theme.service';
 
 interface NavItem {

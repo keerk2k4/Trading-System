@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { Router, CanActivateFn } from '@angular/router';
-import { MockKycService } from '../services/mock-kyc.service';
+import { MockKycService } from '../services/kyc.service';
 
 /**
  * Guard that ensures user has approved KYC before accessing trading features

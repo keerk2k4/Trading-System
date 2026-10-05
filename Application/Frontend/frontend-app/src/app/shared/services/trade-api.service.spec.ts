@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TradeApiService, TRADE_API_BASE_URL } from './trade-api.service';
-import { MockAuthService } from './mock-auth.service';
+import { MockAuthService } from './auth.service';
 import { authTokenInterceptor } from '../interceptors/auth-token.interceptor';
 import { PlaceOrderRequest, TradeApiError } from '../models/order.models';
 import { provideApiClients } from '../api/api-clients';

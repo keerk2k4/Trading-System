@@ -2,8 +2,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { KycFormComponent } from './kyc-form.component';
-import { MockAuthService } from '../../../shared/services/mock-auth.service';
-import { MockKycService } from '../../../shared/services/mock-kyc.service';
+import { MockAuthService } from '../../../shared/services/auth.service';
+import { MockKycService } from '../../../shared/services/kyc.service';
 
 describe('KycFormComponent', () => {
   let kyc: jasmine.SpyObj<MockKycService>;

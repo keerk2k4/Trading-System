@@ -3,8 +3,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { DashboardComponent } from './dashboard.component';
-import { MockAuthService } from '../../shared/services/mock-auth.service';
-import { MockKycService } from '../../shared/services/mock-kyc.service';
+import { MockAuthService } from '../../shared/services/auth.service';
+import { MockKycService } from '../../shared/services/kyc.service';
 import { TradeApiService } from '../../shared/services/trade-api.service';
 import { User } from '../../shared/models/auth.models';
 

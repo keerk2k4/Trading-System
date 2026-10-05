@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { RegisterComponent } from './register.component';
-import { MockAuthService } from '../../../shared/services/mock-auth.service';
+import { MockAuthService } from '../../../shared/services/auth.service';
 
 const PASSWORD = 'correct horse battery staple';
 

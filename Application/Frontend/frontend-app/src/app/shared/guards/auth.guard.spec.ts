@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRouteSnapshot, GuardResult, MaybeAsync, Route, Router, RouterStateSnapshot, UrlTree, provideRouter } from '@angular/router';
-import { mockAdminGuard, mockAuthGuard } from './mock-auth.guard';
-import { MockAuthService } from '../services/mock-auth.service';
+import { mockAdminGuard, mockAuthGuard } from './auth.guard';
+import { MockAuthService } from '../services/auth.service';
 import { routes } from '../../app.routes';
 
 describe('mockAuthGuard', () => {

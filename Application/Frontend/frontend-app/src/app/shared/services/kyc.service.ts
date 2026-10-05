@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { KycSubmission, KycStatus } from '../models/kyc.models';
 import { Observable, of, throwError } from 'rxjs';
 import { catchError, map, switchMap, tap } from 'rxjs/operators';
-import { MockAuthService } from './mock-auth.service';
+import { MockAuthService } from './auth.service';
 import { CreateKycRequest, KycResponse, KYCService } from '../../../generated/auth-client';
 
 @Injectable({

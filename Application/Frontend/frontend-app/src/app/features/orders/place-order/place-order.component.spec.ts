@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { PlaceOrderComponent } from './place-order.component';
-import { MockAuthService } from '../../../shared/services/mock-auth.service';
+import { MockAuthService } from '../../../shared/services/auth.service';
 import { TradeApiService } from '../../../shared/services/trade-api.service';
 import { PlaceOrderRequest } from '../../../shared/models/order.models';
 

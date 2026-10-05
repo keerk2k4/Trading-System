@@ -4,7 +4,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { routes } from './app.routes';
 import { authTokenInterceptor } from './shared/interceptors/auth-token.interceptor';
 import { provideApiClients } from './shared/api/api-clients';
-import { MockAuthService } from './shared/services/mock-auth.service';
+import { MockAuthService } from './shared/services/auth.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [

@@ -4,8 +4,8 @@ import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angula
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { KycSubmission } from '../../../shared/models/kyc.models';
 import { AuthError } from '../../../shared/models/auth.models';
-import { MockAuthService } from '../../../shared/services/mock-auth.service';
-import { MockKycService } from '../../../shared/services/mock-kyc.service';
+import { MockAuthService } from '../../../shared/services/auth.service';
+import { MockKycService } from '../../../shared/services/kyc.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
 import { AuthShellComponent } from '../auth-shell/auth-shell.component';
 import { safeReturnUrl } from '../../../shared/guards/safe-return-url';

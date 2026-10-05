@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { AppShellComponent } from './shared/layout/app-shell.component';
-import { mockAuthGuard, mockAdminGuard } from './shared/guards/mock-auth.guard';
+import { mockAuthGuard, mockAdminGuard } from './shared/guards/auth.guard';
 import { kycApprovalGuard } from './shared/guards/kyc-approval.guard';
 
 // Every screen except sign-in/sign-up must have a canActivate guard, so a

@@ -3,7 +3,7 @@ import { HttpErrorResponse, HttpInterceptorFn, HttpRequest } from '@angular/comm
 import { Router } from '@angular/router';
 import { throwError } from 'rxjs';
 import { catchError, switchMap } from 'rxjs/operators';
-import { MockAuthService } from '../services/mock-auth.service';
+import { MockAuthService } from '../services/auth.service';
 import { AUTH_API_BASE_URL, TRADE_API_BASE_URL } from '../api/api-clients';
 
 // Auth-service endpoints that are called without a session. They must never

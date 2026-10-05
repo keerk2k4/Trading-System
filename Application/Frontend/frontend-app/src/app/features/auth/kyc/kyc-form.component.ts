@@ -2,8 +2,8 @@ import { Component, DestroyRef, ElementRef, OnInit, computed, inject, signal } f
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, NonNullableFormBuilder, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { MockAuthService } from '../../../shared/services/mock-auth.service';
-import { MockKycService } from '../../../shared/services/mock-kyc.service';
+import { MockAuthService } from '../../../shared/services/auth.service';
+import { MockKycService } from '../../../shared/services/kyc.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
 import { StatusBadgeComponent } from '../../../shared/ui/status-badge.component';
 import { KycStatus, KycSubmission } from '../../../shared/models/kyc.models';

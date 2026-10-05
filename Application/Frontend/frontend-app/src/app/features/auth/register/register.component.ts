@@ -19,7 +19,7 @@ import {
 } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthError } from '../../../shared/models/auth.models';
-import { MockAuthService } from '../../../shared/services/mock-auth.service';
+import { MockAuthService } from '../../../shared/services/auth.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
 import { AuthShellComponent } from '../auth-shell/auth-shell.component';
 

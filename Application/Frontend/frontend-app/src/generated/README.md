@@ -16,8 +16,8 @@ so a contract change shows up as a reviewable diff and the app builds without Ja
 - **Never import from here in components.** Use the wrappers instead:
   - `src/app/shared/api/api-clients.ts`: base URLs and bearer-token wiring (`provideApiClients()`)
   - `src/app/shared/services/trade-api.service.ts`: trade client wrapper
-  - `src/app/shared/services/mock-auth.service.ts`: auth client wrapper
-  - `src/app/shared/services/mock-kyc.service.ts`: KYC client wrapper
+  - `src/app/shared/services/auth.service.ts`: auth client wrapper
+  - `src/app/shared/services/kyc.service.ts`: KYC client wrapper
   - `src/app/shared/models/*.models.ts`: app types are aliases of the generated models
 
 ## Regenerate

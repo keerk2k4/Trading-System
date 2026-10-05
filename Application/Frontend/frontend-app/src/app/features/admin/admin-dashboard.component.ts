@@ -2,8 +2,8 @@ import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { MockAuthService } from '../../shared/services/mock-auth.service';
-import { MockKycService } from '../../shared/services/mock-kyc.service';
+import { MockAuthService } from '../../shared/services/auth.service';
+import { MockKycService } from '../../shared/services/kyc.service';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 import { KycSubmission } from '../../shared/models/kyc.models';
 

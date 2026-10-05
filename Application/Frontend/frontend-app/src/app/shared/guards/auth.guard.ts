@@ -1,6 +1,6 @@
 import { inject } from '@angular/core';
 import { Router, CanActivateFn, ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
-import { MockAuthService } from '../services/mock-auth.service';
+import { MockAuthService } from '../services/auth.service';
 
 // `inject()` is required here, not `new MockAuthService()`/`new Router()` -
 // constructing them manually bypasses Angular's DI, so MockAuthService never

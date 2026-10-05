@@ -20,7 +20,7 @@ import {
   Validators
 } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { MockAuthService } from '../../../shared/services/mock-auth.service';
+import { MockAuthService } from '../../../shared/services/auth.service';
 import { TradeApiService } from '../../../shared/services/trade-api.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
 import { StatusBadgeComponent } from '../../../shared/ui/status-badge.component';

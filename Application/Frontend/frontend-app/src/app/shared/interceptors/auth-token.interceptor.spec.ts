@@ -3,7 +3,7 @@ import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { authTokenInterceptor } from './auth-token.interceptor';
-import { MockAuthService } from '../services/mock-auth.service';
+import { MockAuthService } from '../services/auth.service';
 import { AUTH_API_BASE_URL, TRADE_API_BASE_URL } from '../api/api-clients';
 
 describe('authTokenInterceptor', () => {
