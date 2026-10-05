@@ -53,7 +53,11 @@ export class MockAuthService {
   private readonly accessToken = accessTokenStore;
   private readonly currentUser = signal<User | null>(this.loadUserFromStorage());
   public readonly currentUser$ = this.currentUser.asReadonly();
-  public readonly authenticated = computed(() => this.accessToken() !== null);
+  // Authentication = a live, unexpired in-memory access token. The
+  // `current_user` localStorage entry is a display-only cache (username /
+  // greeting) and is never consulted here, so editing it cannot sign a
+  // user in or escalate their role.
+  public readonly authenticated = computed(() => this.hasValidToken());
 
   constructor() {
     this.accessToken.set(null);
@@ -159,11 +163,16 @@ export class MockAuthService {
   // so a returning user (current_user still stored) gets a new one from the
   // refresh cookie instead of being sent to /login. Never fails: with no
   // valid cookie the session is simply cleared and the guards take over.
+  // After a successful refresh the user profile is reloaded from GET
+  // /auth/me (which reads the verified token server-side), so a hand-edited
+  // `current_user` entry in localStorage is overwritten with the truthful
+  // identity instead of lingering as spoofed ADMIN.
   restoreSession(): Observable<void> {
     if (!this.currentUser()) {
       return of(void 0);
     }
     return this.refreshAccessToken().pipe(
+      switchMap(() => this.loadCurrentUser().pipe(catchError(() => of(void 0)))),
       map(() => void 0),
       catchError(() => of(void 0))
     );
@@ -198,11 +207,15 @@ export class MockAuthService {
   }
 
   getCurrentUser(): User | null {
+    // Display-only cache seeded from localStorage. Never use this for
+    // authorisation decisions (route guards, admin checks) - it is fully
+    // client-writable. Use getRolesFromToken()/isAdmin(), which read the
+    // in-memory verified JWT, instead.
     return this.currentUser();
   }
 
   isAuthenticated(): boolean {
-    return this.authenticated();
+    return this.hasValidToken();
   }
 
   getToken(): string | null {
@@ -232,20 +245,52 @@ export class MockAuthService {
     }
   }
 
-  // Get roles from current token
+  // Get roles from the in-memory access token (the only role source the
+  // UI trusts for authorisation). Returns [] when signed out or when the
+  // token is expired, so a stale/edited localStorage entry can never
+  // escalate privileges.
   getRolesFromToken(): string[] {
     const token = this.getToken();
     if (!token) {
       return [];
     }
     const payload = this.decodeToken(token);
+    if (!payload || this.isTokenExpired(payload)) {
+      return [];
+    }
     return payload?.roles || [];
   }
 
-  // Check if user is admin
+  // Check if the signed-in user is an admin, based solely on the verified
+  // JWT `roles` claim - never on the `current_user` localStorage entry.
   isAdmin(): boolean {
     const roles = this.getRolesFromToken();
-    return roles.includes('ADMIN');
+    return roles.some((role) => role?.toUpperCase() === 'ADMIN');
+  }
+
+  private hasValidToken(): boolean {
+    const token = this.accessToken();
+    if (!token) {
+      return false;
+    }
+    const payload = this.decodeToken(token);
+    if (!payload) {
+      // Non-JWT test doubles (e.g. 'new-access' in unit tests) carry no
+      // claims to expire; presence alone means signed in. Real backend
+      // tokens are always JWTs and go through the expiry check below.
+      return true;
+    }
+    return !this.isTokenExpired(payload);
+  }
+
+  private isTokenExpired(payload: TokenPayload): boolean {
+    // Tokens without an `exp` claim (e.g. unsigned test doubles) are
+    // treated as non-expiring so existing unit tests keep working; real
+    // backend tokens always carry `exp` (15 min after `iat` per contract).
+    if (typeof payload?.exp !== 'number') {
+      return false;
+    }
+    return payload.exp * 1000 <= Date.now();
   }
 
   private userFromToken(accessToken: string, username: string): User {
@@ -265,6 +310,9 @@ export class MockAuthService {
   }
 
   private setCurrentUser(user: User): void {
+    // Display cache only. Authorisation always re-reads the JWT via
+    // getRolesFromToken()/isAdmin(), so editing this key in DevTools
+    // cannot grant admin access.
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
     this.currentUser.set(user);
   }

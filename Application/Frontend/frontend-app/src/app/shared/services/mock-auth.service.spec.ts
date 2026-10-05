@@ -165,10 +165,33 @@ describe('MockAuthService session restore (in-memory access token)', () => {
     expect(refresh.request.headers.has('Authorization')).toBe(false);
     refresh.flush({ ...TOKENS, accessToken: 'restored-access' });
 
+    // Bootstrap re-reads the identity from GET /auth/me (verified token
+    // server-side), so a hand-edited `current_user` entry cannot survive
+    // a reload as spoofed ADMIN.
+    const me = http.expectOne(`${AUTH_API_BASE_URL}/auth/me`);
+    me.flush(USER);
+
     expect(done).toBe(true);
     expect(service.getToken()).toBe('restored-access');
     expect(service.isAuthenticated()).toBe(true);
     expect(service.getCurrentUser()).toEqual(USER);
+    http.verify();
+  });
+
+  it('overwrites a spoofed localStorage ADMIN with the token identity on restore', () => {
+    const spoofed = { ...USER, roles: ['ADMIN'] };
+    localStorage.setItem('current_user', JSON.stringify(spoofed));
+    const { service, http } = create();
+
+    service.restoreSession().subscribe();
+
+    http.expectOne(`${AUTH_API_BASE_URL}/auth/refresh`).flush({ ...TOKENS, accessToken: CUSTOMER_TOKEN });
+    // Server truth is CUSTOMER, so the spoofed ADMIN cache is healed.
+    http.expectOne(`${AUTH_API_BASE_URL}/auth/me`).flush(USER);
+
+    expect(service.getCurrentUser()).toEqual(USER);
+    expect(service.isAdmin()).toBe(false);
+    expect(service.getRolesFromToken()).toEqual(['CUSTOMER']);
     http.verify();
   });
 });

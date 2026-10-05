@@ -101,7 +101,10 @@ export class AppShellComponent {
   private readonly main = viewChild.required<ElementRef<HTMLElement>>('main');
 
   private readonly user = this.authService.currentUser$;
-  private readonly isAdmin = computed(() => this.user()?.roles.includes('ADMIN') ?? false);
+  // Navigation/role label must follow the JWT `roles` claim (in-memory),
+  // not the `current_user` localStorage cache, so editing localStorage
+  // cannot reveal the admin navigation.
+  private readonly isAdmin = computed(() => this.authService.isAdmin());
 
   // Reads the session signal, so the sign-out button disappears as soon as
   // the session is cleared.

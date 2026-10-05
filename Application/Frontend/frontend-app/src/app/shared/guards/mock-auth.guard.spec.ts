@@ -1,14 +1,16 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRouteSnapshot, GuardResult, MaybeAsync, Route, Router, RouterStateSnapshot, UrlTree, provideRouter } from '@angular/router';
-import { mockAuthGuard } from './mock-auth.guard';
+import { mockAdminGuard, mockAuthGuard } from './mock-auth.guard';
 import { MockAuthService } from '../services/mock-auth.service';
 import { routes } from '../../app.routes';
 
 describe('mockAuthGuard', () => {
   let signedIn: boolean;
+  let adminFromToken: boolean;
 
   beforeEach(() => {
     signedIn = false;
+    adminFromToken = false;
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
@@ -16,6 +18,9 @@ describe('mockAuthGuard', () => {
           provide: MockAuthService,
           useValue: {
             isAuthenticated: () => signedIn,
+            // Guards must read the role from the JWT, never from the
+            // `current_user` localStorage cache.
+            isAdmin: () => adminFromToken,
             getCurrentUser: () => ({ id: 'u1', username: 'priya', accountId: 17, roles: ['CUSTOMER'] })
           }
         }
@@ -41,6 +46,41 @@ describe('mockAuthGuard', () => {
     signedIn = true;
 
     expect(run('/orders/history')).toBe(true);
+  });
+
+  it('sends a token-admin away from customer screens to the admin dashboard', () => {
+    signedIn = true;
+    adminFromToken = true;
+
+    const result = run('/dashboard');
+    expect(result).toBeInstanceOf(UrlTree);
+    expect(TestBed.inject(Router).serializeUrl(result as UrlTree)).toBe('/admin/dashboard');
+  });
+
+  it('mockAdminGuard blocks a spoofed localStorage ADMIN when the token is CUSTOMER', () => {
+    // getCurrentUser() above still returns CUSTOMER here; even if an
+    // attacker rewrote localStorage to ADMIN, isAdmin() (token) stays
+    // false, so the admin route must redirect to /dashboard.
+    signedIn = true;
+    adminFromToken = false;
+
+    const result = TestBed.runInInjectionContext(() =>
+      mockAdminGuard({} as ActivatedRouteSnapshot, { url: '/admin/dashboard' } as RouterStateSnapshot)
+    );
+
+    expect(result).toBeInstanceOf(UrlTree);
+    expect(TestBed.inject(Router).serializeUrl(result as UrlTree)).toBe('/dashboard');
+  });
+
+  it('mockAdminGuard allows a real token-admin', () => {
+    signedIn = true;
+    adminFromToken = true;
+
+    const result = TestBed.runInInjectionContext(() =>
+      mockAdminGuard({} as ActivatedRouteSnapshot, { url: '/admin/dashboard' } as RouterStateSnapshot)
+    );
+
+    expect(result).toBe(true);
   });
 
   it('guards every route except sign-in and sign-up', () => {

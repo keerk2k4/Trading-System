@@ -21,7 +21,9 @@ export const mockAuthGuard: CanActivateFn = (route: ActivatedRouteSnapshot, stat
   if (authService.isAuthenticated()) {
     // Admins have no trading account or KYC, so the customer screens are not
     // theirs: send them to their own overview rather than the KYC form.
-    if (authService.getCurrentUser()?.roles.includes('ADMIN')) {
+    // Role comes from the in-memory JWT (isAdmin), never from the
+    // `current_user` localStorage entry, which the user can edit.
+    if (authService.isAdmin()) {
       return router.createUrlTree(['/admin/dashboard']);
     }
     return true;
@@ -40,8 +42,12 @@ export const mockAdminGuard: CanActivateFn = (route: ActivatedRouteSnapshot, sta
     return router.createUrlTree(['/admin-login'], { queryParams: { returnUrl: state.url } });
   }
 
-  const user = authService.getCurrentUser();
-  if (user && user.roles.includes('ADMIN')) {
+  // Authorisation source of truth is the JWT `roles` claim read from the
+  // in-memory access token (isAdmin). The `current_user` localStorage entry
+  // is a display cache only and is deliberately ignored here, so changing
+  // `"roles":["CUSTOMER"]` to `"roles":["ADMIN"]` in DevTools no longer
+  // opens the admin dashboard.
+  if (authService.isAdmin()) {
     return true;
   }
 
