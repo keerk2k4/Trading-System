@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CopilotDiffPersistence">
+    <option name="pendingDiffs">
+      <map>
+        <entry key="/application (snapshot).yml">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="/application (snapshot).yml" />
+              <option name="originalContent" value="spring:&#10;  application:&#10;    name: trade-executor&#10;&#10;  # Kafka Configuration&#10;  kafka:&#10;    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}&#10;    consumer:&#10;      group-id: ${KAFKA_CONSUMER_GROUP:trade-executor-group}&#10;      auto-offset-reset: earliest&#10;      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer&#10;      properties:&#10;        spring.json.trusted.packages: &quot;*&quot;&#10;    producer:&#10;      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer&#10;&#10;  # PostgreSQL Configuration&#10;  datasource:&#10;    url: ${DB_URL:jdbc:postgresql://localhost:5432/trade_executor}&#10;    username: ${DB_USERNAME:postgres}&#10;    password: ${DB_PASSWORD:postgres}&#10;    driver-class-name: org.postgresql.Driver&#10;&#10;  # JPA/Hibernate Configuration&#10;  jpa:&#10;    hibernate:&#10;      ddl-auto: ${JPA_DDL_AUTO:validate}&#10;    show-sql: false&#10;    properties:&#10;      hibernate:&#10;        dialect: org.hibernate.dialect.PostgreSQLDialect&#10;        format_sql: true&#10;&#10;# Application-specific Configuration&#10;app:&#10;  # Fauxnance Configuration&#10;  fauxnance:&#10;    base-url: ${FAUXNANCE_BASE_URL:http://localhost:8080}&#10;    api-key: ${FAUXNANCE_API_KEY:}&#10;&#10;# Logging Configuration&#10;logging:&#10;  level:&#10;    root: INFO&#10;    com.tradeexecutor: DEBUG&#10;&#10;" />
+              <option name="updatedContent" value="spring:&#10;  application:&#10;    name: trade-executor&#10;&#10;  # Kafka Configuration&#10;  kafka:&#10;    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}&#10;    consumer:&#10;      group-id: ${KAFKA_CONSUMER_GROUP:trade-executor-group}&#10;      auto-offset-reset: earliest&#10;      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer&#10;      properties:&#10;        spring.json.trusted.packages: &quot;*&quot;&#10;    producer:&#10;      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer&#10;&#10;  # PostgreSQL Configuration&#10;  datasource:&#10;    url: ${DB_URL:jdbc:postgresql://localhost:5432/trade_executor}&#10;    username: ${DB_USERNAME:postgres}&#10;    password: ${DB_PASSWORD:postgres}&#10;    driver-class-name: org.postgresql.Driver&#10;&#10;  # JPA/Hibernate Configuration&#10;  jpa:&#10;    hibernate:&#10;      ddl-auto: ${JPA_DDL_AUTO:validate}&#10;    show-sql: false&#10;    properties:&#10;      hibernate:&#10;        dialect: org.hibernate.dialect.PostgreSQLDialect&#10;        format_sql: true&#10;&#10;# Application-specific Configuration&#10;app:&#10;  # Fauxnance Configuration&#10;  fauxnance:&#10;    base-url: ${FAUXNANCE_BASE_URL:http://localhost:8080}&#10;    api-key: ${FAUXNANCE_API_KEY:}&#10;    retry:&#10;      max-attempts: ${FAUXNANCE_RETRY_MAX_ATTEMPTS:3}&#10;      delay-ms: ${FAUXNANCE_RETRY_DELAY_MS:100}&#10;&#10;# Logging Configuration&#10;logging:&#10;  level:&#10;    root: INFO&#10;    com.tradeexecutor: DEBUG&#10;&#10;" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>

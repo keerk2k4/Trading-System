@@ -1,0 +1,63 @@
+spring:
+  application:
+    name: trade-executor
+
+  # Kafka Configuration
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:10.8.66.137:9092}
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP:trade-executor-group}
+      auto-offset-reset: earliest
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+    producer:
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      enable-idempotence: true
+      retries: 2147483647
+      properties:
+        max.in.flight.requests.per.connection: 5
+
+  # PostgreSQL Configuration
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://postgres:5432/trading_system}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:n3u3d4!}
+    driver-class-name: org.postgresql.Driver
+
+  # MyBatis Configuration
+  mybatis:
+    configuration:
+      map-underscore-to-camel-case: true
+    type-aliases-package: com.tradeexecutor.entity
+
+# Application-specific Configuration
+app:
+  # Message Processing Retry Configuration
+  # Applies to transient failures (e.g., broker unreachable, DB connection lost)
+  retry:
+    max-attempts: ${APP_RETRY_MAX_ATTEMPTS:3}
+    initial-delay-ms: ${APP_RETRY_INITIAL_DELAY_MS:100}
+    max-delay-ms: ${APP_RETRY_MAX_DELAY_MS:30000}
+    backoff-multiplier: ${APP_RETRY_BACKOFF_MULTIPLIER:2.0}
+
+  # Fauxnance Configuration
+  fauxnance:
+    base-url: ${FAUXNANCE_BASE_URL:http://localhost:8080}
+    api-key: ${FAUXNANCE_API_KEY:fnx_dev_CvXEv1ohuj4MUkfZjn0kmyDFguxcvofA}
+    retry:
+      max-attempts: ${FAUXNANCE_RETRY_MAX_ATTEMPTS:1}
+      delay-ms: ${FAUXNANCE_RETRY_DELAY_MS:100}
+  
+  # Market Data Poller Configuration
+  poller:
+    poll-interval-ms: ${POLL_INTERVAL_SECONDS:30000}
+    min-interval-ms: 30000
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    com.tradeexecutor: DEBUG
+
