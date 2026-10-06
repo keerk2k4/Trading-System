@@ -211,6 +211,126 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      operationId: forgotPassword
+      security: []
+      summary: Email a password reset code to the user's registered email address
+      description: |
+        Looks the user up by username and emails a 6-digit code to the address given at
+        registration. Same code rules as `/auth/register/otp` (10 minutes, five attempts, 60-second
+        resend cooldown).
+
+        The response is identical whether or not the username exists, and the email is sent in the
+        background, so the endpoint cannot be used to discover which usernames are registered.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: Always returned for a well-formed request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendOtpResponse'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+  /auth/forgot-password/verify:
+    post:
+      tags: [Auth]
+      operationId: verifyPasswordResetOtp
+      security: []
+      summary: Check the password reset code and receive a reset token
+      description: |
+        On success returns a single-use `verificationToken`, valid for 30 minutes, to send as
+        `resetToken` on `POST /auth/reset-password`. Errors match `/auth/register/otp/verify`; an
+        unknown username gets the same `404 OTP-404` as a username with no pending code.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyPasswordResetOtpRequest'
+      responses:
+        '200':
+          description: Code accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyOtpResponse'
+        '400':
+          description: The code is wrong.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: No code was requested for this username (or it was already used).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '410':
+          description: The code has expired.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+        '429':
+          description: Too many wrong attempts; the code is no longer usable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      operationId: resetPassword
+      security: []
+      summary: Set a new password using a reset token
+      description: |
+        Replaces the password, burns the reset token, revokes every refresh token for the user (so
+        all existing sessions end) and emails a "password changed" notice. Does not sign the user
+        in; the client logs in afterwards.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password changed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '403':
+          description: The reset token is missing, wrong, expired or already used.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid:
+                  value:
+                    errorCode: OTP-403
+                    message: Your password reset session is invalid or has expired. Request a new code.
+        '422':
+          description: Invalid input, or the new password equals the current one.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /auth/register:
     post:
       tags: [Auth]
@@ -863,6 +983,56 @@ components:
           type: integer
           description: Seconds the token stays valid.
           example: 1800
+
+    ForgotPasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [username]
+      properties:
+        username:
+          type: string
+          maxLength: 64
+          example: priya.menon
+
+    VerifyPasswordResetOtpRequest:
+      type: object
+      additionalProperties: false
+      required: [username, otp]
+      properties:
+        username:
+          type: string
+          maxLength: 64
+          example: priya.menon
+        otp:
+          type: string
+          pattern: '^\d{6}$'
+          example: '482913'
+
+    ResetPasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [username, resetToken, newPassword]
+      properties:
+        username:
+          type: string
+          maxLength: 64
+          example: priya.menon
+        resetToken:
+          type: string
+          maxLength: 128
+          description: The `verificationToken` from `POST /auth/forgot-password/verify`.
+        newPassword:
+          type: string
+          minLength: 12
+          maxLength: 128
+          writeOnly: true
+
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
 
     LoginRequest:
       type: object

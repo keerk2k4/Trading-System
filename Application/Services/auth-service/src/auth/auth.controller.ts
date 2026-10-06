@@ -28,7 +28,13 @@ import { UserRepository } from "../repositories/UserRepository";
 import { ThrottleService } from "../services/ThrottleService";
 import { AccountProvisioningEventService } from "../services/AccountProvisioningEventService";
 import { NotificationService } from "../services/NotificationService";
-import { EmailOtpService } from "../services/EmailOtpService";
+import { EmailOtpService, OtpVerifyResult, passwordResetKey } from "../services/EmailOtpService";
+import {
+  ForgotPasswordRequest,
+  MessageResponse,
+  ResetPasswordRequest,
+  VerifyPasswordResetOtpRequest,
+} from "../dtos/PasswordResetRequests";
 import { SendOtpRequest } from "../dtos/SendOtpRequest";
 import { VerifyOtpRequest } from "../dtos/VerifyOtpRequest";
 import { SendOtpResponse, VerifyOtpResponse } from "../dtos/OtpResponse";
@@ -155,6 +161,121 @@ export class AuthController {
   @ApiResponse({ status: 429, description: "Too many wrong attempts.", type: ErrorResponse })
   async verifyRegistrationOtp(@Body() verifyOtpRequest: VerifyOtpRequest, @Res() res: Response): Promise<void> {
     const result = this.emailOtpService.verifyOtp(verifyOtpRequest.email, verifyOtpRequest.otp);
+    this.sendOtpVerifyResult(res, result);
+  }
+
+  @Post("forgot-password")
+  @ApiTags("Auth")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Email a password reset code to the user's registered email address" })
+  @ApiResponse({ status: 200, description: "Always returned, whether or not the username exists.", type: SendOtpResponse })
+  async forgotPassword(@Body() forgotPasswordRequest: ForgotPasswordRequest, @Res() res: Response): Promise<void> {
+    try {
+      const user = await this.userRepository.findByUsername(forgotPasswordRequest.username);
+      if (user) {
+        const key = passwordResetKey(user.userId);
+        const result = this.emailOtpService.requestOtp(key);
+        if (result.ok) {
+          // Not awaited, so an existing username does not answer measurably
+          // slower than an unknown one. A failed send lifts the cooldown.
+          void this.notificationService
+            .sendPasswordResetOtp(user.userId, user.email, user.userName, result.otp, Math.round(result.expiresInSeconds / 60))
+            .then((sent) => {
+              if (!sent) {
+                this.emailOtpService.cancelOtp(key);
+              }
+            });
+        }
+      }
+    } catch (error) {
+      console.error("Forgot password error:", error);
+    }
+
+    // Identical for known and unknown usernames, so the endpoint cannot be
+    // used to discover which accounts exist.
+    const settings = this.emailOtpService.getSettings();
+    const response: SendOtpResponse = {
+      message: "If an account with that username exists, a verification code has been sent to its registered email address.",
+      expiresIn: settings.expiresInSeconds,
+      resendAfter: settings.resendAfterSeconds,
+    };
+    res.status(200).json(response);
+  }
+
+  @Post("forgot-password/verify")
+  @ApiTags("Auth")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Check the password reset code and receive a reset token" })
+  @ApiResponse({ status: 200, description: "Code accepted.", type: VerifyOtpResponse })
+  @ApiResponse({ status: 400, description: "The code is wrong.", type: ErrorResponse })
+  @ApiResponse({ status: 404, description: "No code was requested.", type: ErrorResponse })
+  @ApiResponse({ status: 410, description: "The code has expired.", type: ErrorResponse })
+  @ApiResponse({ status: 429, description: "Too many wrong attempts.", type: ErrorResponse })
+  async verifyPasswordResetOtp(@Body() request: VerifyPasswordResetOtpRequest, @Res() res: Response): Promise<void> {
+    try {
+      const user = await this.userRepository.findByUsername(request.username);
+      const result: OtpVerifyResult = user
+        ? this.emailOtpService.verifyOtp(passwordResetKey(user.userId), request.otp)
+        : { ok: false, reason: "NOT_REQUESTED" };
+      this.sendOtpVerifyResult(res, result);
+    } catch (error) {
+      console.error("Verify password reset OTP error:", error);
+      const response: ErrorResponse = { errorCode: "OTP-503", message: "The code could not be verified. Please try again." };
+      res.status(503).json(response);
+    }
+  }
+
+  @Post("reset-password")
+  @ApiTags("Auth")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Set a new password using a reset token" })
+  @ApiResponse({ status: 200, description: "Password changed.", type: MessageResponse })
+  @ApiResponse({ status: 403, description: "The reset token is missing, wrong or expired.", type: ErrorResponse })
+  @ApiResponse({ status: 422, description: "Invalid input", type: ErrorResponse })
+  async resetPassword(@Body() request: ResetPasswordRequest, @Res() res: Response): Promise<void> {
+    try {
+      const user = await this.userRepository.findByUsername(request.username);
+      const key = user ? passwordResetKey(user.userId) : null;
+      if (!user || !key || !this.emailOtpService.isVerified(key, request.resetToken)) {
+        const error: ErrorResponse = {
+          errorCode: "OTP-403",
+          message: "Your password reset session is invalid or has expired. Request a new code.",
+        };
+        res.status(403).json(error);
+        return;
+      }
+
+      if (await this.passwordService.verifyPassword(request.newPassword, user.passwordHash)) {
+        const error: ErrorResponse = {
+          errorCode: "VAL-422",
+          message: "Your new password must be different from your current password.",
+        };
+        res.status(422).json(error);
+        return;
+      }
+
+      const passwordHash = await this.passwordService.hashPassword(request.newPassword);
+      await this.userRepository.updatePassword(user.userId, passwordHash);
+      this.emailOtpService.consume(key);
+      // Anyone holding an old session (possibly whoever learned the old password) is signed out.
+      await this.refreshTokenService.revokeAllRefreshTokensForUser(user.userId);
+      this.throttleService.resetThrottle(user.userName);
+
+      void this.notificationService.sendPasswordChanged(user.userId, user.email, user.userName);
+
+      const response: MessageResponse = { message: "Your password has been changed. Sign in with your new password." };
+      res.status(200).json(response);
+    } catch (error) {
+      console.error("Reset password error:", error);
+      const response: ErrorResponse = {
+        errorCode: "VAL-422",
+        message: "Your password could not be changed. Please try again.",
+      };
+      res.status(422).json(response);
+    }
+  }
+
+  private sendOtpVerifyResult(res: Response, result: OtpVerifyResult): void {
     if (result.ok) {
       const response: VerifyOtpResponse = {
         verificationToken: result.verificationToken,
@@ -184,7 +305,7 @@ export class AuthController {
         break;
       default:
         status = 404;
-        error = { errorCode: "OTP-404", message: "No verification code was requested for this email. Request a code first." };
+        error = { errorCode: "OTP-404", message: "No verification code has been requested. Request a code first." };
     }
     res.status(status).json(error);
   }

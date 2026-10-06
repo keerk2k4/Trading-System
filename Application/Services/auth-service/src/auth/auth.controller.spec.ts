@@ -93,10 +93,13 @@ describe("AuthController", () => {
       verifyOtp: jest.fn(),
       isVerified: jest.fn().mockReturnValue(true),
       consume: jest.fn(),
+      getSettings: jest.fn().mockReturnValue({ expiresInSeconds: 600, resendAfterSeconds: 60 }),
     };
     notificationService = {
       sendUserRegistered: jest.fn().mockResolvedValue(undefined),
       sendRegistrationOtp: jest.fn().mockResolvedValue(true),
+      sendPasswordResetOtp: jest.fn().mockResolvedValue(true),
+      sendPasswordChanged: jest.fn().mockResolvedValue(undefined),
     };
     tokenService = {
       createAccessToken: jest.fn(),
@@ -127,6 +130,7 @@ describe("AuthController", () => {
       create: jest.fn(),
       assignRole: jest.fn(),
       deleteById: jest.fn(),
+      updatePassword: jest.fn().mockResolvedValue(undefined),
       findByUsername: jest.fn(),
       findByUserId: jest.fn(),
       getRoles: jest.fn().mockResolvedValue([Role.CUSTOMER]),
@@ -220,6 +224,146 @@ describe("AuthController", () => {
 
       expect(state.status).toBe(status);
       expect(state.body.errorCode).toBe(errorCode);
+    });
+  });
+
+  describe("forgotPassword", () => {
+    const GENERIC_BODY = {
+      message: "If an account with that username exists, a verification code has been sent to its registered email address.",
+      expiresIn: 600,
+      resendAfter: 60,
+    };
+
+    it("emails a reset code to the registered address of a known user", async () => {
+      userRepository.findByUsername.mockResolvedValue(user);
+      emailOtpService.requestOtp.mockReturnValue({ ok: true, otp: "654321", expiresInSeconds: 600, resendAfterSeconds: 60 });
+      const { res, state } = makeResponse();
+
+      await controller.forgotPassword({ username: user.userName }, res);
+
+      expect(emailOtpService.requestOtp).toHaveBeenCalledWith(`password-reset:${USER_ID}`);
+      expect(notificationService.sendPasswordResetOtp).toHaveBeenCalledWith(USER_ID, user.email, user.userName, "654321", 10);
+      expect(state).toEqual({ status: 200, body: GENERIC_BODY });
+    });
+
+    it("answers an unknown username exactly like a known one, without sending mail", async () => {
+      userRepository.findByUsername.mockResolvedValue(null);
+      const { res, state } = makeResponse();
+
+      await controller.forgotPassword({ username: "nobody" }, res);
+
+      expect(state).toEqual({ status: 200, body: GENERIC_BODY });
+      expect(emailOtpService.requestOtp).not.toHaveBeenCalled();
+      expect(notificationService.sendPasswordResetOtp).not.toHaveBeenCalled();
+    });
+
+    it("lifts the cooldown when the reset email could not be sent", async () => {
+      userRepository.findByUsername.mockResolvedValue(user);
+      emailOtpService.requestOtp.mockReturnValue({ ok: true, otp: "654321", expiresInSeconds: 600, resendAfterSeconds: 60 });
+      notificationService.sendPasswordResetOtp.mockResolvedValue(false);
+      const { res } = makeResponse();
+
+      await controller.forgotPassword({ username: user.userName }, res);
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(emailOtpService.cancelOtp).toHaveBeenCalledWith(`password-reset:${USER_ID}`);
+    });
+  });
+
+  describe("verifyPasswordResetOtp", () => {
+    it("checks the code under the user's reset key and returns a token", async () => {
+      userRepository.findByUsername.mockResolvedValue(user);
+      emailOtpService.verifyOtp.mockReturnValue({ ok: true, verificationToken: "reset-tok", expiresInSeconds: 1800 });
+      const { res, state } = makeResponse();
+
+      await controller.verifyPasswordResetOtp({ username: user.userName, otp: "654321" }, res);
+
+      expect(emailOtpService.verifyOtp).toHaveBeenCalledWith(`password-reset:${USER_ID}`, "654321");
+      expect(state).toEqual({ status: 200, body: { verificationToken: "reset-tok", expiresIn: 1800 } });
+    });
+
+    it("returns 404 for an unknown username", async () => {
+      userRepository.findByUsername.mockResolvedValue(null);
+      const { res, state } = makeResponse();
+
+      await controller.verifyPasswordResetOtp({ username: "nobody", otp: "654321" }, res);
+
+      expect(state.status).toBe(404);
+      expect(state.body.errorCode).toBe("OTP-404");
+    });
+
+    it("returns 400 with remaining attempts for a wrong code", async () => {
+      userRepository.findByUsername.mockResolvedValue(user);
+      emailOtpService.verifyOtp.mockReturnValue({ ok: false, reason: "INVALID", attemptsRemaining: 1 });
+      const { res, state } = makeResponse();
+
+      await controller.verifyPasswordResetOtp({ username: user.userName, otp: "000000" }, res);
+
+      expect(state).toEqual({
+        status: 400,
+        body: { errorCode: "OTP-400", message: "Incorrect verification code. 1 attempt remaining." },
+      });
+    });
+  });
+
+  describe("resetPassword", () => {
+    const resetRequest = { username: "alice.trader", resetToken: "reset-tok", newPassword: "a brand new long password" };
+
+    it("changes the password, burns the token, signs out every session and emails the user", async () => {
+      userRepository.findByUsername.mockResolvedValue(user);
+      passwordService.verifyPassword.mockResolvedValue(false);
+      passwordService.hashPassword.mockResolvedValue("new-hash");
+      const { res, state } = makeResponse();
+
+      await controller.resetPassword(resetRequest, res);
+
+      expect(emailOtpService.isVerified).toHaveBeenCalledWith(`password-reset:${USER_ID}`, "reset-tok");
+      expect(userRepository.updatePassword).toHaveBeenCalledWith(USER_ID, "new-hash");
+      expect(emailOtpService.consume).toHaveBeenCalledWith(`password-reset:${USER_ID}`);
+      expect(refreshTokenService.revokeAllRefreshTokensForUser).toHaveBeenCalledWith(USER_ID);
+      expect(throttleService.resetThrottle).toHaveBeenCalledWith(user.userName);
+      expect(notificationService.sendPasswordChanged).toHaveBeenCalledWith(USER_ID, user.email, user.userName);
+      expect(state).toEqual({
+        status: 200,
+        body: { message: "Your password has been changed. Sign in with your new password." },
+      });
+    });
+
+    it("returns 403 and changes nothing for an invalid reset token", async () => {
+      userRepository.findByUsername.mockResolvedValue(user);
+      emailOtpService.isVerified.mockReturnValue(false);
+      const { res, state } = makeResponse();
+
+      await controller.resetPassword(resetRequest, res);
+
+      expect(state.status).toBe(403);
+      expect(state.body.errorCode).toBe("OTP-403");
+      expect(userRepository.updatePassword).not.toHaveBeenCalled();
+    });
+
+    it("returns 403 for an unknown username", async () => {
+      userRepository.findByUsername.mockResolvedValue(null);
+      const { res, state } = makeResponse();
+
+      await controller.resetPassword(resetRequest, res);
+
+      expect(state.status).toBe(403);
+      expect(userRepository.updatePassword).not.toHaveBeenCalled();
+    });
+
+    it("refuses to reuse the current password and keeps the token", async () => {
+      userRepository.findByUsername.mockResolvedValue(user);
+      passwordService.verifyPassword.mockResolvedValue(true);
+      const { res, state } = makeResponse();
+
+      await controller.resetPassword(resetRequest, res);
+
+      expect(state).toEqual({
+        status: 422,
+        body: { errorCode: "VAL-422", message: "Your new password must be different from your current password." },
+      });
+      expect(userRepository.updatePassword).not.toHaveBeenCalled();
+      expect(emailOtpService.consume).not.toHaveBeenCalled();
     });
   });
 

@@ -22,17 +22,27 @@ export type OtpVerifyResult =
   | { ok: false; reason: "NOT_REQUESTED" | "EXPIRED" | "TOO_MANY_ATTEMPTS" }
   | { ok: false; reason: "INVALID"; attemptsRemaining: number };
 
+// OTP key for a password reset. Prefixed so it can never collide with a
+// registration key (which is an email address).
+export function passwordResetKey(userId: string): string {
+  return `password-reset:${userId}`;
+}
+
 /**
- * One-time passcodes that prove a registering user owns their email address.
+ * One-time passcodes that prove a user controls an email address.
  *
  * Flow: requestOtp -> (code emailed) -> verifyOtp -> verificationToken ->
- * POST /auth/register carries the token, which consume() checks and burns.
+ * the follow-up request carries the token, which isVerified() checks and
+ * consume() burns. Used by:
+ * - registration: identifier = the email being registered;
+ * - password reset: identifier = passwordResetKey(userId), so a reset code
+ *   can never be mistaken for a registration code or vice versa.
  *
  * - Codes and tokens are stored only as SHA-256 hashes and compared in
  *   constant time; the plaintext never stays in memory after it is returned.
  * - In memory, like ThrottleService: a restart simply means the user asks
  *   for a new code. Swap for Redis/Postgres when running more than one replica.
- * - Keys are the lower-cased, trimmed email so "A@x.com" and "a@x.com" match.
+ * - Keys are the lower-cased, trimmed identifier so "A@x.com" and "a@x.com" match.
  */
 @Injectable()
 export class EmailOtpService {
@@ -45,8 +55,8 @@ export class EmailOtpService {
   private otps = new Map<string, OtpEntry>();
   private verified = new Map<string, VerifiedEntry>();
 
-  requestOtp(email: string): OtpRequestResult {
-    const key = this.key(email);
+  requestOtp(identifier: string): OtpRequestResult {
+    const key = this.key(identifier);
     const now = Date.now();
     this.purgeExpired(now);
 
@@ -77,14 +87,18 @@ export class EmailOtpService {
     };
   }
 
-  // Lets the caller undo a request whose email could not be sent, so the
-  // user is not stuck behind the resend cooldown for a code they never got.
-  cancelOtp(email: string): void {
-    this.otps.delete(this.key(email));
+  getSettings(): { expiresInSeconds: number; resendAfterSeconds: number } {
+    return { expiresInSeconds: this.OTP_TTL_MS / 1000, resendAfterSeconds: this.RESEND_COOLDOWN_MS / 1000 };
   }
 
-  verifyOtp(email: string, otp: string): OtpVerifyResult {
-    const key = this.key(email);
+  // Lets the caller undo a request whose email could not be sent, so the
+  // user is not stuck behind the resend cooldown for a code they never got.
+  cancelOtp(identifier: string): void {
+    this.otps.delete(this.key(identifier));
+  }
+
+  verifyOtp(identifier: string, otp: string): OtpVerifyResult {
+    const key = this.key(identifier);
     const now = Date.now();
     const entry = this.otps.get(key);
 
@@ -121,11 +135,11 @@ export class EmailOtpService {
 
   // True when the token was issued by verifyOtp for exactly this email and
   // has not expired or been consumed. Does not burn the token.
-  isVerified(email: string, verificationToken: string | undefined | null): boolean {
+  isVerified(identifier: string, verificationToken: string | undefined | null): boolean {
     if (!verificationToken) {
       return false;
     }
-    const key = this.key(email);
+    const key = this.key(identifier);
     const entry = this.verified.get(key);
     if (!entry) {
       return false;
@@ -138,12 +152,12 @@ export class EmailOtpService {
   }
 
   // Burns the token once registration has succeeded, so it cannot create a second account.
-  consume(email: string): void {
-    this.verified.delete(this.key(email));
+  consume(identifier: string): void {
+    this.verified.delete(this.key(identifier));
   }
 
-  private key(email: string): string {
-    return email.trim().toLowerCase();
+  private key(identifier: string): string {
+    return identifier.trim().toLowerCase();
   }
 
   private hash(value: string): Buffer {

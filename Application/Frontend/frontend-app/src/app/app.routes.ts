@@ -21,6 +21,12 @@ export const routes: Routes = [
     title: 'Sign in · Trading Platform',
     loadComponent: () => import('./features/auth/login/login.component').then((m) => m.LoginComponent)
   },
+  {
+    path: 'forgot-password',
+    title: 'Reset password · Trading Platform',
+    loadComponent: () =>
+      import('./features/auth/forgot-password/forgot-password.component').then((m) => m.ForgotPasswordComponent)
+  },
   // isAdmin tells LoginComponent to call POST /auth/admin/login instead of
   // POST /auth/login - the real backend treats these as separate endpoints.
   {

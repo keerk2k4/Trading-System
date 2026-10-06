@@ -9,7 +9,7 @@ import { AUTH_API_BASE_URL, TRADE_API_BASE_URL } from '../api/api-clients';
 // Auth-service endpoints that are called without a session. They must never
 // carry a bearer token, and a 401 from them is a real answer, not an expired
 // access token.
-const PUBLIC_AUTH_PATHS = ['/auth/login', '/auth/admin/login', '/auth/register', '/auth/register/otp', '/auth/register/otp/verify', '/auth/refresh', '/auth/logout'];
+const PUBLIC_AUTH_PATHS = ['/auth/login', '/auth/admin/login', '/auth/register', '/auth/register/otp', '/auth/register/otp/verify', '/auth/forgot-password', '/auth/forgot-password/verify', '/auth/reset-password', '/auth/refresh', '/auth/logout'];
 
 function needsBearerToken(url: string): boolean {
   if (url.startsWith(`${TRADE_API_BASE_URL}/`)) {

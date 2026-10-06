@@ -71,6 +71,11 @@ import { safeReturnUrl } from '../../../shared/guards/safe-return-url';
           @if (passwordError(); as message) {
             <p class="tp-field-error" id="login-password-error" data-testid="login-password-error">{{ message }}</p>
           }
+          @if (!isAdminLogin) {
+            <p class="tp-hint">
+              <a class="tp-link" routerLink="/forgot-password" data-testid="login-forgot-password-link">Forgot password?</a>
+            </p>
+          }
         </div>
 
         <button

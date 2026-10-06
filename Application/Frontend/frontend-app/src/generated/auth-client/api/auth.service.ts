@@ -19,11 +19,17 @@ import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 // @ts-ignore
 import { ErrorResponse } from '../model/error-response';
 // @ts-ignore
+import { ForgotPasswordRequest } from '../model/forgot-password-request';
+// @ts-ignore
 import { LoginRequest } from '../model/login-request';
+// @ts-ignore
+import { MessageResponse } from '../model/message-response';
 // @ts-ignore
 import { RefreshRequest } from '../model/refresh-request';
 // @ts-ignore
 import { RegisterRequest } from '../model/register-request';
+// @ts-ignore
+import { ResetPasswordRequest } from '../model/reset-password-request';
 // @ts-ignore
 import { SendOtpRequest } from '../model/send-otp-request';
 // @ts-ignore
@@ -36,6 +42,8 @@ import { UserResponse } from '../model/user-response';
 import { VerifyOtpRequest } from '../model/verify-otp-request';
 // @ts-ignore
 import { VerifyOtpResponse } from '../model/verify-otp-response';
+// @ts-ignore
+import { VerifyPasswordResetOtpRequest } from '../model/verify-password-reset-otp-request';
 
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS }                     from '../variables';
@@ -51,6 +59,73 @@ export class AuthService extends BaseService {
 
     constructor(protected httpClient: HttpClient, @Optional() @Inject(BASE_PATH) basePath: string|string[], @Optional() configuration?: Configuration) {
         super(basePath, configuration);
+    }
+
+    /**
+     * Email a password reset code to the user\&#39;s registered email address
+     * Looks the user up by username and emails a 6-digit code to the address given at registration. Same code rules as &#x60;/auth/register/otp&#x60; (10 minutes, five attempts, 60-second resend cooldown).  The response is identical whether or not the username exists, and the email is sent in the background, so the endpoint cannot be used to discover which usernames are registered. 
+     * @endpoint post /auth/forgot-password
+     * @param forgotPasswordRequest 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public forgotPassword(forgotPasswordRequest: ForgotPasswordRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<SendOtpResponse>;
+    public forgotPassword(forgotPasswordRequest: ForgotPasswordRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<SendOtpResponse>>;
+    public forgotPassword(forgotPasswordRequest: ForgotPasswordRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<SendOtpResponse>>;
+    public forgotPassword(forgotPasswordRequest: ForgotPasswordRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (forgotPasswordRequest === null || forgotPasswordRequest === undefined) {
+            throw new Error('Required parameter forgotPasswordRequest was null or undefined when calling forgotPassword.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/auth/forgot-password`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<SendOtpResponse>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: forgotPasswordRequest,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
     }
 
     /**
@@ -456,6 +531,73 @@ export class AuthService extends BaseService {
     }
 
     /**
+     * Set a new password using a reset token
+     * Replaces the password, burns the reset token, revokes every refresh token for the user (so all existing sessions end) and emails a \&quot;password changed\&quot; notice. Does not sign the user in; the client logs in afterwards. 
+     * @endpoint post /auth/reset-password
+     * @param resetPasswordRequest 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public resetPassword(resetPasswordRequest: ResetPasswordRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<MessageResponse>;
+    public resetPassword(resetPasswordRequest: ResetPasswordRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<MessageResponse>>;
+    public resetPassword(resetPasswordRequest: ResetPasswordRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<MessageResponse>>;
+    public resetPassword(resetPasswordRequest: ResetPasswordRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (resetPasswordRequest === null || resetPasswordRequest === undefined) {
+            throw new Error('Required parameter resetPasswordRequest was null or undefined when calling resetPassword.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/auth/reset-password`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<MessageResponse>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: resetPasswordRequest,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
      * Email a one-time code to verify the address before registering
      * Emails a 6-digit code to the address. The code is valid for 10 minutes and allows five attempts. Another code for the same address can be requested after 60 seconds; a new code replaces the previous one. The code itself is never returned in the response. 
      * @endpoint post /auth/register/otp
@@ -512,6 +654,73 @@ export class AuthService extends BaseService {
             {
                 context: localVarHttpContext,
                 body: sendOtpRequest,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Check the password reset code and receive a reset token
+     * On success returns a single-use &#x60;verificationToken&#x60;, valid for 30 minutes, to send as &#x60;resetToken&#x60; on &#x60;POST /auth/reset-password&#x60;. Errors match &#x60;/auth/register/otp/verify&#x60;; an unknown username gets the same &#x60;404 OTP-404&#x60; as a username with no pending code. 
+     * @endpoint post /auth/forgot-password/verify
+     * @param verifyPasswordResetOtpRequest 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public verifyPasswordResetOtp(verifyPasswordResetOtpRequest: VerifyPasswordResetOtpRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<VerifyOtpResponse>;
+    public verifyPasswordResetOtp(verifyPasswordResetOtpRequest: VerifyPasswordResetOtpRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<VerifyOtpResponse>>;
+    public verifyPasswordResetOtp(verifyPasswordResetOtpRequest: VerifyPasswordResetOtpRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<VerifyOtpResponse>>;
+    public verifyPasswordResetOtp(verifyPasswordResetOtpRequest: VerifyPasswordResetOtpRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (verifyPasswordResetOtpRequest === null || verifyPasswordResetOtpRequest === undefined) {
+            throw new Error('Required parameter verifyPasswordResetOtpRequest was null or undefined when calling verifyPasswordResetOtp.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/auth/forgot-password/verify`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<VerifyOtpResponse>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: verifyPasswordResetOtpRequest,
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,

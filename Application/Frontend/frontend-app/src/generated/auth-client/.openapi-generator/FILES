@@ -12,13 +12,16 @@ git_push.sh
 index.ts
 model/create-kyc-request.ts
 model/error-response.ts
+model/forgot-password-request.ts
 model/kyc-response.ts
 model/kyc-review-status.ts
 model/kyc-status.ts
 model/login-request.ts
+model/message-response.ts
 model/models.ts
 model/refresh-request.ts
 model/register-request.ts
+model/reset-password-request.ts
 model/role.ts
 model/send-otp-request.ts
 model/send-otp-response.ts
@@ -27,6 +30,7 @@ model/update-kyc-request.ts
 model/user-response.ts
 model/verify-otp-request.ts
 model/verify-otp-response.ts
+model/verify-password-reset-otp-request.ts
 param.ts
 provide-api.ts
 query.params.ts

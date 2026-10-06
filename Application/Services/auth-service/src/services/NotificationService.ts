@@ -50,8 +50,7 @@ export class NotificationService {
    * without a mail server. In production a missing SMTP_HOST is a failure.
    */
   async sendRegistrationOtp(email: string, otp: string, expiresInMinutes: number): Promise<boolean> {
-    if (!this.transporter && process.env.NODE_ENV !== "production" && this.hasDeliverableAddress(email)) {
-      console.warn(`[DEV ONLY] SMTP_HOST not configured. Registration OTP: ${otp}`);
+    if (this.printOtpInDev(email, "Registration", otp)) {
       return true;
     }
 
@@ -64,6 +63,43 @@ export class NotificationService {
         `Your verification code is: ${otp}\n\n` +
         `It expires in ${expiresInMinutes} minutes. Enter it on the registration page to verify your email address.\n\n` +
         "If you did not try to create an account, you can ignore this email.\n\n" +
+        "Enterprise Trading Platform",
+    });
+  }
+
+  // Same delivery rules as sendRegistrationOtp, sent to the address on file.
+  async sendPasswordResetOtp(
+    userId: string,
+    email: string,
+    username: string,
+    otp: string,
+    expiresInMinutes: number,
+  ): Promise<boolean> {
+    if (this.printOtpInDev(email, `Password reset (user ${userId})`, otp)) {
+      return true;
+    }
+
+    return this.send(userId, {
+      to: email,
+      subject: "Your Enterprise Trading Platform password reset code",
+      text:
+        `Hello ${username},\n\n` +
+        "We received a request to reset the password for your account.\n\n" +
+        `Your verification code is: ${otp}\n\n` +
+        `It expires in ${expiresInMinutes} minutes. Enter it on the password reset page to choose a new password.\n\n` +
+        "If you did not request a password reset, you can ignore this email; your password will not change.\n\n" +
+        "Enterprise Trading Platform",
+    });
+  }
+
+  async sendPasswordChanged(userId: string, email: string, username: string): Promise<void> {
+    await this.send(userId, {
+      to: email,
+      subject: "Your password has been changed",
+      text:
+        `Hello ${username},\n\n` +
+        "The password for your account was just changed and all existing sessions were signed out.\n\n" +
+        "If you did not make this change, contact support immediately.\n\n" +
         "Enterprise Trading Platform",
     });
   }
@@ -116,6 +152,15 @@ export class NotificationService {
         "Please contact support if you have any questions.\n\n" +
         "Enterprise Trading Platform",
     });
+  }
+
+  // Local development without a mail server: print the code instead of sending it.
+  private printOtpInDev(email: string, label: string, otp: string): boolean {
+    if (this.transporter || process.env.NODE_ENV === "production" || !this.hasDeliverableAddress(email)) {
+      return false;
+    }
+    console.warn(`[DEV ONLY] SMTP_HOST not configured. ${label} OTP: ${otp}`);
+    return true;
   }
 
   // Resolves true only when the SMTP server accepted the message.

@@ -5,6 +5,7 @@ import {
   AuthResponse,
   ErrorResponse,
   LoginRequest,
+  MessageResponseData,
   RegisterRequest,
   SendOtpResponseData,
   TokenPayload,
@@ -84,6 +85,30 @@ export class MockAuthService {
   verifyRegistrationOtp(email: string, otp: string): Observable<VerifyOtpResponseData> {
     return this.authApi
       .verifyRegistrationOtp({ email, otp })
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // Real backend: POST /auth/forgot-password -> { message, expiresIn, resendAfter }.
+  // The answer is the same whether or not the username exists; the code goes
+  // to the email address given at registration.
+  requestPasswordReset(username: string): Observable<SendOtpResponseData> {
+    return this.authApi
+      .forgotPassword({ username })
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // Real backend: POST /auth/forgot-password/verify -> { verificationToken, expiresIn }.
+  verifyPasswordResetOtp(username: string, otp: string): Observable<VerifyOtpResponseData> {
+    return this.authApi
+      .verifyPasswordResetOtp({ username, otp })
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // Real backend: POST /auth/reset-password -> { message }. Ends every
+  // existing session for the user; it does not sign them in.
+  resetPassword(username: string, resetToken: string, newPassword: string): Observable<MessageResponseData> {
+    return this.authApi
+      .resetPassword({ username, resetToken, newPassword })
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
