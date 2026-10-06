@@ -15,6 +15,20 @@ const DOCUMENT_TYPES = [
   { value: 'PAN', label: 'PAN card' }
 ];
 
+// Today as YYYY-MM-DD in the user's local time zone (the format <input type="date"> uses).
+function todayIso(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+// The picker's max attribute greys out future days, but a date can still be
+// typed in, so the value is checked as well. ISO dates compare as strings.
+function notInFutureValidator(control: AbstractControl): ValidationErrors | null {
+  const value = control.value as string | null;
+  return value && value > todayIso() ? { futureDate: true } : null;
+}
+
 function minimumAgeValidator(minimumAge: number): ValidatorFn {
   return (control: AbstractControl): ValidationErrors | null => {
     const value = control.value as string | null;
@@ -98,6 +112,7 @@ function minimumAgeValidator(minimumAge: number): ValidatorFn {
                     data-testid="kyc-dob"
                     type="date"
                     formControlName="dateOfBirth"
+                    [max]="maxDateOfBirth"
                     autocomplete="bday"
                     aria-required="true"
                     [attr.aria-invalid]="showError('dateOfBirth') ? 'true' : null"
@@ -234,8 +249,9 @@ export class KycFormComponent implements OnInit {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   protected readonly documentTypes = DOCUMENT_TYPES;
+  protected readonly maxDateOfBirth = todayIso();
   protected readonly form = inject(NonNullableFormBuilder).group({
-    dateOfBirth: ['', [Validators.required, minimumAgeValidator(18)]],
+    dateOfBirth: ['', [Validators.required, notInFutureValidator, minimumAgeValidator(18)]],
     documentType: ['', Validators.required],
     documentNumber: ['', Validators.required]
   });
@@ -297,6 +313,9 @@ export class KycFormComponent implements OnInit {
     if (control.hasError('required')) {
       return 'Enter your date of birth.';
     }
+    if (control.hasError('futureDate')) {
+      return 'Date of birth cannot be a future date. Select today or an earlier date.';
+    }
     if (control.hasError('minimumAge')) {
       return 'You must be at least 18 years old.';
     }
@@ -335,9 +354,11 @@ export class KycFormComponent implements OnInit {
           this.kycStatus.set(kyc.status);
           this.rejectionReason = kyc.rejectionReason ?? '';
         },
-        error: (err: { errorCode?: string }) => {
+        error: (err: { errorCode?: string; message?: string }) => {
           this.isLoading.set(false);
-          this.errorMessage.set(this.errorMapping.getErrorMessage(err.errorCode ?? ''));
+          // The backend's date-of-birth refusals carry a specific, user-facing message.
+          const specific = err.errorCode === 'VAL-422' && err.message && err.message !== 'Invalid input';
+          this.errorMessage.set(specific ? err.message! : this.errorMapping.getErrorMessage(err.errorCode ?? ''));
         }
       });
   }

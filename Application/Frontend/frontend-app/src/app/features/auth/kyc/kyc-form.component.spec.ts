@@ -72,6 +72,26 @@ describe('KycFormComponent', () => {
     expect(page.querySelector('[data-testid="dob-error"]')?.textContent).toContain('at least 18 years old');
   });
 
+  it('disables future dates in the date picker', () => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+    expect(page.querySelector<HTMLInputElement>('#dob')!.max).toBe(today);
+  });
+
+  it('blocks a typed future date of birth with a clear message', () => {
+    set('dob', `${new Date().getFullYear() + 1}-01-01`);
+    set('docType', 'PASSPORT', 'change');
+    set('docNum', 'PS123456789');
+    submit();
+
+    expect(kyc.submitKyc).not.toHaveBeenCalled();
+    expect(page.querySelector('[data-testid="dob-error"]')?.textContent?.trim()).toBe(
+      'Date of birth cannot be a future date. Select today or an earlier date.'
+    );
+  });
+
   it('shows a rejected marker on step 2 when KYC is rejected', () => {
     kyc.getCurrentUserKyc.and.returnValue(
       of({

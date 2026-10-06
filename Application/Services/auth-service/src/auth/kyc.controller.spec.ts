@@ -112,6 +112,55 @@ describe("KycController", () => {
     );
   });
 
+  describe("future date of birth", () => {
+    const FUTURE_DOB_ERROR = {
+      errorCode: "VAL-422",
+      message: "Date of birth cannot be a future date. Select today or an earlier date.",
+    };
+    const nextYear = `${new Date().getUTCFullYear() + 1}-01-01`;
+
+    it("refuses a KYC submission dated in the future and stores nothing", async () => {
+      const { res, state } = makeResponse();
+
+      await controller.createKyc(
+        { sub: USER_ID, roles: ["CUSTOMER"] } as any,
+        { dateOfBirth: nextYear, documentType: "PASSPORT", documentNumber: "P1234567" },
+        res,
+      );
+
+      expect(state).toEqual({ status: 422, body: FUTURE_DOB_ERROR });
+      expect(kycRepository.createSubmission).not.toHaveBeenCalled();
+    });
+
+    it("refuses a KYC update dated in the future and changes nothing", async () => {
+      const { res, state } = makeResponse();
+
+      await controller.updateMyKyc(
+        { sub: USER_ID, roles: ["CUSTOMER"] } as any,
+        { dateOfBirth: nextYear, documentType: "PASSPORT", documentNumber: "P1234567" },
+        res,
+      );
+
+      expect(state).toEqual({ status: 422, body: FUTURE_DOB_ERROR });
+      expect(kycRepository.updateSubmissionByUserId).not.toHaveBeenCalled();
+    });
+
+    it("accepts today's date", async () => {
+      kycRepository.findByUserId.mockResolvedValue(null);
+      userRepository.findByUserId.mockResolvedValue(applicant as any);
+      kycRepository.createSubmission.mockResolvedValue(kycRow);
+      const { res, state } = makeResponse();
+
+      await controller.createKyc(
+        { sub: USER_ID, roles: ["CUSTOMER"] } as any,
+        { dateOfBirth: new Date().toISOString().slice(0, 10), documentType: "PASSPORT", documentNumber: "P1234567" },
+        res,
+      );
+
+      expect(state.status).toBe(201);
+    });
+  });
+
   it("gets the current customer's submitted KYC", async () => {
     kycRepository.findByUserId.mockResolvedValue(kycRow);
     const { res, state } = makeResponse();

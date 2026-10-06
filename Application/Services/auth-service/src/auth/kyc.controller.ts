@@ -108,6 +108,10 @@ export class KycController {
         return;
       }
 
+      if (this.rejectFutureDateOfBirth(request.dateOfBirth, res)) {
+        return;
+      }
+
       const existing = await this.kycRepository.findByUserId(claims.sub);
       if (existing) {
         const response: ErrorResponse = {
@@ -171,6 +175,10 @@ export class KycController {
       if (!hasCustomerRole || hasAdminRole) {
         const response: ErrorResponse = { errorCode: "AUTH-403", message: "Forbidden" };
         res.status(403).json(response);
+        return;
+      }
+
+      if (this.rejectFutureDateOfBirth(request.dateOfBirth, res)) {
         return;
       }
 
@@ -338,6 +346,22 @@ export class KycController {
     } catch (error) {
       console.error(`KYC review notification failed for user ${userId}:`, (error as Error)?.message);
     }
+  }
+
+  // Refuses a date of birth after today. "Today" is taken in the most advanced
+  // time zone (UTC+14), so a user whose local date is already ahead of the
+  // server's is never refused for picking their own today.
+  private rejectFutureDateOfBirth(dateOfBirth: string, res: Response): boolean {
+    const latestToday = new Date(Date.now() + 14 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    if (dateOfBirth.slice(0, 10) <= latestToday) {
+      return false;
+    }
+    const response: ErrorResponse = {
+      errorCode: "VAL-422",
+      message: "Date of birth cannot be a future date. Select today or an earlier date.",
+    };
+    res.status(422).json(response);
+    return true;
   }
 
   private toKycResponse(row: {
