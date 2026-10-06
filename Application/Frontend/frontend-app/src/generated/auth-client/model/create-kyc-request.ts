@@ -11,10 +11,16 @@
 
 export interface CreateKycRequest { 
     /**
-     * ISO 8601 calendar date.
+     * ISO 8601 calendar date. Must not be in the future, otherwise `422 VAL-422` with the message \"Date of birth cannot be a future date. Select today or an earlier date.\" Stored AES-256-GCM encrypted at rest. 
      */
     dateOfBirth: string;
+    /**
+     * Stored AES-256-GCM encrypted at rest.
+     */
     documentType: string;
+    /**
+     * Document type + number must be unique across users: one already submitted by another user is refused with `409 DOC-409`. Compared ignoring case, spaces and punctuation (`p 123-4567` equals `P1234567`); the same number under a different document type is allowed. Stored AES-256-GCM encrypted at rest; uniqueness is checked through a keyed lookup hash, never the number itself. 
+     */
     documentNumber: string;
 }
 

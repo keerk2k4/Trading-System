@@ -17,11 +17,14 @@ export interface RegisterRequest {
      */
     password: string;
     /**
-     * Address for notification emails (registration, KYC submitted, KYC approved or rejected). Never returned in any response and never logged. 
+     * Address for notification emails (registration, KYC submitted, KYC approved or rejected). Never returned in any response and never logged. Stored AES-256-GCM encrypted at rest. 
      */
     email: string;
     firstName: string;
     lastName: string;
+    /**
+     * Unique across accounts: a number already registered is refused with `409 PHONE-409`. Numbers are compared by digits only, so `+91 98765-43210` and `919876543210` are the same number. Stored AES-256-GCM encrypted at rest; uniqueness is checked through a keyed lookup hash, never the number itself. 
+     */
     phone: string;
     /**
      * Token from `POST /auth/register/otp/verify`. Required by `/auth/register`; ignored by `/auth/admin/register`. 
