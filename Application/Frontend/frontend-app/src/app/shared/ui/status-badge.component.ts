@@ -10,11 +10,15 @@ const TONES: Record<string, Tone> = {
   PENDING: 'warning',
   REJECTED: 'negative',
   SUSPENDED: 'negative',
-  CLOSED: 'negative'
+  CLOSED: 'negative',
+  // Service health
+  UP: 'positive',
+  DEGRADED: 'warning',
+  DOWN: 'negative'
 };
 
 /**
- * Status pill for order, KYC and account states. The label is the status in
+ * Status pill for order, KYC, account and service-health states. The label is the status in
  * words ("PARTIALLY_FILLED" -> "Partially filled"), so colour is never the
  * only cue.
  */

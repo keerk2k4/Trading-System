@@ -9,7 +9,10 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.Date;
+import java.util.List;
+import java.util.Locale;
 
 /**
  * JWT token validation utility.
@@ -27,6 +30,7 @@ public class JwtTokenProvider {
     private static final Logger LOGGER = LoggerFactory.getLogger(JwtTokenProvider.class);
     private static final String ALGORITHM = "HS256";
     private static final String ACCOUNT_ID_CLAIM = "accountId";
+    private static final String ROLES_CLAIM = "roles";
     
     private final SecretKey secretKey;
     
@@ -51,6 +55,62 @@ public class JwtTokenProvider {
      * @return The account ID from the token, or null if validation fails
      */
     public Long extractAccountId(String token) {
+        Claims claims = verifiedClaims(token);
+        if (claims == null) {
+            return null;
+        }
+
+        Object accountIdObj = claims.get(ACCOUNT_ID_CLAIM);
+        if (accountIdObj == null) {
+            LOGGER.warn("Token missing {} claim", ACCOUNT_ID_CLAIM);
+            return null;
+        }
+
+        if (accountIdObj instanceof Integer) {
+            return ((Integer) accountIdObj).longValue();
+        } else if (accountIdObj instanceof Long) {
+            return (Long) accountIdObj;
+        } else {
+            LOGGER.warn("Invalid {} claim type: {}", ACCOUNT_ID_CLAIM, accountIdObj.getClass());
+            return null;
+        }
+    }
+
+    /**
+     * Extracts the roles claim from a JWT token, after the same validation as
+     * {@link #extractAccountId(String)}. Roles are returned uppercase.
+     *
+     * <p>Auth Service puts {@code roles} on every access token: customers carry
+     * {@code CUSTOMER}, admins carry {@code ADMIN} (with {@code accountId} 0).
+     *
+     * @param token The JWT token string (without "Bearer " prefix)
+     * @return The roles from the token; empty if validation fails or there are none
+     */
+    public List<String> extractRoles(String token) {
+        Claims claims = verifiedClaims(token);
+        if (claims == null) {
+            return List.of();
+        }
+
+        Object rolesObj = claims.get(ROLES_CLAIM);
+        if (rolesObj instanceof Collection<?> roles) {
+            return roles.stream()
+                    .filter(String.class::isInstance)
+                    .map(role -> ((String) role).trim().toUpperCase(Locale.ROOT))
+                    .toList();
+        }
+        if (rolesObj instanceof String role) {
+            return List.of(role.trim().toUpperCase(Locale.ROOT));
+        }
+        return List.of();
+    }
+
+    /**
+     * Verifies signature, expiry and algorithm, in that order.
+     *
+     * @return the token's claims, or null if any check fails
+     */
+    private Claims verifiedClaims(String token) {
         try {
             // Parse and verify signature (step 1)
             // This throws JwtException if signature is invalid or token is malformed
@@ -75,22 +135,8 @@ public class JwtTokenProvider {
                 LOGGER.warn("Token uses wrong algorithm: {} (expected {})", algorithm, ALGORITHM);
                 return null;
             }
-            
-            // Extract account ID claim
-            Object accountIdObj = claims.get(ACCOUNT_ID_CLAIM);
-            if (accountIdObj == null) {
-                LOGGER.warn("Token missing {} claim", ACCOUNT_ID_CLAIM);
-                return null;
-            }
-            
-            if (accountIdObj instanceof Integer) {
-                return ((Integer) accountIdObj).longValue();
-            } else if (accountIdObj instanceof Long) {
-                return (Long) accountIdObj;
-            } else {
-                LOGGER.warn("Invalid {} claim type: {}", ACCOUNT_ID_CLAIM, accountIdObj.getClass());
-                return null;
-            }
+
+            return claims;
             
         } catch (io.jsonwebtoken.security.SecurityException e) {
             LOGGER.warn("Invalid JWT signature: {}", e.getMessage());

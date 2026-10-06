@@ -18,6 +18,7 @@ import { KycSubmission } from '../../shared/models/kyc.models';
           <p>Signed in as {{ user()?.username }}. Review customer verification requests.</p>
         </div>
         <div class="tp-actions">
+          <a class="tp-btn tp-btn-secondary" routerLink="/admin/health" data-testid="admin-open-health">Service health</a>
           <a class="tp-btn tp-btn-primary" routerLink="/admin/kyc-review" data-testid="admin-open-review">Open KYC review</a>
         </div>
       </header>

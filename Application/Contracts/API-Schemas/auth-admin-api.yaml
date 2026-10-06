@@ -1,0 +1,179 @@
+openapi: 3.1.0
+
+info:
+  title: Auth Service, health routes
+  version: 1.0.0
+  summary: The Auth service's own health, for monitors and for the admin dashboard.
+  description: |
+    Written by the team. The programme's `auth-api.yaml` is left untouched; these routes live on
+    the same service and port, and the Angular UI generates its typed client from this file.
+
+    ## Two views of one check
+
+    `GET /health` is public and answers only `UP` or `DOWN`, because load balancers, Docker and
+    uptime monitors call it without a token. It reveals nothing else.
+
+    `GET /health/details` is for the admin dashboard and needs a token whose `roles` claim
+    contains `ADMIN`: what is wrong, not just that something is.
+
+    Both check the service's own database with `SELECT 1`, limited to 2 seconds, and reuse the
+    answer for 5 seconds so a flood of calls never reaches the database.
+  license:
+    name: Instructional use only
+
+servers:
+  - url: http://localhost:3000
+    description: Local development.
+  - url: http://auth-service:3000
+    description: Service name inside the Docker Compose network.
+
+tags:
+  - name: Health
+    description: The service's own status.
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      summary: Service status for load balancers and monitors (public, status only)
+      security: []
+      responses:
+        '200':
+          description: The service and its database are up.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicHealthResponse'
+              example:
+                status: UP
+        '503':
+          description: The service is running but its database is not answering.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicHealthResponse'
+              example:
+                status: DOWN
+
+  /health/details:
+    get:
+      tags: [Health]
+      operationId: getHealthDetails
+      summary: Detailed service status (admin only)
+      description: |
+        Always 200 for an admin: a component that is down is part of the report, not a failed
+        request.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The status of each component.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthDetailsResponse'
+              example:
+                status: UP
+                checkedAt: '2026-10-06T10:00:00.000Z'
+                uptimeSeconds: 86400
+                components:
+                  database:
+                    status: UP
+                    responseMs: 4
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: An access token issued by `/auth/admin/login`.
+
+  responses:
+    Unauthorised:
+      description: Missing, malformed, expired or wrongly signed token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            errorCode: AUTH-401
+            message: Unauthorised
+    Forbidden:
+      description: A valid token without the `ADMIN` role.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            errorCode: AUTH-403
+            message: Forbidden
+
+  schemas:
+
+    HealthStatus:
+      type: string
+      enum: [UP, DOWN]
+
+    PublicHealthResponse:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/HealthStatus'
+
+    HealthDetailsResponse:
+      type: object
+      additionalProperties: false
+      required: [status, checkedAt, uptimeSeconds, components]
+      properties:
+        status:
+          $ref: '#/components/schemas/HealthStatus'
+        checkedAt:
+          type: string
+          format: date-time
+        uptimeSeconds:
+          type: integer
+          minimum: 0
+          description: How long this process has been running.
+        components:
+          type: object
+          additionalProperties: false
+          required: [database]
+          properties:
+            database:
+              $ref: '#/components/schemas/DatabaseHealth'
+
+    DatabaseHealth:
+      type: object
+      additionalProperties: false
+      required: [status, responseMs]
+      properties:
+        status:
+          $ref: '#/components/schemas/HealthStatus'
+        responseMs:
+          type: [integer, 'null']
+          description: How long `SELECT 1` took; null when there was no answer.
+        detail:
+          type: string
+          description: |
+            Present when the database is down. A fixed sentence, never the driver's error text.
+          example: No response within 2 s
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [errorCode, message]
+      properties:
+        errorCode:
+          type: string
+          enum: [AUTH-401, AUTH-403]
+        message:
+          type: string

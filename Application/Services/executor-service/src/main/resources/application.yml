@@ -62,9 +62,43 @@ app:
     poll-interval-ms: ${POLL_INTERVAL_SECONDS:30000}
     min-interval-ms: 30000
 
+# Health: only the health endpoint is exposed. /actuator/health answers UP or
+# DOWN only, for load balancers and container restarts. It covers the database
+# and Kafka (kafka/KafkaHealthIndicator). The Trade API reads the dependencies
+# group below to build the admin dashboard's service-health view; the browser
+# never calls this service. Answers are cached briefly so repeated calls do
+# not each open a broker connection.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+      cache:
+        time-to-live: 5s
+      probes:
+        enabled: true
+      # /actuator/health/dependencies names which dependency is failing
+      # (db, kafka) with UP/DOWN only, no details, so the Trade API can report
+      # "running, but can't reach Kafka" rather than "down". It is read service
+      # to service only; this executor serves nothing to browsers.
+      group:
+        dependencies:
+          include: db,kafka
+          show-components: always
+          show-details: never
+
 # Logging Configuration
 logging:
   level:
     root: INFO
+    # Each Kafka health check opens a short-lived admin client, and the Kafka
+    # library logs its whole configuration and version at INFO every time.
+    # Kept to warnings; connection failures still appear.
+    org.apache.kafka.clients.admin.AdminClientConfig: WARN
+    org.apache.kafka.common.utils.AppInfoParser: WARN
     com.tradeexecutor: DEBUG
 

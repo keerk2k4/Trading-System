@@ -47,6 +47,24 @@ describe('authTokenInterceptor', () => {
     req.flush({});
   });
 
+  it('sends the public auth health check without a bearer token', () => {
+    const url = `${AUTH_API_BASE_URL}/health`;
+    http.get(url).subscribe();
+
+    const req = backend.expectOne(url);
+    expect(req.request.headers.has('Authorization')).toBe(false);
+    req.flush({ status: 'UP' });
+  });
+
+  it('adds the bearer token to the admin-only auth health details', () => {
+    const url = `${AUTH_API_BASE_URL}/health/details`;
+    http.get(url).subscribe();
+
+    const req = backend.expectOne(url);
+    expect(req.request.headers.get('Authorization')).toBe(`Bearer ${TOKEN}`);
+    req.flush({});
+  });
+
   it('never sends the bearer token to a third-party origin', () => {
     const url = 'https://market-data.example.com/v1/quotes?symbol=AAPL';
     http.get(url).subscribe();

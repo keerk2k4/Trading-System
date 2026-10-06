@@ -1,0 +1,186 @@
+openapi: 3.1.0
+
+info:
+  title: Trade REST API, admin routes
+  version: 1.0.0
+  summary: Admin-only views of the platform, served by the Trade REST API.
+  description: |
+    Written by the team for the admin dashboard. The programme's `trade-api.yaml` is left
+    untouched; these routes live on the same service, port and token verification, and the
+    Angular UI generates its typed admin client from this file in the same way.
+
+    ## Authorisation
+
+    Every route requires a valid signed JWT in the `Authorization` header, verified exactly as
+    for `trade-api.yaml`, and its `roles` claim must contain `ADMIN`.
+
+    | Caller | Answer |
+    |---|---|
+    | No token, or a missing, malformed, expired or wrongly signed one | `AUTH-401`, 401 |
+    | A valid token without the `ADMIN` role, such as any customer's | `AUTH-403`, 403 |
+
+    The Angular route guard on the admin pages is a usability control. This check is the
+    security control.
+  license:
+    name: Instructional use only
+
+servers:
+  - url: http://trade-api:8080
+    description: Service name inside the Docker Compose network
+  - url: http://localhost:8080
+    description: Local development, run from Docker Compose
+
+tags:
+  - name: Admin
+    description: Admin-only views of the platform.
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/v1/admin/health:
+    get:
+      tags: [Admin]
+      operationId: getPlatformHealth
+      summary: Health of the Trade API and its database, Kafka and the Trade Executor
+      description: |
+        Runs the three checks at the same time, each limited to 4 seconds, and reuses the answer
+        for 5 seconds. Always 200 for an admin: a service that is down is part of the report,
+        not a failed request.
+
+        The Auth service is not included. The browser asks it directly
+        (`auth-admin-api.yaml`, `GET /health/details`), so calls between services stay one-way.
+      responses:
+        '200':
+          description: The status of each service.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminHealthResponse'
+              example:
+                overall: DEGRADED
+                checkedAt: '2026-10-06T10:00:00Z'
+                services:
+                  - name: Trade API
+                    status: UP
+                    responseMs: 4
+                    detail: Running; database answered
+                  - name: Kafka
+                    status: UP
+                    responseMs: 35
+                    detail: 1 broker reachable
+                  - name: Trade Executor
+                    status: DEGRADED
+                    responseMs: 9
+                    detail: Running, but can't reach Kafka
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        A JWT issued by the auth service through `/auth/admin/login`. The claims contract is
+        defined in `auth-api.yaml`.
+
+  responses:
+    Unauthorised:
+      description: Missing, malformed, expired or wrongly signed token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            unauthorised:
+              value:
+                errorCode: AUTH-401
+                message: Unauthorised
+    Forbidden:
+      description: A valid token without the `ADMIN` role.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            forbidden:
+              value:
+                errorCode: AUTH-403
+                message: Forbidden
+
+  schemas:
+
+    HealthStatus:
+      type: string
+      enum: [UP, DEGRADED, DOWN, UNKNOWN]
+      description: |
+        | Status | Meaning | Where to look |
+        |---|---|---|
+        | `UP` | Running, and everything it depends on answers | Nothing to do |
+        | `DEGRADED` | Running, but its database or Kafka is failing | The dependency named in `detail`, not this service |
+        | `DOWN` | No answer at all | This service: it is stopped or unreachable |
+        | `UNKNOWN` | Could not be asked, or answered with something unreadable | Whatever asks on its behalf |
+
+    AdminHealthResponse:
+      type: object
+      additionalProperties: false
+      required: [overall, checkedAt, services]
+      properties:
+        overall:
+          type: string
+          enum: [UP, DEGRADED]
+          description: '`UP` when every service is `UP`, otherwise `DEGRADED`.'
+        checkedAt:
+          type: string
+          format: date-time
+          description: When the checks ran. Answers are reused for up to 5 seconds.
+        services:
+          type: array
+          description: Always the Trade API, Kafka and the Trade Executor, in that order.
+          items:
+            $ref: '#/components/schemas/ServiceHealth'
+
+    ServiceHealth:
+      type: object
+      additionalProperties: false
+      required: [name, status, responseMs, detail]
+      properties:
+        name:
+          type: string
+          example: Trade Executor
+        status:
+          $ref: '#/components/schemas/HealthStatus'
+        responseMs:
+          type: [integer, 'null']
+          format: int64
+          description: How long the check took; null when there was no answer.
+          example: 12
+        detail:
+          type: string
+          description: |
+            A fixed sentence for a person to read. Never an exception text, host name or port.
+          example: Not reachable
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [errorCode, message]
+      description: The same error envelope as `trade-api.yaml`.
+      properties:
+        errorCode:
+          type: string
+          enum: [AUTH-401, AUTH-403]
+          description: |
+            | Code | HTTP | Meaning |
+            |---|---|---|
+            | `AUTH-401` | 401 | Unauthorised or invalid token |
+            | `AUTH-403` | 403 | Valid token, but not an admin |
+          example: AUTH-403
+        message:
+          type: string
+          example: Forbidden

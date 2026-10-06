@@ -1,12 +1,15 @@
 package com.tradingsystem.spring_boot_app.service;
 
 import com.tradingsystem.exception.AccountNotActiveException;
+import com.tradingsystem.spring_boot_app.exception.ForbiddenException;
 import com.tradingsystem.spring_boot_app.exception.UnauthorisedException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.mock.web.MockHttpServletRequest;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -15,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class AuthServiceTest {
 
     private static final String ACCOUNT_ID_ATTRIBUTE = "accountId";
+    private static final String ROLES_ATTRIBUTE = "roles";
 
     private final AuthService authService = new AuthService();
 
@@ -104,6 +108,42 @@ class AuthServiceTest {
 
         assertThrows(UnauthorisedException.class,
                 () -> authService.authenticatedAccountId(request));
+    }
+
+    @Test
+    void requireAdminAcceptsTokenWithAdminRole() {
+        MockHttpServletRequest request = requestWithAuthorization("Bearer opaque-token");
+        request.setAttribute(ROLES_ATTRIBUTE, List.of("ADMIN"));
+
+        assertDoesNotThrow(() -> authService.requireAdmin(request));
+    }
+
+    @Test
+    void requireAdminRejectsCustomerTokenWithForbidden() {
+        MockHttpServletRequest request = requestWithAuthorization("Bearer opaque-token");
+        request.setAttribute(ACCOUNT_ID_ATTRIBUTE, 44L);
+        request.setAttribute(ROLES_ATTRIBUTE, List.of("CUSTOMER"));
+
+        ForbiddenException failure = assertThrows(ForbiddenException.class,
+                () -> authService.requireAdmin(request));
+
+        assertEquals("Forbidden", failure.getMessage());
+    }
+
+    @Test
+    void requireAdminRejectsTokenWithoutRolesWithForbidden() {
+        MockHttpServletRequest request = requestWithAuthorization("Bearer opaque-token");
+        request.setAttribute(ACCOUNT_ID_ATTRIBUTE, 44L);
+
+        assertThrows(ForbiddenException.class, () -> authService.requireAdmin(request));
+    }
+
+    @Test
+    void requireAdminChecksBearerHeaderBeforeRoles() {
+        MockHttpServletRequest request = requestWithAuthorization(null);
+        request.setAttribute(ROLES_ATTRIBUTE, List.of("ADMIN"));
+
+        assertThrows(UnauthorisedException.class, () -> authService.requireAdmin(request));
     }
 
     private static MockHttpServletRequest requestWithAuthorization(String authorization) {

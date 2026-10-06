@@ -1,6 +1,8 @@
 import { EnvironmentProviders } from '@angular/core';
 import { provideApi as provideAuthApi } from '../../../generated/auth-client';
 import { provideApi as provideTradeApi } from '../../../generated/trade-client';
+import { provideApi as provideAuthAdminApi } from '../../../generated/auth-admin-client';
+import { provideApi as provideTradeAdminApi } from '../../../generated/trade-admin-client';
 import { environment } from '../../../environments/environment';
 import { accessTokenStore } from '../services/access-token.store';
 
@@ -29,5 +31,13 @@ export function provideApiClients(): EnvironmentProviders[] {
     }),
     // Trade API requests get their bearer token from authTokenInterceptor.
     provideTradeApi(TRADE_API_BASE_URL),
+    // The team's own admin contracts (Contracts/API-Schemas/*-admin-api.yaml),
+    // on the same two services. /health is public and is sent without a
+    // token; /health/details and /api/v1/admin/** carry the admin's token.
+    provideAuthAdminApi({
+      basePath: AUTH_API_BASE_URL,
+      credentials: { bearerAuth: readAccessToken }
+    }),
+    provideTradeAdminApi(TRADE_API_BASE_URL),
   ];
 }

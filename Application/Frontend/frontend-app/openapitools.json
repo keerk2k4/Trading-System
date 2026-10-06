@@ -31,6 +31,34 @@
           "enumPropertyNaming": "original",
           "supportsES6": true
         }
+      },
+      "trade-admin-client": {
+        "generatorName": "typescript-angular",
+        "inputSpec": "../../Contracts/API-Schemas/trade-admin-api.yaml",
+        "output": "src/generated/trade-admin-client",
+        "skipValidateSpec": true,
+        "additionalProperties": {
+          "ngVersion": "21.0.0",
+          "providedIn": "root",
+          "fileNaming": "kebab-case",
+          "stringEnums": false,
+          "enumPropertyNaming": "original",
+          "supportsES6": true
+        }
+      },
+      "auth-admin-client": {
+        "generatorName": "typescript-angular",
+        "inputSpec": "../../Contracts/API-Schemas/auth-admin-api.yaml",
+        "output": "src/generated/auth-admin-client",
+        "skipValidateSpec": true,
+        "additionalProperties": {
+          "ngVersion": "21.0.0",
+          "providedIn": "root",
+          "fileNaming": "kebab-case",
+          "stringEnums": false,
+          "enumPropertyNaming": "original",
+          "supportsES6": true
+        }
       }
     }
   }

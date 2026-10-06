@@ -19,8 +19,8 @@ import java.util.Map;
  * Validates bearer tokens in the Authorization header:
  * 1. Checks header is present and has "Bearer " prefix
  * 2. Validates JWT token (signature, expiry, algorithm)
- * 3. Extracts account ID from token claims
- * 4. Stores account ID in request attribute for controller use
+ * 3. Extracts account ID and roles from token claims
+ * 4. Stores both in request attributes for controller use
  * 
  * All validation failures (missing header, wrong scheme, invalid/expired token)
  * return AUTH-401 with the same error message.
@@ -29,6 +29,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String ACCOUNT_ID_ATTRIBUTE = "accountId";
+    private static final String ROLES_ATTRIBUTE = "roles";
     private final JwtTokenProvider tokenProvider;
     
     public JwtAuthenticationFilter(JwtTokenProvider tokenProvider) {
@@ -73,8 +74,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 throw new UnauthorisedException();
             }
             
-            // Store account ID in request attribute for controller access
+            // Store account ID and roles in request attributes for controller access.
+            // Roles decide admin-only routes (AuthService.requireAdmin); they never
+            // widen what a customer route returns, which stays scoped to accountId.
             request.setAttribute(ACCOUNT_ID_ATTRIBUTE, accountId);
+            request.setAttribute(ROLES_ATTRIBUTE, tokenProvider.extractRoles(token));
             
             // Continue the filter chain
             filterChain.doFilter(request, response);
