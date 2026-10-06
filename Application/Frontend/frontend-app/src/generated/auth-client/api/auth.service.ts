@@ -25,9 +25,17 @@ import { RefreshRequest } from '../model/refresh-request';
 // @ts-ignore
 import { RegisterRequest } from '../model/register-request';
 // @ts-ignore
+import { SendOtpRequest } from '../model/send-otp-request';
+// @ts-ignore
+import { SendOtpResponse } from '../model/send-otp-response';
+// @ts-ignore
 import { TokenResponse } from '../model/token-response';
 // @ts-ignore
 import { UserResponse } from '../model/user-response';
+// @ts-ignore
+import { VerifyOtpRequest } from '../model/verify-otp-request';
+// @ts-ignore
+import { VerifyOtpResponse } from '../model/verify-otp-response';
 
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS }                     from '../variables';
@@ -315,7 +323,7 @@ export class AuthService extends BaseService {
 
     /**
      * Register a user
-     * Creates a user, assigns the &#x60;CUSTOMER&#x60; role, and publishes a &#x60;user-registrations&#x60; event so the Trade REST API can provision a trading account asynchronously. It does not create the trading account itself and does not accept a caller-supplied &#x60;accountId&#x60;.  Registration does not return tokens. The client logs in afterwards. Returning a session from a registration endpoint makes the endpoint an unauthenticated session factory, and any weakness in it becomes an authentication bypass.  A caller-supplied &#x60;roles&#x60; field is ignored on this route regardless of what is sent: the service always assigns &#x60;CUSTOMER&#x60;. Use &#x60;/auth/admin/register&#x60; to create an admin user. 
+     * Creates a user, assigns the &#x60;CUSTOMER&#x60; role, and publishes a &#x60;user-registrations&#x60; event so the Trade REST API can provision a trading account asynchronously. It does not create the trading account itself and does not accept a caller-supplied &#x60;accountId&#x60;.  The email must first be verified: call &#x60;/auth/register/otp&#x60;, then &#x60;/auth/register/otp/verify&#x60;, and send the returned token as &#x60;emailVerificationToken&#x60;. Without a valid token the request is refused with &#x60;403 OTP-403&#x60; before anything else is checked.  Registration does not return tokens. The client logs in afterwards. Returning a session from a registration endpoint makes the endpoint an unauthenticated session factory, and any weakness in it becomes an authentication bypass.  A caller-supplied &#x60;roles&#x60; field is ignored on this route regardless of what is sent: the service always assigns &#x60;CUSTOMER&#x60;. Use &#x60;/auth/admin/register&#x60; to create an admin user. 
      * @endpoint post /auth/register
      * @param registerRequest 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
@@ -437,6 +445,140 @@ export class AuthService extends BaseService {
             {
                 context: localVarHttpContext,
                 body: registerRequest,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Email a one-time code to verify the address before registering
+     * Emails a 6-digit code to the address. The code is valid for 10 minutes and allows five attempts. Another code for the same address can be requested after 60 seconds; a new code replaces the previous one. The code itself is never returned in the response. 
+     * @endpoint post /auth/register/otp
+     * @param sendOtpRequest 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public sendRegistrationOtp(sendOtpRequest: SendOtpRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<SendOtpResponse>;
+    public sendRegistrationOtp(sendOtpRequest: SendOtpRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<SendOtpResponse>>;
+    public sendRegistrationOtp(sendOtpRequest: SendOtpRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<SendOtpResponse>>;
+    public sendRegistrationOtp(sendOtpRequest: SendOtpRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (sendOtpRequest === null || sendOtpRequest === undefined) {
+            throw new Error('Required parameter sendOtpRequest was null or undefined when calling sendRegistrationOtp.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/auth/register/otp`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<SendOtpResponse>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: sendOtpRequest,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Check the emailed code and receive an email verification token
+     * On success returns a single-use &#x60;verificationToken&#x60;, valid for 30 minutes, which must be sent as &#x60;emailVerificationToken&#x60; on &#x60;POST /auth/register&#x60; with the same email. 
+     * @endpoint post /auth/register/otp/verify
+     * @param verifyOtpRequest 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public verifyRegistrationOtp(verifyOtpRequest: VerifyOtpRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<VerifyOtpResponse>;
+    public verifyRegistrationOtp(verifyOtpRequest: VerifyOtpRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<VerifyOtpResponse>>;
+    public verifyRegistrationOtp(verifyOtpRequest: VerifyOtpRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<VerifyOtpResponse>>;
+    public verifyRegistrationOtp(verifyOtpRequest: VerifyOtpRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (verifyOtpRequest === null || verifyOtpRequest === undefined) {
+            throw new Error('Required parameter verifyOtpRequest was null or undefined when calling verifyRegistrationOtp.');
+        }
+
+        let localVarHeaders = this.defaultHeaders;
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        // to determine the Content-Type header
+        const consumes: string[] = [
+            'application/json'
+        ];
+        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
+        if (httpContentTypeSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
+        }
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/auth/register/otp/verify`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<VerifyOtpResponse>('post', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
+                body: verifyOtpRequest,
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,

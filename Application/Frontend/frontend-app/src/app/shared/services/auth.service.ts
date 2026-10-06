@@ -6,10 +6,12 @@ import {
   ErrorResponse,
   LoginRequest,
   RegisterRequest,
+  SendOtpResponseData,
   TokenPayload,
   TokenResponse,
   User,
-  UserResponseData
+  UserResponseData,
+  VerifyOtpResponseData
 } from '../models/auth.models';
 import { Observable, of, throwError } from 'rxjs';
 import { catchError, finalize, map, shareReplay, switchMap, tap } from 'rxjs/operators';
@@ -69,6 +71,22 @@ export class MockAuthService {
   // (e.g. the dashboard's three calls) must therefore share one refresh.
   private refreshInFlight: Observable<string> | null = null;
 
+  // Real backend: POST /auth/register/otp -> { message, expiresIn, resendAfter }.
+  // Emails a 6-digit code; the code itself never comes back to the page.
+  sendRegistrationOtp(email: string): Observable<SendOtpResponseData> {
+    return this.authApi
+      .sendRegistrationOtp({ email })
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // Real backend: POST /auth/register/otp/verify -> { verificationToken, expiresIn }.
+  // The token is what register() must send to prove the email was verified.
+  verifyRegistrationOtp(email: string, otp: string): Observable<VerifyOtpResponseData> {
+    return this.authApi
+      .verifyRegistrationOtp({ email, otp })
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
   // Real backend: POST /auth/register -> { id, username, roles }.
   // No tokens and no accountId come back here - registration only creates
   // the user; the trading account is provisioned asynchronously afterwards.
@@ -81,6 +99,7 @@ export class MockAuthService {
         lastName: data.lastName,
         phone: data.phone,
         password: data.password,
+        emailVerificationToken: data.emailVerificationToken,
       })
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }

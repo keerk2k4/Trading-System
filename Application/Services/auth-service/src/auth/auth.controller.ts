@@ -28,6 +28,10 @@ import { UserRepository } from "../repositories/UserRepository";
 import { ThrottleService } from "../services/ThrottleService";
 import { AccountProvisioningEventService } from "../services/AccountProvisioningEventService";
 import { NotificationService } from "../services/NotificationService";
+import { EmailOtpService } from "../services/EmailOtpService";
+import { SendOtpRequest } from "../dtos/SendOtpRequest";
+import { VerifyOtpRequest } from "../dtos/VerifyOtpRequest";
+import { SendOtpResponse, VerifyOtpResponse } from "../dtos/OtpResponse";
 
 // The refresh token travels in an HttpOnly cookie so page scripts (and any
 // injected XSS payload) can never read it. Scoped to /auth so the browser
@@ -70,6 +74,7 @@ export class AuthController {
     private throttleService: ThrottleService,
     private accountProvisioningEventService: AccountProvisioningEventService,
     private notificationService: NotificationService,
+    private emailOtpService: EmailOtpService,
   ) { }
 
   private setRefreshCookie(res: Response, refreshToken: string): void {
@@ -89,16 +94,122 @@ export class AuthController {
     return readCookie(req, REFRESH_COOKIE_NAME) ?? body?.refreshToken;
   }
 
+  @Post("register/otp")
+  @ApiTags("Auth")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Email a one-time code to verify the address before registering" })
+  @ApiResponse({ status: 200, description: "Code sent.", type: SendOtpResponse })
+  @ApiResponse({ status: 429, description: "A code was sent too recently.", type: ErrorResponse })
+  @ApiResponse({ status: 503, description: "The email could not be sent.", type: ErrorResponse })
+  async sendRegistrationOtp(@Body() sendOtpRequest: SendOtpRequest, @Res() res: Response): Promise<void> {
+    try {
+      const result = this.emailOtpService.requestOtp(sendOtpRequest.email);
+      if (!result.ok) {
+        const error: ErrorResponse = {
+          errorCode: "OTP-429",
+          message: `Please wait ${result.retryAfterSeconds} seconds before requesting a new code.`,
+        };
+        res.status(429).json(error);
+        return;
+      }
+
+      const sent = await this.notificationService.sendRegistrationOtp(
+        sendOtpRequest.email,
+        result.otp,
+        Math.round(result.expiresInSeconds / 60),
+      );
+      if (!sent) {
+        this.emailOtpService.cancelOtp(sendOtpRequest.email);
+        const error: ErrorResponse = {
+          errorCode: "OTP-503",
+          message: "We could not send the verification code. Check the email address and try again.",
+        };
+        res.status(503).json(error);
+        return;
+      }
+
+      const response: SendOtpResponse = {
+        message: "A verification code has been sent to your email.",
+        expiresIn: result.expiresInSeconds,
+        resendAfter: result.resendAfterSeconds,
+      };
+      res.status(200).json(response);
+    } catch (error) {
+      console.error("Send registration OTP error:", error);
+      const response: ErrorResponse = {
+        errorCode: "OTP-503",
+        message: "We could not send the verification code. Please try again.",
+      };
+      res.status(503).json(response);
+    }
+  }
+
+  @Post("register/otp/verify")
+  @ApiTags("Auth")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Check the emailed code and receive an email verification token" })
+  @ApiResponse({ status: 200, description: "Email verified.", type: VerifyOtpResponse })
+  @ApiResponse({ status: 400, description: "The code is wrong.", type: ErrorResponse })
+  @ApiResponse({ status: 404, description: "No code was requested for this email.", type: ErrorResponse })
+  @ApiResponse({ status: 410, description: "The code has expired.", type: ErrorResponse })
+  @ApiResponse({ status: 429, description: "Too many wrong attempts.", type: ErrorResponse })
+  async verifyRegistrationOtp(@Body() verifyOtpRequest: VerifyOtpRequest, @Res() res: Response): Promise<void> {
+    const result = this.emailOtpService.verifyOtp(verifyOtpRequest.email, verifyOtpRequest.otp);
+    if (result.ok) {
+      const response: VerifyOtpResponse = {
+        verificationToken: result.verificationToken,
+        expiresIn: result.expiresInSeconds,
+      };
+      res.status(200).json(response);
+      return;
+    }
+
+    let status: number;
+    let error: ErrorResponse;
+    switch (result.reason) {
+      case "INVALID":
+        status = 400;
+        error = {
+          errorCode: "OTP-400",
+          message: `Incorrect verification code. ${result.attemptsRemaining} attempt${result.attemptsRemaining === 1 ? "" : "s"} remaining.`,
+        };
+        break;
+      case "EXPIRED":
+        status = 410;
+        error = { errorCode: "OTP-410", message: "The verification code has expired. Request a new code." };
+        break;
+      case "TOO_MANY_ATTEMPTS":
+        status = 429;
+        error = { errorCode: "OTP-429", message: "Too many incorrect attempts. Request a new code." };
+        break;
+      default:
+        status = 404;
+        error = { errorCode: "OTP-404", message: "No verification code was requested for this email. Request a code first." };
+    }
+    res.status(status).json(error);
+  }
+
   @Post("register")
   @ApiTags("Auth")
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: "Register a user" })
   @ApiResponse({ status: 201, description: "User created.", type: UserResponse })
+  @ApiResponse({ status: 403, description: "The email address has not been verified.", type: ErrorResponse })
   @ApiResponse({ status: 409, description: "The username is already taken.", type: ErrorResponse })
   @ApiResponse({ status: 422, description: "Invalid input", type: ErrorResponse })
   async register(@Body() registerRequest: RegisterRequest, @Res() res: Response): Promise<void> {
     let createdUserId: string | null = null;
     try {
+      // Checked first so an unverified caller learns nothing about which usernames exist.
+      if (!this.emailOtpService.isVerified(registerRequest.email, registerRequest.emailVerificationToken)) {
+        const error: ErrorResponse = {
+          errorCode: "OTP-403",
+          message: "Email not verified. Verify the code sent to your email before registering.",
+        };
+        res.status(403).json(error);
+        return;
+      }
+
       const alreadyTaken = await this.userRepository.isUsernameTaken(registerRequest.username);
       if (alreadyTaken) {
         const error: ErrorResponse = {
@@ -123,6 +234,7 @@ export class AuthController {
       createdUserId = user.userId;
       await this.userRepository.assignRole(user.userId, "CUSTOMER");
       await this.accountProvisioningEventService.publishUserRegistered(user.userId, user.userName);
+      this.emailOtpService.consume(registerRequest.email);
 
       // Fire and forget: a mail outage must not fail or roll back registration.
       void this.notificationService.sendUserRegistered(user.userId, registerRequest.email, user.userName);

@@ -24,6 +24,10 @@ export interface RegisterRequest {
     lastName: string;
     phone: string;
     /**
+     * Token from `POST /auth/register/otp/verify`. Required by `/auth/register`; ignored by `/auth/admin/register`. 
+     */
+    emailVerificationToken?: string;
+    /**
      * Accepted by the schema but ignored by `/auth/register`, which always assigns `CUSTOMER`, and by `/auth/admin/register`, which always assigns `ADMIN`. Kept on the request shape only so both endpoints can share one DTO; do not rely on it changing the assigned role. 
      */
     roles?: Array<Role>;

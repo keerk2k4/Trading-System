@@ -20,9 +20,13 @@ model/models.ts
 model/refresh-request.ts
 model/register-request.ts
 model/role.ts
+model/send-otp-request.ts
+model/send-otp-response.ts
 model/token-response.ts
 model/update-kyc-request.ts
 model/user-response.ts
+model/verify-otp-request.ts
+model/verify-otp-response.ts
 param.ts
 provide-api.ts
 query.params.ts

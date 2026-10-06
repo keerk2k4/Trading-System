@@ -10,6 +10,7 @@ import { ThrottleService } from "../services/ThrottleService";
 import { DatabaseService } from "../database/database.service";
 import { AccountProvisioningEventService } from "../services/AccountProvisioningEventService";
 import { NotificationService } from "../services/NotificationService";
+import { EmailOtpService } from "../services/EmailOtpService";
 
 const SECRET = "refresh-rotation-test-secret-min32";
 const USER_ID = "11111111-2222-4333-8444-555555555555";
@@ -137,6 +138,7 @@ describe("Auth refresh rotation", () => {
         RefreshTokenService,
         PasswordService,
         ThrottleService,
+        EmailOtpService,
         { provide: DatabaseService, useValue: fakeDb },
         {
           provide: UserRepository,

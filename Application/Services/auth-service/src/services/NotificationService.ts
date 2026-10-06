@@ -41,6 +41,33 @@ export class NotificationService {
     });
   }
 
+  /**
+   * Emails a registration one-time passcode. Unlike the other notifications
+   * the caller needs to know the outcome, so this returns whether it was sent.
+   *
+   * Local development only: with no SMTP_HOST and NODE_ENV !== "production",
+   * the code is printed to the console instead so the flow can be tested
+   * without a mail server. In production a missing SMTP_HOST is a failure.
+   */
+  async sendRegistrationOtp(email: string, otp: string, expiresInMinutes: number): Promise<boolean> {
+    if (!this.transporter && process.env.NODE_ENV !== "production" && this.hasDeliverableAddress(email)) {
+      console.warn(`[DEV ONLY] SMTP_HOST not configured. Registration OTP: ${otp}`);
+      return true;
+    }
+
+    // There is no user id before registration; "registration" stands in for it in logs.
+    return this.send("registration", {
+      to: email,
+      subject: "Your Enterprise Trading Platform verification code",
+      text:
+        "Hello,\n\n" +
+        `Your verification code is: ${otp}\n\n` +
+        `It expires in ${expiresInMinutes} minutes. Enter it on the registration page to verify your email address.\n\n` +
+        "If you did not try to create an account, you can ignore this email.\n\n" +
+        "Enterprise Trading Platform",
+    });
+  }
+
   async sendUserRegistered(userId: string, email: string, username: string): Promise<void> {
     await this.send(userId, {
       to: email,
@@ -91,22 +118,25 @@ export class NotificationService {
     });
   }
 
-  private async send(userId: string, message: MailMessage): Promise<void> {
+  // Resolves true only when the SMTP server accepted the message.
+  private async send(userId: string, message: MailMessage): Promise<boolean> {
     if (!this.hasDeliverableAddress(message.to)) {
       console.log(`Notification skipped for user ${userId}: no deliverable email address`);
-      return;
+      return false;
     }
 
     if (!this.transporter) {
       console.log(`Notification skipped for user ${userId}: SMTP_HOST not configured ("${message.subject}")`);
-      return;
+      return false;
     }
 
     try {
       await this.transporter.sendMail({ from: this.from, ...message });
       console.log(`Notification sent to user ${userId}: "${message.subject}"`);
+      return true;
     } catch (error) {
       console.error(`Notification failed for user ${userId}: "${message.subject}"`, (error as Error)?.message);
+      return false;
     }
   }
 

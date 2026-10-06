@@ -84,10 +84,19 @@ describe("AuthController", () => {
   let throttleService: any;
   let accountProvisioningEventService: any;
   let notificationService: any;
+  let emailOtpService: any;
 
   beforeEach(() => {
+    emailOtpService = {
+      requestOtp: jest.fn(),
+      cancelOtp: jest.fn(),
+      verifyOtp: jest.fn(),
+      isVerified: jest.fn().mockReturnValue(true),
+      consume: jest.fn(),
+    };
     notificationService = {
       sendUserRegistered: jest.fn().mockResolvedValue(undefined),
+      sendRegistrationOtp: jest.fn().mockResolvedValue(true),
     };
     tokenService = {
       createAccessToken: jest.fn(),
@@ -138,6 +147,7 @@ describe("AuthController", () => {
       throttleService,
       accountProvisioningEventService,
       notificationService,
+      emailOtpService,
     );
     jest.spyOn(console, "error").mockImplementation(() => undefined);
   });
@@ -146,7 +156,114 @@ describe("AuthController", () => {
     jest.restoreAllMocks();
   });
 
+  describe("sendRegistrationOtp", () => {
+    it("emails the code and returns its lifetime", async () => {
+      emailOtpService.requestOtp.mockReturnValue({ ok: true, otp: "123456", expiresInSeconds: 600, resendAfterSeconds: 60 });
+      const { res, state } = makeResponse();
+
+      await controller.sendRegistrationOtp({ email: "new.trader@example.com" }, res);
+
+      expect(notificationService.sendRegistrationOtp).toHaveBeenCalledWith("new.trader@example.com", "123456", 10);
+      expect(state.status).toBe(200);
+      expect(state.body).toEqual({
+        message: "A verification code has been sent to your email.",
+        expiresIn: 600,
+        resendAfter: 60,
+      });
+      expect(JSON.stringify(state.body)).not.toContain("123456");
+    });
+
+    it("returns 429 during the resend cooldown without sending mail", async () => {
+      emailOtpService.requestOtp.mockReturnValue({ ok: false, reason: "COOLDOWN", retryAfterSeconds: 42 });
+      const { res, state } = makeResponse();
+
+      await controller.sendRegistrationOtp({ email: "new.trader@example.com" }, res);
+
+      expect(state.status).toBe(429);
+      expect(state.body.errorCode).toBe("OTP-429");
+      expect(notificationService.sendRegistrationOtp).not.toHaveBeenCalled();
+    });
+
+    it("returns 503 and cancels the code when the email cannot be sent", async () => {
+      emailOtpService.requestOtp.mockReturnValue({ ok: true, otp: "123456", expiresInSeconds: 600, resendAfterSeconds: 60 });
+      notificationService.sendRegistrationOtp.mockResolvedValue(false);
+      const { res, state } = makeResponse();
+
+      await controller.sendRegistrationOtp({ email: "new.trader@example.com" }, res);
+
+      expect(state.status).toBe(503);
+      expect(state.body.errorCode).toBe("OTP-503");
+      expect(emailOtpService.cancelOtp).toHaveBeenCalledWith("new.trader@example.com");
+    });
+  });
+
+  describe("verifyRegistrationOtp", () => {
+    it("returns a verification token for the right code", async () => {
+      emailOtpService.verifyOtp.mockReturnValue({ ok: true, verificationToken: "tok", expiresInSeconds: 1800 });
+      const { res, state } = makeResponse();
+
+      await controller.verifyRegistrationOtp({ email: "new.trader@example.com", otp: "123456" }, res);
+
+      expect(state).toEqual({ status: 200, body: { verificationToken: "tok", expiresIn: 1800 } });
+    });
+
+    it.each([
+      [{ ok: false, reason: "INVALID", attemptsRemaining: 2 }, 400, "OTP-400"],
+      [{ ok: false, reason: "EXPIRED" }, 410, "OTP-410"],
+      [{ ok: false, reason: "TOO_MANY_ATTEMPTS" }, 429, "OTP-429"],
+      [{ ok: false, reason: "NOT_REQUESTED" }, 404, "OTP-404"],
+    ])("maps %o to %i %s", async (result, status, errorCode) => {
+      emailOtpService.verifyOtp.mockReturnValue(result);
+      const { res, state } = makeResponse();
+
+      await controller.verifyRegistrationOtp({ email: "new.trader@example.com", otp: "000000" }, res);
+
+      expect(state.status).toBe(status);
+      expect(state.body.errorCode).toBe(errorCode);
+    });
+  });
+
   describe("register", () => {
+    it("returns 403 and creates nothing when the email has not been verified", async () => {
+      emailOtpService.isVerified.mockReturnValue(false);
+      const { res, state } = makeResponse();
+
+      await controller.register(registerRequest({ emailVerificationToken: "bogus" }), res);
+
+      expect(state).toEqual({
+        status: 403,
+        body: {
+          errorCode: "OTP-403",
+          message: "Email not verified. Verify the code sent to your email before registering.",
+        },
+      });
+      expect(emailOtpService.isVerified).toHaveBeenCalledWith("new.trader@example.com", "bogus");
+      expect(userRepository.isUsernameTaken).not.toHaveBeenCalled();
+      expect(userRepository.create).not.toHaveBeenCalled();
+    });
+
+    it("consumes the verification token only after a successful registration", async () => {
+      userRepository.isUsernameTaken.mockResolvedValue(false);
+      passwordService.hashPassword.mockResolvedValue("hashed-password");
+      userRepository.create.mockResolvedValue(user);
+      accountProvisioningEventService.publishUserRegistered.mockResolvedValue(undefined);
+      const { res, state } = makeResponse();
+
+      await controller.register(registerRequest(), res);
+
+      expect(state.status).toBe(201);
+      expect(emailOtpService.consume).toHaveBeenCalledWith("new.trader@example.com");
+    });
+
+    it("keeps the verification token when the username is taken", async () => {
+      userRepository.isUsernameTaken.mockResolvedValue(true);
+      const { res } = makeResponse();
+
+      await controller.register(registerRequest(), res);
+
+      expect(emailOtpService.consume).not.toHaveBeenCalled();
+    });
+
     it("creates auth user and publishes account provisioning event, ignoring self-declared roles", async () => {
       userRepository.isUsernameTaken.mockResolvedValue(false);
       passwordService.hashPassword.mockResolvedValue("hashed-password");

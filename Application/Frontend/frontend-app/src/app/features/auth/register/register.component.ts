@@ -18,6 +18,8 @@ import {
   Validators
 } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { Subscription, timer } from 'rxjs';
+import { map, take } from 'rxjs/operators';
 import { AuthError } from '../../../shared/models/auth.models';
 import { MockAuthService } from '../../../shared/services/auth.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
@@ -32,6 +34,21 @@ function matchesPassword(control: AbstractControl): ValidationErrors | null {
 @Component({
   selector: 'app-register',
   imports: [ReactiveFormsModule, RouterLink, AuthShellComponent],
+  styles: `
+    .tp-otp-row {
+      display: flex;
+      gap: 0.5rem;
+      align-items: stretch;
+    }
+    .tp-otp-row .tp-input {
+      flex: 1;
+      min-width: 0;
+    }
+    .tp-otp-row .tp-btn {
+      flex: none;
+      min-height: 2.75rem;
+    }
+  `,
   template: `
     <app-auth-shell [heading]="heading()" [subtitle]="subtitle()">
       @if (registeredUsername(); as username) {
@@ -78,23 +95,98 @@ function matchesPassword(control: AbstractControl): ValidationErrors | null {
 
           <div>
             <label class="tp-label" for="register-email">Email</label>
-            <input
-              class="tp-input"
-              id="register-email"
-              data-testid="register-email"
-              type="email"
-              formControlName="email"
-              autocomplete="email"
-              autocapitalize="none"
-              spellcheck="false"
-              aria-required="true"
-              [attr.aria-invalid]="emailError() ? 'true' : null"
-              [attr.aria-describedby]="emailError() ? 'register-email-error' : null"
-            />
+            <div class="tp-otp-row">
+              <input
+                class="tp-input"
+                id="register-email"
+                data-testid="register-email"
+                type="email"
+                formControlName="email"
+                autocomplete="email"
+                autocapitalize="none"
+                spellcheck="false"
+                aria-required="true"
+                [readOnly]="emailVerified()"
+                [attr.aria-invalid]="emailError() ? 'true' : null"
+                [attr.aria-describedby]="emailError() ? 'register-email-error' : 'register-email-hint'"
+              />
+              @if (emailVerified()) {
+                <button class="tp-btn tp-btn-secondary" type="button" data-testid="register-change-email" (click)="changeEmail()">
+                  Change
+                </button>
+              } @else {
+                <button
+                  class="tp-btn tp-btn-secondary"
+                  id="register-send-otp"
+                  type="button"
+                  data-testid="register-send-otp"
+                  [attr.aria-disabled]="otpSending() || resendCountdown() > 0 ? 'true' : null"
+                  (click)="sendOtp()"
+                >
+                  @if (otpSending()) {
+                    <span class="tp-spinner" aria-hidden="true"></span>
+                    Sending…
+                  } @else if (resendCountdown() > 0) {
+                    Resend in {{ resendCountdown() }}s
+                  } @else if (otpSent()) {
+                    Resend OTP
+                  } @else {
+                    Send OTP
+                  }
+                </button>
+              }
+            </div>
             @if (emailError(); as message) {
               <p class="tp-field-error" id="register-email-error" data-testid="register-email-error">{{ message }}</p>
+            } @else if (emailVerified()) {
+              <p class="tp-hint is-met" id="register-email-hint" data-testid="register-email-verified">Email verified.</p>
+            } @else if (otpSent()) {
+              <p class="tp-hint" id="register-email-hint" data-testid="register-otp-sent">
+                We sent a 6-digit code to this address. It expires in 10 minutes.
+              </p>
+            } @else {
+              <p class="tp-hint" id="register-email-hint">You must verify your email with a one-time code before registering.</p>
             }
           </div>
+
+          @if (otpSent() && !emailVerified()) {
+            <div>
+              <label class="tp-label" for="register-otp">Verification code</label>
+              <div class="tp-otp-row">
+                <input
+                  class="tp-input"
+                  id="register-otp"
+                  data-testid="register-otp"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="6"
+                  [formControl]="otpControl"
+                  autocomplete="one-time-code"
+                  aria-required="true"
+                  [attr.aria-invalid]="otpError() ? 'true' : null"
+                  [attr.aria-describedby]="otpError() ? 'register-otp-error' : null"
+                  (keydown.enter)="$event.preventDefault(); verifyOtp()"
+                />
+                <button
+                  class="tp-btn tp-btn-primary"
+                  type="button"
+                  data-testid="register-verify-otp"
+                  [attr.aria-disabled]="otpVerifying() ? 'true' : null"
+                  (click)="verifyOtp()"
+                >
+                  @if (otpVerifying()) {
+                    <span class="tp-spinner" aria-hidden="true"></span>
+                    Verifying…
+                  } @else {
+                    Verify
+                  }
+                </button>
+              </div>
+              @if (otpError(); as message) {
+                <p class="tp-field-error" id="register-otp-error" role="alert" data-testid="register-otp-error">{{ message }}</p>
+              }
+            </div>
+          }
 
           <div>
             <label class="tp-label" for="register-first-name">First name</label>
@@ -246,6 +338,23 @@ export class RegisterComponent {
     confirmPassword: ['', [Validators.required, matchesPassword]]
   });
 
+  // Kept outside the main form: it only matters until the email is verified,
+  // and it is never part of the registration request.
+  protected readonly otpControl = inject(NonNullableFormBuilder).control('', [
+    Validators.required,
+    Validators.pattern(/^\d{6}$/)
+  ]);
+
+  protected readonly otpSent = signal(false);
+  protected readonly otpSending = signal(false);
+  protected readonly otpVerifying = signal(false);
+  protected readonly otpError = signal('');
+  protected readonly resendCountdown = signal(0);
+  // The token proves to the backend that this exact email was verified.
+  private readonly verificationToken = signal<string | null>(null);
+  protected readonly emailVerified = computed(() => this.verificationToken() !== null);
+  private countdownSub: Subscription | null = null;
+
   protected readonly submitted = signal(false);
   protected readonly isLoading = signal(false);
   protected readonly errorMessage = signal('');
@@ -264,6 +373,17 @@ export class RegisterComponent {
     this.form.controls.password.valueChanges
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.form.controls.confirmPassword.updateValueAndValidity());
+
+    // A code or verification belongs to one address; editing it starts over.
+    this.form.controls.email.valueChanges
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => {
+        if (this.otpSent() || this.emailVerified()) {
+          this.resetOtpState();
+        }
+      });
+
+    this.destroyRef.onDestroy(() => this.countdownSub?.unsubscribe());
   }
 
   protected usernameError(): string | null {
@@ -358,6 +478,120 @@ export class RegisterComponent {
     return control.hasError('required') ? 'Confirm your password.' : 'Passwords do not match.';
   }
 
+  protected sendOtp(): void {
+    if (this.otpSending() || this.resendCountdown() > 0) {
+      return;
+    }
+
+    const emailControl = this.form.controls.email;
+    emailControl.markAsTouched();
+    if (emailControl.invalid) {
+      this.host.nativeElement.querySelector<HTMLElement>('#register-email')?.focus();
+      return;
+    }
+
+    this.otpSending.set(true);
+    this.otpError.set('');
+    this.errorMessage.set('');
+
+    this.authService
+      .sendRegistrationOtp(emailControl.value)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          this.otpSending.set(false);
+          this.otpSent.set(true);
+          this.otpControl.reset();
+          this.startResendCountdown(res.resendAfter);
+          afterNextRender(() => this.host.nativeElement.querySelector<HTMLElement>('#register-otp')?.focus(), {
+            injector: this.injector
+          });
+        },
+        error: (err: AuthError) => {
+          this.otpSending.set(false);
+          this.errorMessage.set(this.otpErrorMessage(err, 'We could not send the verification code. Please try again.'));
+        }
+      });
+  }
+
+  protected verifyOtp(): void {
+    if (this.otpVerifying()) {
+      return;
+    }
+
+    this.otpError.set('');
+    const otp = this.otpControl.value.trim();
+    if (!/^\d{6}$/.test(otp)) {
+      this.otpError.set('Enter the 6-digit code from the email.');
+      this.host.nativeElement.querySelector<HTMLElement>('#register-otp')?.focus();
+      return;
+    }
+
+    this.otpVerifying.set(true);
+    this.authService
+      .verifyRegistrationOtp(this.form.controls.email.value, otp)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          this.otpVerifying.set(false);
+          this.verificationToken.set(res.verificationToken);
+          this.errorMessage.set('');
+          this.stopResendCountdown();
+        },
+        error: (err: AuthError) => {
+          this.otpVerifying.set(false);
+          // An expired or burned code cannot be retried; the user needs a new one.
+          if (err.errorCode === 'OTP-410' || err.errorCode === 'OTP-429' || err.errorCode === 'OTP-404') {
+            this.otpControl.reset();
+            this.stopResendCountdown();
+          }
+          this.otpError.set(this.otpErrorMessage(err, 'The code could not be verified. Please try again.'));
+          this.host.nativeElement.querySelector<HTMLElement>('#register-otp')?.focus();
+        }
+      });
+  }
+
+  protected changeEmail(): void {
+    this.resetOtpState();
+    this.host.nativeElement.querySelector<HTMLElement>('#register-email')?.focus();
+  }
+
+  private resetOtpState(): void {
+    this.verificationToken.set(null);
+    this.otpSent.set(false);
+    this.otpError.set('');
+    this.otpControl.reset();
+    this.stopResendCountdown();
+  }
+
+  private startResendCountdown(seconds: number): void {
+    this.stopResendCountdown();
+    this.resendCountdown.set(seconds);
+    this.countdownSub = timer(1000, 1000)
+      .pipe(
+        take(seconds),
+        map((tick) => seconds - tick - 1)
+      )
+      .subscribe((remaining) => this.resendCountdown.set(remaining));
+  }
+
+  private stopResendCountdown(): void {
+    this.countdownSub?.unsubscribe();
+    this.countdownSub = null;
+    this.resendCountdown.set(0);
+  }
+
+  // The auth-service's OTP-* messages are written for end users, so they are shown as-is.
+  private otpErrorMessage(err: AuthError, fallback: string): string {
+    if (this.errorMapping.isNetworkError(err.status)) {
+      return this.errorMapping.getNetworkErrorMessage();
+    }
+    if (err.errorCode === 'VAL-422') {
+      return 'Enter a valid email address.';
+    }
+    return err.errorCode?.startsWith('OTP-') && err.message ? err.message : fallback;
+  }
+
   protected togglePasswordVisibility(): void {
     this.passwordsVisible.update((visible) => !visible);
   }
@@ -375,11 +609,24 @@ export class RegisterComponent {
       return;
     }
 
+    const emailVerificationToken = this.verificationToken();
+    if (!emailVerificationToken) {
+      this.errorMessage.set(
+        this.otpSent()
+          ? 'Enter the verification code sent to your email and press Verify before creating your account.'
+          : 'Verify your email address before creating your account. Press "Send OTP" to get a code.'
+      );
+      this.host.nativeElement
+        .querySelector<HTMLElement>(this.otpSent() ? '#register-otp' : '#register-send-otp')
+        ?.focus();
+      return;
+    }
+
     this.isLoading.set(true);
     const { username, email, firstName, lastName, phone, password } = this.form.getRawValue();
 
     this.authService
-      .register({ username, email, firstName, lastName, phone, password })
+      .register({ username, email, firstName, lastName, phone, password, emailVerificationToken })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (user) => {
@@ -402,6 +649,14 @@ export class RegisterComponent {
       const username = this.form.controls.username;
       username.setErrors({ taken: true });
       this.host.nativeElement.querySelector<HTMLElement>('#register-username')?.focus();
+      return;
+    }
+
+    if (err.errorCode === 'OTP-403') {
+      // The verification expired or was already used: the email must be verified again.
+      this.resetOtpState();
+      this.errorMessage.set('Your email verification has expired. Press "Send OTP" to verify your email again.');
+      this.host.nativeElement.querySelector<HTMLElement>('#register-send-otp')?.focus();
       return;
     }
 

@@ -1,7 +1,7 @@
 // Auth models and interfaces.
 // Wire types are aliases of the models generated from contracts/auth-api.yaml
 // (src/generated/auth-client); the rest are UI-only shapes.
-import type { UserResponse } from '../../../generated/auth-client';
+import type { SendOtpResponse, UserResponse, VerifyOtpResponse } from '../../../generated/auth-client';
 
 export interface User {
   id: string;
@@ -31,7 +31,13 @@ export interface RegisterRequest {
   lastName: string;
   phone: string;
   password: string;
+  // From POST /auth/register/otp/verify; the backend refuses registration without it.
+  emailVerificationToken: string;
 }
+
+// POST /auth/register/otp and POST /auth/register/otp/verify responses.
+export type SendOtpResponseData = SendOtpResponse;
+export type VerifyOtpResponseData = VerifyOtpResponse;
 
 // POST /auth/register response. accountId is absent at registration - the
 // trading account is provisioned asynchronously afterwards.

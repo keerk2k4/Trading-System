@@ -109,6 +109,108 @@ tags:
     description: Know-your-customer submission and admin review.
 
 paths:
+  /auth/register/otp:
+    post:
+      tags: [Auth]
+      operationId: sendRegistrationOtp
+      security: []
+      summary: Email a one-time code to verify the address before registering
+      description: |
+        Emails a 6-digit code to the address. The code is valid for 10 minutes and allows five
+        attempts. Another code for the same address can be requested after 60 seconds; a new code
+        replaces the previous one. The code itself is never returned in the response.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendOtpRequest'
+      responses:
+        '200':
+          description: Code sent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendOtpResponse'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+        '429':
+          description: A code was sent to this address too recently.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                cooldown:
+                  value:
+                    errorCode: OTP-429
+                    message: Please wait 42 seconds before requesting a new code.
+        '503':
+          description: The email could not be sent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unavailable:
+                  value:
+                    errorCode: OTP-503
+                    message: We could not send the verification code. Check the email address and try again.
+
+  /auth/register/otp/verify:
+    post:
+      tags: [Auth]
+      operationId: verifyRegistrationOtp
+      security: []
+      summary: Check the emailed code and receive an email verification token
+      description: |
+        On success returns a single-use `verificationToken`, valid for 30 minutes, which must be
+        sent as `emailVerificationToken` on `POST /auth/register` with the same email.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOtpRequest'
+      responses:
+        '200':
+          description: Email verified.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyOtpResponse'
+        '400':
+          description: The code is wrong.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                wrong:
+                  value:
+                    errorCode: OTP-400
+                    message: Incorrect verification code. 4 attempts remaining.
+        '404':
+          description: No code was requested for this email (or it was already used).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '410':
+          description: The code has expired.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+        '429':
+          description: Too many wrong attempts; the code is no longer usable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /auth/register:
     post:
       tags: [Auth]
@@ -119,6 +221,11 @@ paths:
         Creates a user, assigns the `CUSTOMER` role, and publishes a `user-registrations` event so
         the Trade REST API can provision a trading account asynchronously. It does not create the
         trading account itself and does not accept a caller-supplied `accountId`.
+
+        The email must first be verified: call `/auth/register/otp`, then
+        `/auth/register/otp/verify`, and send the returned token as `emailVerificationToken`.
+        Without a valid token the request is refused with `403 OTP-403` before anything else is
+        checked.
 
         Registration does not return tokens. The client logs in afterwards. Returning a session from
         a registration endpoint makes the endpoint an unauthenticated session factory, and any
@@ -145,6 +252,19 @@ paths:
                     id: 8f14e45f-ceea-4c1b-9d3b-1a2b3c4d5e6f
                     username: priya.menon
                     roles: [CUSTOMER]
+        '403':
+          description: |
+            `emailVerificationToken` is missing, wrong, expired, already used, or was issued for a
+            different email address.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                unverified:
+                  value:
+                    errorCode: OTP-403
+                    message: Email not verified. Verify the code sent to your email before registering.
         '409':
           description: The username is already taken.
           content:
@@ -665,6 +785,13 @@ components:
           type: string
           pattern: '^\\+?[1-9]\\d{7,14}$'
           example: +919876543210
+        emailVerificationToken:
+          type: string
+          maxLength: 128
+          description: |
+            Token from `POST /auth/register/otp/verify`. Required by `/auth/register`; ignored by
+            `/auth/admin/register`.
+          writeOnly: true
         roles:
           type: array
           minItems: 1
@@ -682,6 +809,60 @@ components:
         firstName: Priya
         lastName: Menon
         phone: +919876543210
+
+    SendOtpRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          example: priya.menon@example.com
+
+    SendOtpResponse:
+      type: object
+      required: [message, expiresIn, resendAfter]
+      properties:
+        message:
+          type: string
+          example: A verification code has been sent to your email.
+        expiresIn:
+          type: integer
+          description: Seconds until the code expires.
+          example: 600
+        resendAfter:
+          type: integer
+          description: Seconds before another code can be requested.
+          example: 60
+
+    VerifyOtpRequest:
+      type: object
+      additionalProperties: false
+      required: [email, otp]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          example: priya.menon@example.com
+        otp:
+          type: string
+          pattern: '^\d{6}$'
+          example: '482913'
+
+    VerifyOtpResponse:
+      type: object
+      required: [verificationToken, expiresIn]
+      properties:
+        verificationToken:
+          type: string
+          description: Send as `emailVerificationToken` on `POST /auth/register`.
+        expiresIn:
+          type: integer
+          description: Seconds the token stays valid.
+          example: 1800
 
     LoginRequest:
       type: object

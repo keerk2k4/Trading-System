@@ -46,6 +46,15 @@ export class RegisterRequest {
   @Matches(/^\+?[1-9]\d{7,14}$/)
   phone!: string;
 
+  // Issued by POST /auth/register/otp/verify. Required by /auth/register
+  // (enforced in the controller); /auth/admin/register shares this DTO and
+  // ignores it.
+  @ApiPropertyOptional({ maxLength: 128, description: 'Token from POST /auth/register/otp/verify.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  emailVerificationToken?: string;
+
   // NOTE: accountId removed deliberately. The team decided registration
   // auto-creates a new trading account via Trade REST API, rather than
   // requiring the client to already own one -- see the security review
