@@ -23,8 +23,13 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MockAuthService } from '../../../shared/services/auth.service';
 import { TradeApiService } from '../../../shared/services/trade-api.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
+import { WatchlistService } from '../../../shared/services/watchlist.service';
 import { StatusBadgeComponent } from '../../../shared/ui/status-badge.component';
 import { OrderSide, PlaceOrderResponse, TradeApiError } from '../../../shared/models/order.models';
+import { WatchlistStock } from '../../../shared/models/watchlist.models';
+
+/** Results shown under the symbol field; the full list belongs on the watchlist page. */
+const MAX_SEARCH_RESULTS = 6;
 
 function wholeNumber(control: AbstractControl<number | null>): ValidationErrors | null {
   const value = control.value;
@@ -134,7 +139,38 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                   @if (symbolError(); as message) {
                     <p class="tp-field-error" id="symbol-error" data-testid="order-error-symbol">{{ message }}</p>
                   } @else {
-                    <p class="tp-hint" id="symbol-hint">For example AAPL, MSFT or GOOGL.</p>
+                    <p class="tp-hint" id="symbol-hint">Search by company name or symbol, for example Apple or AAPL.</p>
+                  }
+
+                  <span class="sr-only" role="status" data-testid="order-search-status">{{ searchStatus() }}</span>
+                  @if (showSearch()) {
+                    <div class="results" role="region" aria-label="Matching stocks">
+                      @if (searchResults().length === 0) {
+                        <p class="tp-muted" data-testid="order-search-empty">No stocks match “{{ (values().symbol ?? '').trim() }}”.</p>
+                      } @else {
+                        <ul class="result-list">
+                          @for (stock of searchResults(); track stock.symbol) {
+                            <li class="result-row" data-testid="order-search-row">
+                              <div class="identity">
+                                <strong>{{ stock.symbol }}</strong>
+                                <span class="tp-muted">{{ stock.companyName }}</span>
+                              </div>
+                              <span class="tp-num">{{ stock.price | currency }}</span>
+                              <button
+                                class="tp-btn tp-btn-secondary"
+                                type="button"
+                                data-testid="order-search-select"
+                                [attr.data-symbol]="stock.symbol"
+                                [attr.aria-label]="'Select ' + stock.symbol + ', ' + stock.companyName"
+                                (click)="selectStock(stock)"
+                              >
+                                Select
+                              </button>
+                            </li>
+                          }
+                        </ul>
+                      }
+                    </div>
                   }
                 </div>
 
@@ -228,12 +264,21 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
     .symbol { text-transform: uppercase; }
     h2:focus-visible { outline: 2px solid var(--tp-focus); outline-offset: 4px; border-radius: 0.125rem; }
     .estimate { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--tp-border); }
+    .results { margin-top: 0.5rem; }
+    .result-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+    .result-row {
+      display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem;
+      border: 1px solid var(--tp-border); border-radius: var(--tp-radius); background-color: var(--tp-surface-raised);
+    }
+    .identity { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+    .identity span { font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   `]
 })
 export class PlaceOrderComponent implements OnInit {
   private readonly authService = inject(MockAuthService);
   private readonly orderService = inject(TradeApiService);
   private readonly errorMapping = inject(ErrorMappingService);
+  private readonly watchlist = inject(WatchlistService);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
@@ -259,6 +304,38 @@ export class PlaceOrderComponent implements OnInit {
     return side === 'BUY' ? 'Place buy order' : side === 'SELL' ? 'Place sell order' : 'Place order';
   });
 
+  // The symbol last chosen from the results (or deep-linked). While the field
+  // still holds it, the results stay hidden; typing anything else reopens them.
+  private readonly pickedSymbol = signal('');
+  protected readonly showSearch = computed(() => {
+    const query = (this.values().symbol ?? '').trim();
+    return query !== '' && query.toUpperCase() !== this.pickedSymbol();
+  });
+  // Same name-or-symbol filter as the watchlist page, over the same catalog.
+  protected readonly searchResults = computed(() =>
+    this.showSearch() ? this.watchlist.search(this.values().symbol ?? '').slice(0, MAX_SEARCH_RESULTS) : []
+  );
+  // Text typed to search ("apple") that matches stocks but is not itself one of
+  // their symbols. Submitting it would only come back as INS-404, so the trader
+  // is asked to pick from the list. Text matching nothing (or an empty catalog)
+  // is still left to the server, which stays the authority on instruments.
+  protected readonly needsPick = computed(() => {
+    if (!this.showSearch()) {
+      return false;
+    }
+    const query = (this.values().symbol ?? '').trim().toUpperCase();
+    const matches = this.watchlist.search(query);
+    return matches.length > 0 && !matches.some((stock) => stock.symbol === query);
+  });
+  // Read by screen readers, which cannot see the result list appear.
+  protected readonly searchStatus = computed(() => {
+    if (!this.showSearch()) {
+      return '';
+    }
+    const count = this.searchResults().length;
+    return count === 0 ? 'No stocks match.' : `${count} ${count === 1 ? 'stock matches' : 'stocks match'}.`;
+  });
+
   protected readonly submitted = signal(false);
   protected readonly isLoading = signal(false);
   protected readonly errorMessage = signal('');
@@ -268,6 +345,8 @@ export class PlaceOrderComponent implements OnInit {
   private idempotencyKey = '';
 
   ngOnInit(): void {
+    this.watchlist.loadCatalog();
+
     // Deep link from the watchlist (/orders/new?symbol=AAPL): fill the ticket
     // with that stock. The user's own typing always wins, so only a pristine
     // control is ever filled and validation still applies unchanged.
@@ -276,7 +355,27 @@ export class PlaceOrderComponent implements OnInit {
       const control = this.form.controls.symbol;
       if (symbol && control.pristine && control.value !== symbol) {
         control.setValue(symbol);
+        this.pickedSymbol.set(symbol);
       }
+    });
+  }
+
+  /**
+   * Fills the ticket from a search result: the symbol always, and the limit
+   * price from the live quote only when the trader has not typed one yet.
+   * Focus moves on to quantity because the pressed button disappears.
+   */
+  protected selectStock(stock: WatchlistStock): void {
+    const { symbol, price } = this.form.controls;
+    symbol.setValue(stock.symbol);
+    symbol.markAsDirty();
+    this.pickedSymbol.set(stock.symbol);
+    if (price.value === null && stock.price > 0) {
+      price.setValue(Math.round(stock.price * 100) / 100);
+      price.markAsDirty();
+    }
+    afterNextRender(() => this.host.nativeElement.querySelector<HTMLElement>('#quantity')?.focus(), {
+      injector: this.injector
     });
   }
 
@@ -285,12 +384,20 @@ export class PlaceOrderComponent implements OnInit {
   }
 
   protected symbolError(): string | null {
-    if (!this.shows('symbol')) {
+    const control = this.form.controls.symbol;
+    const needsPick = this.needsPick();
+    if (!(control.touched || this.submitted()) || (control.valid && !needsPick)) {
       return null;
     }
-    return this.form.controls.symbol.hasError('required')
-      ? 'Enter a symbol.'
-      : 'Symbols are at most 10 characters.';
+    if (control.hasError('required')) {
+      return 'Enter a symbol.';
+    }
+    // Mid-search ("Microsoft Corp"), the length rule is not the problem;
+    // say nothing until submit, then point at the list.
+    if (needsPick) {
+      return this.submitted() ? 'Choose a stock from the list below.' : null;
+    }
+    return 'Symbols are at most 10 characters.';
   }
 
   protected quantityError(): string | null {
@@ -323,8 +430,9 @@ export class PlaceOrderComponent implements OnInit {
     this.submitted.set(true);
     this.errorMessage.set('');
 
-    if (this.form.invalid) {
-      this.host.nativeElement.querySelector<HTMLElement>('input.ng-invalid')?.focus();
+    if (this.form.invalid || this.needsPick()) {
+      const page = this.host.nativeElement;
+      (page.querySelector<HTMLElement>('input.ng-invalid') ?? page.querySelector<HTMLElement>('#symbol'))?.focus();
       return;
     }
 
@@ -384,6 +492,7 @@ export class PlaceOrderComponent implements OnInit {
     this.errorMessage.set('');
     this.placedOrder.set(null);
     this.idempotencyKey = '';
+    this.pickedSymbol.set('');
     // The button that was pressed has been replaced by the empty ticket.
     afterNextRender(() => this.host.nativeElement.querySelector<HTMLElement>('#side-buy')?.focus(), {
       injector: this.injector
