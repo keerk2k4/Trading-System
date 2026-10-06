@@ -18,7 +18,13 @@ import { KycResponse } from "../dtos/KycResponse";
 import { UpdateKycRequest, KycReviewStatus } from "../dtos/UpdateKycRequest";
 import { BearerGuard } from "../guards/BearerGuard";
 import { AuthenticatedUser, CurrentUser } from "../guards/CurrentUser";
-import { KycRepository } from "../repositories/KycRepository";
+import { DOCUMENT_UNIQUE_INDEX, KycRepository } from "../repositories/KycRepository";
+import { isUniqueViolation } from "../database/unique-violation";
+
+const DOCUMENT_TAKEN: ErrorResponse = {
+  errorCode: "DOC-409",
+  message: "This document is already registered to another account. Check the document type and number.",
+};
 import { UserRepository } from "../repositories/UserRepository";
 import { TradeApiClient } from "../services/TradeApiClient";
 import { NotificationService } from "../services/NotificationService";
@@ -122,6 +128,11 @@ export class KycController {
         return;
       }
 
+      if (await this.kycRepository.isDocumentTaken(request.documentType, request.documentNumber, claims.sub)) {
+        res.status(409).json(DOCUMENT_TAKEN);
+        return;
+      }
+
       const user = await this.userRepository.findByUserId(claims.sub);
       if (!user) {
         const response: ErrorResponse = { errorCode: "AUTH-401", message: "Unauthorised" };
@@ -141,6 +152,10 @@ export class KycController {
 
       res.status(201).json(this.toKycResponse(created));
     } catch (error) {
+      if (isUniqueViolation(error, DOCUMENT_UNIQUE_INDEX)) {
+        res.status(409).json(DOCUMENT_TAKEN);
+        return;
+      }
       console.error("Create KYC error:", error);
       const response: ErrorResponse = { errorCode: "VAL-422", message: "Invalid input" };
       res.status(422).json(response);
@@ -182,6 +197,11 @@ export class KycController {
         return;
       }
 
+      if (await this.kycRepository.isDocumentTaken(request.documentType, request.documentNumber, claims.sub)) {
+        res.status(409).json(DOCUMENT_TAKEN);
+        return;
+      }
+
       const updated = await this.kycRepository.updateSubmissionByUserId({
         userId: claims.sub,
         dateOfBirth: request.dateOfBirth,
@@ -200,6 +220,10 @@ export class KycController {
 
       res.status(200).json(this.toKycResponse(updated));
     } catch (error) {
+      if (isUniqueViolation(error, DOCUMENT_UNIQUE_INDEX)) {
+        res.status(409).json(DOCUMENT_TAKEN);
+        return;
+      }
       console.error("Update KYC error:", error);
       const response: ErrorResponse = { errorCode: "VAL-422", message: "Invalid input" };
       res.status(422).json(response);

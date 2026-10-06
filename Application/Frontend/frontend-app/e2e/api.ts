@@ -41,13 +41,24 @@ export function uniqueUsername(prefix = 'e2e'): string {
   return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1e4)}`;
 }
 
+// Phone numbers are unique per account, so every test user needs its own.
+export function uniquePhone(): string {
+  const random = String(Math.floor(Math.random() * 100)).padStart(2, '0');
+  return `+19${String(Date.now()).slice(-8)}${random}`;
+}
+
+// Document type + number is unique across KYC submissions.
+export function uniqueDocumentNumber(): string {
+  return `P${Date.now()}${Math.floor(Math.random() * 1000)}`;
+}
+
 export function registrationFor(username = uniqueUsername()) {
   return {
     username,
     email: `${username}@example.com`,
     firstName: 'E2e',
     lastName: 'Tester',
-    phone: '+15550001234',
+    phone: uniquePhone(),
     password: 'E2e-Password-123'
   };
 }
@@ -98,10 +109,14 @@ export async function createUser(request: APIRequestContext): Promise<TestUser &
   return { ...user, tokens: await waitUntilCanSignIn(request, user) };
 }
 
-export async function submitKyc(request: APIRequestContext, accessToken: string): Promise<void> {
+export async function submitKyc(
+  request: APIRequestContext,
+  accessToken: string,
+  documentNumber = uniqueDocumentNumber()
+): Promise<void> {
   const res = await request.post(`${env.authApi}/kyc`, {
     headers: bearer(accessToken),
-    data: { dateOfBirth: '1990-01-15', documentType: 'PASSPORT', documentNumber: `P${Date.now()}` }
+    data: { dateOfBirth: '1990-01-15', documentType: 'PASSPORT', documentNumber }
   });
   expect(res.status(), 'submit KYC').toBe(201);
 }

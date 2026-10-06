@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { env, MESSAGES } from './env';
-import { registrationFor } from './api';
+import { registerViaApi, registrationFor } from './api';
 import { waitForOtp } from './mail';
 
 // Registration journey against the real auth service. The email must be
@@ -76,6 +76,18 @@ test.describe('Registration journey', () => {
 
     await expect(page.getByTestId('register-email-verified')).toHaveCount(0);
     await expect(page.getByTestId('register-send-otp')).toBeVisible();
+  });
+
+  test('a phone number already used by another account is reported on the field', async ({ page, request }) => {
+    const existing = await registerViaApi(request);
+    const data = await fillRegistration(page, { phone: existing.phone });
+    await verifyEmail(page, data.email);
+    await page.getByTestId('register-submit').click();
+
+    await expect(page.getByTestId('register-phone-error')).toHaveText(
+      'This phone number is already registered to another account.'
+    );
+    await expect(page.getByRole('heading', { name: 'Account created' })).toHaveCount(0);
   });
 
   test('a taken username is reported on the field', async ({ page }) => {

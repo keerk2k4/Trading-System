@@ -16,6 +16,8 @@ export class ErrorMappingService {
     'AUTH-403': 'This sign-in is not allowed to do that. Sign in with a customer account and try again.',
     'KYC-404': 'We could not find your identity verification. Please submit your details.',
     'KYC-409': 'This identity verification has already been submitted or approved.',
+    'PHONE-409': 'This phone number is already registered to another account.',
+    'DOC-409': 'This document is already registered to another account. Check the document type and number.',
   };
 
   getErrorMessage(errorCode: string): string {

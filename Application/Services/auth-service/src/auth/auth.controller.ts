@@ -24,7 +24,8 @@ import { TokenService } from "../services/TokenService";
 import { PasswordService } from "../services/PasswordService";
 import { RefreshTokenService } from "../services/RefreshTokenService";
 import { TradeApiClient } from "../services/TradeApiClient";
-import { UserRepository } from "../repositories/UserRepository";
+import { PHONE_UNIQUE_INDEX, UserRepository } from "../repositories/UserRepository";
+import { isUniqueViolation } from "../database/unique-violation";
 import { ThrottleService } from "../services/ThrottleService";
 import { AccountProvisioningEventService } from "../services/AccountProvisioningEventService";
 import { NotificationService } from "../services/NotificationService";
@@ -44,6 +45,11 @@ import { SendOtpResponse, VerifyOtpResponse } from "../dtos/OtpResponse";
 // only sends it to /auth/refresh and /auth/logout, never to /kyc or the
 // Trade API. The body still carries it during the transition period.
 export const REFRESH_COOKIE_NAME = "refresh_token";
+
+const PHONE_TAKEN: ErrorResponse = {
+  errorCode: "PHONE-409",
+  message: "This phone number is already registered to another account.",
+};
 const REFRESH_COOKIE_OPTIONS: CookieOptions = {
   httpOnly: true,
   secure: true,
@@ -316,7 +322,7 @@ export class AuthController {
   @ApiOperation({ summary: "Register a user" })
   @ApiResponse({ status: 201, description: "User created.", type: UserResponse })
   @ApiResponse({ status: 403, description: "The email address has not been verified.", type: ErrorResponse })
-  @ApiResponse({ status: 409, description: "The username is already taken.", type: ErrorResponse })
+  @ApiResponse({ status: 409, description: "The username (AUTH-409) or phone number (PHONE-409) is already taken.", type: ErrorResponse })
   @ApiResponse({ status: 422, description: "Invalid input", type: ErrorResponse })
   async register(@Body() registerRequest: RegisterRequest, @Res() res: Response): Promise<void> {
     let createdUserId: string | null = null;
@@ -338,6 +344,11 @@ export class AuthController {
           message: "Username already registered",
         };
         res.status(409).json(error);
+        return;
+      }
+
+      if (await this.userRepository.isPhoneTaken(registerRequest.phone)) {
+        res.status(409).json(PHONE_TAKEN);
         return;
       }
 
@@ -373,6 +384,10 @@ export class AuthController {
       if (createdUserId) {
         await this.userRepository.deleteById(createdUserId);
       }
+      if (isUniqueViolation(error, PHONE_UNIQUE_INDEX)) {
+        res.status(409).json(PHONE_TAKEN);
+        return;
+      }
       console.error("Register error:", error);
       const response: ErrorResponse = {
         errorCode: "VAL-422",
@@ -387,7 +402,7 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: "Register an admin user" })
   @ApiResponse({ status: 201, description: "Admin user created.", type: UserResponse })
-  @ApiResponse({ status: 409, description: "The username is already taken.", type: ErrorResponse })
+  @ApiResponse({ status: 409, description: "The username (AUTH-409) or phone number (PHONE-409) is already taken.", type: ErrorResponse })
   @ApiResponse({ status: 422, description: "Invalid input", type: ErrorResponse })
   async registerAdmin(@Body() registerRequest: RegisterRequest, @Res() res: Response): Promise<void> {
     let createdUserId: string | null = null;
@@ -399,6 +414,11 @@ export class AuthController {
           message: "Username already registered",
         };
         res.status(409).json(error);
+        return;
+      }
+
+      if (await this.userRepository.isPhoneTaken(registerRequest.phone)) {
+        res.status(409).json(PHONE_TAKEN);
         return;
       }
 
@@ -427,6 +447,10 @@ export class AuthController {
     } catch (error) {
       if (createdUserId) {
         await this.userRepository.deleteById(createdUserId);
+      }
+      if (isUniqueViolation(error, PHONE_UNIQUE_INDEX)) {
+        res.status(409).json(PHONE_TAKEN);
+        return;
       }
       console.error("Admin register error:", error);
       const response: ErrorResponse = {

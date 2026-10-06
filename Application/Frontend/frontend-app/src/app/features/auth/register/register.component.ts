@@ -463,6 +463,9 @@ export class RegisterComponent {
     if (control.hasError('required')) {
       return 'Enter a phone number.';
     }
+    if (control.hasError('taken')) {
+      return this.errorMapping.getErrorMessage('PHONE-409');
+    }
     return 'Enter a valid phone number in international format.';
   }
 
@@ -649,6 +652,13 @@ export class RegisterComponent {
       const username = this.form.controls.username;
       username.setErrors({ taken: true });
       this.host.nativeElement.querySelector<HTMLElement>('#register-username')?.focus();
+      return;
+    }
+
+    if (err.errorCode === 'PHONE-409') {
+      // Reported on the field itself; it clears as soon as the number is edited.
+      this.form.controls.phone.setErrors({ taken: true });
+      this.host.nativeElement.querySelector<HTMLElement>('#register-phone')?.focus();
       return;
     }
 

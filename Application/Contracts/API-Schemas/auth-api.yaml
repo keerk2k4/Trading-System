@@ -386,7 +386,7 @@ paths:
                     errorCode: OTP-403
                     message: Email not verified. Verify the code sent to your email before registering.
         '409':
-          description: The username is already taken.
+          description: The username (`AUTH-409`) or phone number (`PHONE-409`) is already registered.
           content:
             application/json:
               schema:
@@ -433,7 +433,7 @@ paths:
                     accountId: 0
                     roles: [ADMIN]
         '409':
-          description: The username is already taken.
+          description: The username (`AUTH-409`) or phone number (`PHONE-409`) is already registered.
           content:
             application/json:
               schema:
@@ -663,7 +663,9 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
-          description: This user has already submitted KYC.
+          description: |
+            This user has already submitted KYC (`KYC-409`), or another user already registered the
+            same document type and number (`DOC-409`; compared ignoring case, spaces and punctuation).
           content:
             application/json:
               schema:
@@ -673,6 +675,10 @@ paths:
                   value:
                     errorCode: KYC-409
                     message: KYC already submitted
+                documentTaken:
+                  value:
+                    errorCode: DOC-409
+                    message: This document is already registered to another account. Check the document type and number.
         '422':
           $ref: '#/components/responses/InvalidInput'
       security:
@@ -713,6 +719,17 @@ paths:
                   value:
                     errorCode: KYC-404
                     message: KYC record not found
+        '409':
+          description: Another user already registered the same document type and number.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                documentTaken:
+                  value:
+                    errorCode: DOC-409
+                    message: This document is already registered to another account. Check the document type and number.
         '422':
           $ref: '#/components/responses/InvalidInput'
       security:
@@ -1230,6 +1247,8 @@ components:
             | `ACC-403` | 403 | Linked trading account is suspended (login only) |
             | `KYC-404` | 404 | No KYC submission exists for the given user |
             | `KYC-409` | 409 | KYC already submitted, or already approved |
+            | `PHONE-409` | 409 | Phone number already registered to another account (register) |
+            | `DOC-409` | 409 | Document type + number already registered to another account (KYC) |
             | `VAL-422` | 422 | Invalid input |
 
             `AUTH-403`, `AUTH-409`, `KYC-404` and `KYC-409` extend the platform error catalogue and

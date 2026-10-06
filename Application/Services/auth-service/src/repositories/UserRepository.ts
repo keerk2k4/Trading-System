@@ -1,10 +1,21 @@
 import { Injectable } from "@nestjs/common";
 import { DatabaseService } from "../database/database.service";
 import { User } from "../entities/User";
+import { FieldEncryptionService } from "../services/FieldEncryptionService";
 
+// Name of the UNIQUE index on phone_lookup_hash (migration 018). Postgres
+// reports it as `constraint` on a 23505 unique-violation error.
+export const PHONE_UNIQUE_INDEX = "uq_auth_users_phone_lookup_hash";
+
+// email and phone are stored AES-256-GCM encrypted (FieldEncryptionService):
+// encrypted in create(), decrypted in mapRowToUser(). Never query by them;
+// phone uniqueness goes through phone_lookup_hash instead.
 @Injectable()
 export class UserRepository {
-  constructor(private databaseService: DatabaseService) {}
+  constructor(
+    private databaseService: DatabaseService,
+    private fieldEncryption: FieldEncryptionService,
+  ) {}
 
   async findByUsername(userName: string): Promise<User | null> {
     const result = await this.databaseService.query("SELECT * FROM auth.users WHERE user_name = $1", [userName]);    
@@ -28,13 +39,42 @@ export class UserRepository {
 
   async create(user: Omit<User, "userId">): Promise<User> {
     const result = await this.databaseService.query(
-      `INSERT INTO auth.users (user_name, password_hash, email, phone, first_name, last_name, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO auth.users (user_name, password_hash, email, phone, phone_lookup_hash, first_name, last_name, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [user.userName, user.passwordHash, user.email, user.phone, user.firstName, user.lastName, user.status]
+      [
+        user.userName,
+        user.passwordHash,
+        this.fieldEncryption.encrypt(user.email),
+        this.fieldEncryption.encrypt(user.phone),
+        this.phoneLookupHash(user.phone),
+        user.firstName,
+        user.lastName,
+        user.status,
+      ]
     );
 
     return this.mapRowToUser(result.rows[0]);
+  }
+
+  // True when another account already uses this phone number (compared by
+  // lookup hash, so "+91 98765-43210" and "+919876543210" match).
+  async isPhoneTaken(phone: string): Promise<boolean> {
+    const hash = this.phoneLookupHash(phone);
+    if (!hash) {
+      return false;
+    }
+    const result = await this.databaseService.query(
+      "SELECT 1 FROM auth.users WHERE phone_lookup_hash = $1 LIMIT 1",
+      [hash],
+    );
+    return result.rows.length > 0;
+  }
+
+  // Digits only, so formatting and a leading "+" never make two equal numbers differ.
+  phoneLookupHash(phone: string | null | undefined): string | null {
+    const digits = (phone ?? "").replace(/\D/g, "");
+    return digits ? this.fieldEncryption.lookupHash("phone", digits) : null;
   }
 
   async isUsernameTaken(userName: string): Promise<boolean> {
@@ -86,8 +126,8 @@ export class UserRepository {
       userId: row.user_id,
       userName: row.user_name,
       passwordHash: row.password_hash,
-      email: row.email,
-      phone: row.phone || null,
+      email: this.fieldEncryption.decrypt(row.email) as string,
+      phone: this.fieldEncryption.decrypt(row.phone) || null,
       firstName: row.first_name,
       lastName: row.last_name,
       status: row.status,

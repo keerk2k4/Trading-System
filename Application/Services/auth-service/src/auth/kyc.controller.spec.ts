@@ -59,6 +59,7 @@ describe("KycController", () => {
       reviewSubmission: jest.fn(),
       updateSubmissionByUserId: jest.fn(),
       findAllPending: jest.fn(),
+      isDocumentTaken: jest.fn().mockResolvedValue(false),
     } as unknown as jest.Mocked<KycRepository>;
 
     userRepository = {
@@ -110,6 +111,47 @@ describe("KycController", () => {
       "alice.trader@example.com",
       "alice.trader",
     );
+  });
+
+  describe("duplicate document", () => {
+    const DOCUMENT_TAKEN = {
+      errorCode: "DOC-409",
+      message: "This document is already registered to another account. Check the document type and number.",
+    };
+    const request = { dateOfBirth: "1996-02-14", documentType: "PASSPORT", documentNumber: "P1234567" };
+
+    it("refuses a submission whose document another user already registered", async () => {
+      kycRepository.findByUserId.mockResolvedValue(null);
+      kycRepository.isDocumentTaken.mockResolvedValue(true);
+      const { res, state } = makeResponse();
+
+      await controller.createKyc({ sub: USER_ID, roles: ["CUSTOMER"] } as any, request, res);
+
+      expect(state).toEqual({ status: 409, body: DOCUMENT_TAKEN });
+      expect(kycRepository.isDocumentTaken).toHaveBeenCalledWith("PASSPORT", "P1234567", USER_ID);
+      expect(kycRepository.createSubmission).not.toHaveBeenCalled();
+    });
+
+    it("refuses an update to a document another user already registered", async () => {
+      kycRepository.isDocumentTaken.mockResolvedValue(true);
+      const { res, state } = makeResponse();
+
+      await controller.updateMyKyc({ sub: USER_ID, roles: ["CUSTOMER"] } as any, request, res);
+
+      expect(state).toEqual({ status: 409, body: DOCUMENT_TAKEN });
+      expect(kycRepository.updateSubmissionByUserId).not.toHaveBeenCalled();
+    });
+
+    it("maps a document unique-index violation (two submissions racing) to 409 DOC-409", async () => {
+      kycRepository.findByUserId.mockResolvedValue(null);
+      userRepository.findByUserId.mockResolvedValue(applicant as any);
+      kycRepository.createSubmission.mockRejectedValue({ code: "23505", constraint: "uq_auth_kyc_document_lookup_hash" });
+      const { res, state } = makeResponse();
+
+      await controller.createKyc({ sub: USER_ID, roles: ["CUSTOMER"] } as any, request, res);
+
+      expect(state).toEqual({ status: 409, body: DOCUMENT_TAKEN });
+    });
   });
 
   describe("future date of birth", () => {
