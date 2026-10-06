@@ -47,7 +47,54 @@ describe('DashboardComponent', () => {
     create({ id: 'u-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] });
 
     expect(page.querySelector('h1')?.textContent).toContain('gaurang123');
-    expect(statValues()).toEqual(['$3,300.00', '$1,000.00', '$2,300.00']);
+    expect(statValues()).toEqual(['$3,300.00', '$1,000.00', '$2,300.00', '$0.00', '0.00%']);
+  });
+
+  it('totals unrealized P&L across positions as an amount and a share of cost basis', () => {
+    tradeApi.getPositions.and.returnValue(
+      of([
+        // Cost 2,500 -> 2,700: +200
+        { accountId: 6, symbol: 'ACME', quantity: 100, averageCost: 25, currentPrice: 27, marketValue: 2700, unrealizedPnl: 200, unrealizedPnlPercent: 8 },
+        // Cost 1,000 -> 900: -100
+        { accountId: 6, symbol: 'BETA', quantity: 10, averageCost: 100, currentPrice: 90, marketValue: 900, unrealizedPnl: -100, unrealizedPnlPercent: -10 }
+      ])
+    );
+    create({ id: 'u-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] });
+
+    const pnl = page.querySelector('[data-testid="dashboard-unrealized-pnl"] app-pnl-value')!;
+    const pnlPercent = page.querySelector('[data-testid="dashboard-unrealized-pnl-percent"] app-pnl-value')!;
+    expect(pnl.textContent?.trim()).toBe('+$100.00');
+    // 100 / 3,500 cost basis
+    expect(pnlPercent.textContent?.trim()).toBe('+2.86%');
+    expect(pnl.classList).toContain('tp-positive');
+  });
+
+  it('shows each position\'s unrealized P&L and a total row in the positions table', () => {
+    tradeApi.getPositions.and.returnValue(
+      of([
+        { accountId: 6, symbol: 'ACME', quantity: 100, averageCost: 25, currentPrice: 27, marketValue: 2700, unrealizedPnl: 200, unrealizedPnlPercent: 8 },
+        { accountId: 6, symbol: 'BETA', quantity: 10, averageCost: 100, currentPrice: 90, marketValue: 900, unrealizedPnl: -100, unrealizedPnlPercent: -10 },
+        // No quote yet: valued at cost, P&L not available
+        { accountId: 6, symbol: 'GAMA', quantity: 4, averageCost: 50, currentPrice: null, marketValue: null, unrealizedPnl: null, unrealizedPnlPercent: null }
+      ])
+    );
+    create({ id: 'u-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] });
+
+    const cell = (symbol: string, id: string) =>
+      page.querySelector(`[data-symbol="${symbol}"] [data-testid="${id}"] app-pnl-value`)!;
+    expect(cell('ACME', 'position-unrealized-pnl').textContent?.trim()).toBe('+$200.00');
+    expect(cell('ACME', 'position-unrealized-pnl-percent').textContent?.trim()).toBe('+8.00%');
+    expect(cell('ACME', 'position-unrealized-pnl').classList).toContain('tp-positive');
+    expect(cell('BETA', 'position-unrealized-pnl').textContent?.trim()).toBe('-$100.00');
+    expect(cell('BETA', 'position-unrealized-pnl-percent').classList).toContain('tp-negative');
+    expect(cell('GAMA', 'position-unrealized-pnl').textContent?.trim()).toBe('—');
+
+    const total = page.querySelector('[data-testid="positions-total-row"]')!;
+    // Market value 2,700 + 900 + 200 at cost
+    expect(total.textContent).toContain('$3,800.00');
+    expect(total.querySelector('[data-testid="positions-total-pnl"] app-pnl-value')?.textContent?.trim()).toBe('+$100.00');
+    // 100 / (2,500 + 1,000 + 200) cost basis
+    expect(total.querySelector('[data-testid="positions-total-pnl-percent"] app-pnl-value')?.textContent?.trim()).toBe('+2.70%');
   });
 
   it('explains a missing trading account when the backend returns ACC-404', () => {
@@ -56,6 +103,6 @@ describe('DashboardComponent', () => {
 
     expect(tradeApi.getAccount).toHaveBeenCalled();
     expect(page.querySelector('[role="alert"]')?.textContent).toContain('could not be found');
-    expect(statValues()).toEqual(['—', '—', '—']);
+    expect(statValues()).toEqual(['—', '—', '—', '—', '—']);
   });
 });

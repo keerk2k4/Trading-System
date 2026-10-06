@@ -230,6 +230,7 @@ public class SettlementServiceTest {
         
         when(positionMapperMock.updatePosition(anyLong(), anyInt(), any(BigDecimal.class)))
             .thenReturn(1);
+        when(orderMapperMock.recordRealizedPnl(anyLong(), any(), any())).thenReturn(1);
         
         assertDoesNotThrow(() -> settlementService.settleOrder(
             orderId, accountId, executionPrice, quantity, side, result
@@ -240,6 +241,8 @@ public class SettlementServiceTest {
         );
         
         verify(positionMapperMock, times(1)).updatePosition(anyLong(), anyInt(), any(BigDecimal.class));
+        // (50.00 - 45.00 average cost) x 20
+        verify(orderMapperMock).recordRealizedPnl(orderId, new BigDecimal("45.00"), new BigDecimal("100.0000"));
     }
     
     private Account createMockAccount(Long accountId, double balance) {
@@ -405,6 +408,7 @@ public class SettlementServiceTest {
             .thenReturn(java.util.Optional.of(existingPosition));
         when(positionMapperMock.updatePosition(anyLong(), anyInt(), any(BigDecimal.class)))
             .thenReturn(1);
+        when(orderMapperMock.recordRealizedPnl(anyLong(), any(), any())).thenReturn(1);
         
         assertDoesNotThrow(() -> settlementService.settleOrder(
             orderId, accountId, executionPrice, quantity, side, result
@@ -412,6 +416,8 @@ public class SettlementServiceTest {
         
         verify(holdingMapperMock, times(1)).updateHolding(anyLong(), anyInt(), any(BigDecimal.class));
         verify(positionMapperMock, times(1)).updatePosition(anyLong(), anyInt(), any(BigDecimal.class));
+        // (100.50 - 100.00 average cost) x 5
+        verify(orderMapperMock).recordRealizedPnl(orderId, new BigDecimal("100.00"), new BigDecimal("2.5000"));
         verify(kafkaProducerMock, times(1)).publishTradeEvent(
             eq(accountId.toString()), any(TradeEvent.class)
         );

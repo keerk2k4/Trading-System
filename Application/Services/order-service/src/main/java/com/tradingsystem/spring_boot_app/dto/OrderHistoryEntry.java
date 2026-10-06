@@ -6,8 +6,20 @@ import com.tradingsystem.domain.enums.OrderStatus;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+/**
+ * realizedPnl / realizedPnlPercent are set only for FILLED SELL orders with a
+ * known average cost (recorded by the executor at settlement); null otherwise.
+ */
 public record OrderHistoryEntry(String orderId, Long accountId, String symbol,
                                 OrderSide side, int quantity, BigDecimal price,
                                 BigDecimal executedPrice, OrderStatus status,
-                                String idempotencyKey, OffsetDateTime createdOn) {
+                                String idempotencyKey, OffsetDateTime createdOn,
+                                BigDecimal realizedPnl, BigDecimal realizedPnlPercent) {
+    public OrderHistoryEntry(String orderId, Long accountId, String symbol,
+                             OrderSide side, int quantity, BigDecimal price,
+                             BigDecimal executedPrice, OrderStatus status,
+                             String idempotencyKey, OffsetDateTime createdOn) {
+        this(orderId, accountId, symbol, side, quantity, price, executedPrice, status,
+                idempotencyKey, createdOn, null, null);
+    }
 }

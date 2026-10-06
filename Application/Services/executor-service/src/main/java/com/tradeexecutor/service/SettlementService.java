@@ -30,7 +30,8 @@ import java.util.Optional;
  * Handles the transactional settlement of executed orders:
  * 1. Update order status atomically with WHERE order_id = ? AND status = 'NEW'
  * 2. Update account cash balance with optimistic locking
- * 3. Update/create position
+ * 3. Update/create position; a SELL also records its realised P&L against the
+ *    position's weighted average cost
  * 4. On success, publish ORDER_FILLED or ORDER_REJECTED event
  * 
  * All database changes happen in a single transaction and are rolled back if any operation fails.
@@ -281,6 +282,7 @@ public class SettlementService {
                 }
                 // SELL preserves weighted average cost basis; only quantity changes.
                 updatedAveragePrice = current.getAveragePrice().setScale(2, RoundingMode.HALF_UP);
+                recordRealizedPnl(orderId, updatedAveragePrice, executionPrice, quantity);
             }
 
             if (updatedQuantity == 0) {
@@ -335,6 +337,23 @@ public class SettlementService {
             newPosition.getPositionId(), quantity, newPosition.getAveragePrice());
     }
     
+    /**
+     * Realised P&L of a SELL against the weighted average cost of the shares
+     * held: (executionPrice - averageCost) x quantity. Recorded on the order
+     * in the same transaction as the fill.
+     */
+    private void recordRealizedPnl(Long orderId, BigDecimal averageCost,
+                                   BigDecimal executionPrice, int quantity) {
+        BigDecimal realizedPnl = executionPrice.subtract(averageCost)
+            .multiply(BigDecimal.valueOf(quantity))
+            .setScale(4, RoundingMode.HALF_UP);
+        if (orderMapper.recordRealizedPnl(orderId, averageCost, realizedPnl) == 0) {
+            throw new IllegalStateException("Failed to record realised P&L for SELL order " + orderId);
+        }
+        logger.info("    ✓ Realised P&L recorded (avgCost={}, sellPrice={}, quantity={}, pnl={})",
+            averageCost, executionPrice, quantity, realizedPnl);
+    }
+
     /**
      * Update or create a holding for DELIVERY product type (equity holdings in demat account).
      * 

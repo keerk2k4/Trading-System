@@ -121,6 +121,9 @@ public interface OrderMapper {
 
     /**
      * Order history projection with persisted execution price from executor.
+     * Realised P&L (weighted average cost) is recorded on FILLED SELL orders by
+     * the executor; the percentage is relative to the average cost of the
+     * shares sold.
      */
     @Select("""
         SELECT
@@ -133,7 +136,11 @@ public interface OrderMapper {
             CAST(o.filled_price AS numeric(18,2)) AS executed_price,
             o.status AS status,
             o.idempotency_key AS idempotency_key,
-            o.created_at AS created_on
+            o.created_at AS created_on,
+            CASE WHEN o.side = 'SELL' AND o.status = 'FILLED'
+                 THEN ROUND(o.realized_pnl, 2) END AS realized_pnl,
+            CASE WHEN o.side = 'SELL' AND o.status = 'FILLED'
+                 THEN ROUND(o.realized_pnl * 100 / NULLIF(o.realized_avg_cost * o.quantity, 0), 2) END AS realized_pnl_percent
         FROM orders o
         JOIN instruments i ON i.instrument_id = o.instrument_id
         WHERE o.trading_account_id = #{accountId}
@@ -149,7 +156,9 @@ public interface OrderMapper {
         @Arg(column = "executed_price", javaType = java.math.BigDecimal.class),
         @Arg(column = "status", javaType = com.tradingsystem.domain.enums.OrderStatus.class),
         @Arg(column = "idempotency_key", javaType = String.class),
-        @Arg(column = "created_on", javaType = java.time.LocalDateTime.class)
+        @Arg(column = "created_on", javaType = java.time.LocalDateTime.class),
+        @Arg(column = "realized_pnl", javaType = java.math.BigDecimal.class),
+        @Arg(column = "realized_pnl_percent", javaType = java.math.BigDecimal.class)
     })
     List<OrderHistoryRow> findOrderHistoryByAccountId(@Param("accountId") Long accountId);
     

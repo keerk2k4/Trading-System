@@ -131,5 +131,20 @@ public interface OrderMapper {
         WHERE order_id = #{orderId} AND status = 'NEW'
         """)
     int markOrderRejected(@Param("orderId") Long orderId);
+
+    /**
+     * Record realised P&L on a FILLED SELL, weighted average cost method:
+     * averageCost is the position's average price at the moment of the sale.
+     */
+    @Update("""
+        UPDATE orders
+        SET realized_avg_cost = #{averageCost},
+            realized_pnl = #{realizedPnl},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE order_id = #{orderId} AND side = 'SELL' AND status = 'FILLED'
+        """)
+    int recordRealizedPnl(@Param("orderId") Long orderId,
+                          @Param("averageCost") BigDecimal averageCost,
+                          @Param("realizedPnl") BigDecimal realizedPnl);
 }
 

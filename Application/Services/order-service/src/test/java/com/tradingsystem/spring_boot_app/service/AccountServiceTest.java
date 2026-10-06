@@ -15,6 +15,7 @@ import com.tradingsystem.spring_boot_app.dto.BalanceResponse;
 import com.tradingsystem.spring_boot_app.dto.OrderHistoryEntry;
 import com.tradingsystem.spring_boot_app.dto.OrderHistoryRow;
 import com.tradingsystem.spring_boot_app.dto.PositionResponse;
+import com.tradingsystem.spring_boot_app.kafka.QuotePayload;
 import com.tradingsystem.spring_boot_app.mapper.AccountMapper;
 import com.tradingsystem.spring_boot_app.mapper.OrderMapper;
 import com.tradingsystem.spring_boot_app.mapper.PositionMapper;
@@ -34,6 +35,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -181,6 +183,55 @@ class AccountServiceTest {
     }
 
     @Test
+    void getPositionsComputesUnrealizedPnlFromLivePrice() {
+        LatestPriceCache cache = mock(LatestPriceCache.class);
+        QuotePayload quote = mock(QuotePayload.class);
+        when(quote.price()).thenReturn(new BigDecimal("27.00"));
+        when(cache.get("ACME")).thenReturn(Optional.of(quote));
+        service = new AccountService(accounts, positions, orders, cache);
+
+        Account account = mock(Account.class);
+        when(account.getAccountId()).thenReturn(7L);
+        when(accounts.findAccountById(7L)).thenReturn(Optional.of(account));
+        Position position = mock(Position.class);
+        Instrument instrument = mock(Instrument.class);
+        when(position.getAccount()).thenReturn(account);
+        when(position.getInstrument()).thenReturn(instrument);
+        when(instrument.getSymbol()).thenReturn("ACME");
+        when(position.getQuantity()).thenReturn(100);
+        when(position.getAveragePrice()).thenReturn(new BigDecimal("25.00"));
+        when(positions.findPositionsByAccountId(7L)).thenReturn(List.of(position));
+
+        PositionResponse result = service.getPositions(7L).getFirst();
+
+        assertAll(
+                () -> assertEquals(new BigDecimal("2700.00"), result.marketValue()),
+                () -> assertEquals(new BigDecimal("200.00"), result.unrealizedPnl()),
+                () -> assertEquals(new BigDecimal("8.00"), result.unrealizedPnlPercent())
+        );
+    }
+
+    @Test
+    void getOrdersPassesRecordedRealizedPnlThrough() {
+        Account account = mock(Account.class);
+        when(accounts.findAccountById(7L)).thenReturn(Optional.of(account));
+        LocalDateTime createdAt = LocalDateTime.of(2026, 10, 1, 9, 0);
+        OrderHistoryRow sell = new OrderHistoryRow("ORD-3", 7L, "ACME", OrderSide.SELL, 2,
+                new BigDecimal("96.00"), new BigDecimal("96.00"), OrderStatus.FILLED, "k3", createdAt,
+                new BigDecimal("-0.50"), new BigDecimal("-0.26"));
+        when(orders.findOrderHistoryByAccountId(7L)).thenReturn(List.of(sell, row("ORD-1", OrderStatus.FILLED, createdAt)));
+
+        List<OrderHistoryEntry> result = service.getOrders(7L, null, null, null);
+
+        assertAll(
+                () -> assertEquals(new BigDecimal("-0.50"), result.get(0).realizedPnl()),
+                () -> assertEquals(new BigDecimal("-0.26"), result.get(0).realizedPnlPercent()),
+                () -> assertNull(result.get(1).realizedPnl()),
+                () -> assertNull(result.get(1).realizedPnlPercent())
+        );
+    }
+
+    @Test
     void getOrdersMapsRowsAndAppliesOptionalStatusFilter() {
         Account account = mock(Account.class);
         when(accounts.findAccountById(7L)).thenReturn(Optional.of(account));
@@ -235,6 +286,8 @@ class AccountServiceTest {
                 new BigDecimal("25.48"),
                 status,
                 "key-" + orderId,
-                createdOn);
+                createdOn,
+                null,
+                null);
     }
 }

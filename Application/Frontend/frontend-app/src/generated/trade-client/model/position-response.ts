@@ -28,5 +28,13 @@ export interface PositionResponse {
      * quantity multiplied by currentPrice. Null when no quote seen yet.
      */
     marketValue?: number | null;
+    /**
+     * (currentPrice - averageCost) x quantity, to two decimal places. Null when no quote seen yet. 
+     */
+    unrealizedPnl?: number | null;
+    /**
+     * unrealizedPnl / (averageCost x quantity) x 100, to two decimal places. Null when no quote seen yet.
+     */
+    unrealizedPnlPercent?: number | null;
 }
 

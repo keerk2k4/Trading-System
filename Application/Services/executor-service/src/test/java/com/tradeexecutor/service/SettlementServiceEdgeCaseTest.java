@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -169,6 +170,7 @@ class SettlementServiceEdgeCaseTest {
         Position position = position(5, new BigDecimal("10.00"));
         stubFilledPersistence(order, account, Optional.of(position));
         when(positionMapper.updatePosition(POSITION_ID, 3, new BigDecimal("10.00"))).thenReturn(1);
+        when(orderMapper.recordRealizedPnl(eq(ORDER_ID), any(), any())).thenReturn(1);
 
         settlementService.settleOrder(
                 ORDER_ID, ACCOUNT_ID, new BigDecimal("20.00"), 2, OrderSide.SELL,
@@ -177,6 +179,46 @@ class SettlementServiceEdgeCaseTest {
 
         verify(accountMapper).updateAvailableBalanceOptimistic(ACCOUNT_ID, new BigDecimal("1040.00"), 1L);
         verify(positionMapper).updatePosition(POSITION_ID, 3, new BigDecimal("10.00"));
+        // (20.00 - 10.00 average cost) x 2
+        verify(orderMapper).recordRealizedPnl(ORDER_ID, new BigDecimal("10.00"), new BigDecimal("20.0000"));
+    }
+
+    @Test
+    @DisplayName("SELL below average cost records a realised loss against the weighted average")
+    void sellBelowAverageCostRecordsLoss() {
+        // BUY 5 @ 100 + BUY 3 @ 90 -> 8 held at weighted average 96.25; SELL 2 @ 96
+        Order order = order(OrderSide.SELL, 2);
+        Account account = account(new BigDecimal("1000.00"));
+        Position position = position(8, new BigDecimal("96.25"));
+        stubFilledPersistence(order, account, Optional.of(position));
+        when(positionMapper.updatePosition(POSITION_ID, 6, new BigDecimal("96.25"))).thenReturn(1);
+        when(orderMapper.recordRealizedPnl(eq(ORDER_ID), any(), any())).thenReturn(1);
+
+        settlementService.settleOrder(
+                ORDER_ID, ACCOUNT_ID, new BigDecimal("96.00"), 2, OrderSide.SELL,
+                ExecutionResult.filled(new BigDecimal("96.00"))
+        );
+
+        verify(orderMapper).recordRealizedPnl(ORDER_ID, new BigDecimal("96.25"), new BigDecimal("-0.5000"));
+    }
+
+    @Test
+    @DisplayName("Failing to record realised P&L aborts the settlement")
+    void failedRealizedPnlWriteThrows() {
+        Order order = order(OrderSide.SELL, 2);
+        Account account = account(new BigDecimal("1000.00"));
+        // Settlement stops before the position is written, so no position id is needed.
+        Position position = org.mockito.Mockito.mock(Position.class);
+        when(position.getQuantity()).thenReturn(5);
+        when(position.getAveragePrice()).thenReturn(new BigDecimal("10.00"));
+        stubFilledPersistence(order, account, Optional.of(position));
+        when(orderMapper.recordRealizedPnl(eq(ORDER_ID), any(), any())).thenReturn(0);
+
+        assertThrows(IllegalStateException.class,
+                () -> settlementService.settleOrder(
+                        ORDER_ID, ACCOUNT_ID, new BigDecimal("20.00"), 2, OrderSide.SELL,
+                        ExecutionResult.filled(new BigDecimal("20.00"))));
+        verify(positionMapper, never()).updatePosition(anyLong(), anyInt(), any());
     }
 
     @Test

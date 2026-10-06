@@ -28,6 +28,14 @@ export interface OrderHistoryEntry {
     status: OrderStatus;
     idempotencyKey?: string;
     createdOn: string;
+    /**
+     * Realised profit or loss, to two decimal places, using the weighted average cost method: (executedPrice - average cost) x quantity, where average cost is the position\'s averageCost at the moment the SELL was filled. Set only on FILLED SELL orders; null for BUY orders, unfilled orders and sells whose cost basis is unknown. 
+     */
+    realizedPnl?: number | null;
+    /**
+     * realizedPnl / (average cost x quantity) x 100, to two decimal places. Null whenever realizedPnl is null. 
+     */
+    realizedPnlPercent?: number | null;
 }
 export namespace OrderHistoryEntry {
 }

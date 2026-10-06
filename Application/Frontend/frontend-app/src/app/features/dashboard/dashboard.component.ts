@@ -8,19 +8,22 @@ import { MockKycService } from '../../shared/services/kyc.service';
 import { TradeApiService } from '../../shared/services/trade-api.service';
 import { ErrorMappingService } from '../../shared/services/error-mapping.service';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
+import { PnlValueComponent } from '../../shared/ui/pnl-value.component';
 import { Account, Position, TradeApiError } from '../../shared/models/order.models';
 
 interface PortfolioSummary {
   cash: number;
   holdings: number;
   total: number;
+  unrealizedPnl: number;
+  unrealizedPnlPercent: number | null;
   currency: string;
   asOf: string;
 }
 
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, CurrencyPipe, DatePipe, DecimalPipe, StatusBadgeComponent],
+  imports: [RouterLink, CurrencyPipe, DatePipe, DecimalPipe, StatusBadgeComponent, PnlValueComponent],
   template: `
     <div class="tp-page">
       <header class="tp-page-header">
@@ -62,6 +65,23 @@ interface PortfolioSummary {
         </div>
       </section>
 
+      <section class="tp-grid tp-grid-2" aria-label="Unrealized profit and loss" [attr.aria-busy]="isLoading()">
+        <div class="tp-panel tp-stat">
+          <p class="tp-stat-label">Unrealized P&amp;L</p>
+          <p class="tp-stat-value" data-testid="dashboard-unrealized-pnl">
+            <app-pnl-value [value]="summary()?.unrealizedPnl" [currency]="currency()" />
+          </p>
+          <p class="tp-stat-meta">Open positions at live price vs average cost</p>
+        </div>
+        <div class="tp-panel tp-stat">
+          <p class="tp-stat-label">Unrealized P&amp;L %</p>
+          <p class="tp-stat-value" data-testid="dashboard-unrealized-pnl-percent">
+            <app-pnl-value kind="percent" [value]="summary()?.unrealizedPnlPercent" />
+          </p>
+          <p class="tp-stat-meta">Relative to total cost basis</p>
+        </div>
+      </section>
+
       <div class="tp-grid tp-grid-main-side">
         <section class="tp-panel" aria-labelledby="positions-heading">
           <div class="tp-panel-header">
@@ -85,6 +105,8 @@ interface PortfolioSummary {
                     <th scope="col" class="num">Avg cost</th>
                     <th scope="col" class="num">Live price</th>
                     <th scope="col" class="num">Market value</th>
+                    <th scope="col" class="num">Unrealized P&amp;L</th>
+                    <th scope="col" class="num">P&amp;L %</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -95,9 +117,28 @@ interface PortfolioSummary {
                       <td class="num">{{ position.averageCost | currency: currency() }}</td>
                       <td class="num">{{ (position.currentPrice ?? position.averageCost) | currency: currency() }}</td>
                       <td class="num">{{ (position.marketValue ?? position.quantity * position.averageCost) | currency: currency() }}</td>
+                      <!-- "—" until market-data has sent a quote for this symbol -->
+                      <td class="num" data-testid="position-unrealized-pnl">
+                        <app-pnl-value [value]="position.unrealizedPnl" [currency]="currency()" />
+                      </td>
+                      <td class="num" data-testid="position-unrealized-pnl-percent">
+                        <app-pnl-value kind="percent" [value]="position.unrealizedPnlPercent" />
+                      </td>
                     </tr>
                   }
                 </tbody>
+                <tfoot>
+                  <tr data-testid="positions-total-row">
+                    <th scope="row" colspan="4">Total</th>
+                    <td class="num">{{ summary()?.holdings | currency: currency() }}</td>
+                    <td class="num" data-testid="positions-total-pnl">
+                      <app-pnl-value [value]="summary()?.unrealizedPnl" [currency]="currency()" />
+                    </td>
+                    <td class="num" data-testid="positions-total-pnl-percent">
+                      <app-pnl-value kind="percent" [value]="summary()?.unrealizedPnlPercent" />
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           }
@@ -119,7 +160,17 @@ interface PortfolioSummary {
         </section>
       </div>
     </div>
-  `
+  `,
+  styles: [`
+    tfoot th,
+    tfoot td {
+      padding: 0.75rem 1.25rem;
+      font-weight: 600;
+      white-space: nowrap;
+      border-top: 1px solid var(--tp-border);
+    }
+    tfoot th { text-align: left; color: var(--tp-text); }
+  `]
 })
 export class DashboardComponent implements OnInit {
   private readonly authService = inject(MockAuthService);
@@ -162,12 +213,21 @@ export class DashboardComponent implements OnInit {
             0
           );
 
+          // A position without a live quote is valued at cost, so it adds
+          // nothing to P&L but still counts towards the cost basis.
+          const costBasis = positions.reduce((total, position) => total + position.quantity * position.averageCost, 0);
+          const unrealizedPnl = roundToCents(
+            positions.reduce((total, position) => total + (position.unrealizedPnl ?? 0), 0)
+          );
+
           this.account.set(account);
           this.positions.set(positions);
           this.summary.set({
             cash: balance.cashBalance,
             holdings,
             total: balance.cashBalance + holdings,
+            unrealizedPnl,
+            unrealizedPnlPercent: costBasis > 0 ? roundToCents((unrealizedPnl / costBasis) * 100) : null,
             currency: balance.currency,
             asOf: balance.asOf
           });
@@ -183,4 +243,8 @@ export class DashboardComponent implements OnInit {
         }
       });
   }
+}
+
+function roundToCents(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }

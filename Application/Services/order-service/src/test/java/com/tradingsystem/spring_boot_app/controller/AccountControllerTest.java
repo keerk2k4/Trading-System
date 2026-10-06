@@ -163,9 +163,9 @@ class AccountControllerTest {
     @Test
     void getOrdersAnswers200WithContractBody() throws Exception {
         when(accounts.getOrders(eq(1L), any(), any(), any())).thenReturn(List.of(
-                new OrderHistoryEntry("ORD-" + UUID, 1L, "ACME", OrderSide.BUY, 100,
+                new OrderHistoryEntry("ORD-" + UUID, 1L, "ACME", OrderSide.SELL, 100,
                         new BigDecimal("25.50"), new BigDecimal("25.48"), OrderStatus.FILLED,
-                        UUID, NOW)));
+                        UUID, NOW, new BigDecimal("200.00"), new BigDecimal("8.00"))));
 
         mvc.perform(get("/api/v1/accounts/{id}/orders", 1)
                         .header("Authorization", TOKEN)
@@ -176,13 +176,15 @@ class AccountControllerTest {
                 .andExpect(jsonPath("$[0].orderId").value("ORD-" + UUID))
                 .andExpect(jsonPath("$[0].accountId").value(1))
                 .andExpect(jsonPath("$[0].symbol").value("ACME"))
-                .andExpect(jsonPath("$[0].side").value("BUY"))
+                .andExpect(jsonPath("$[0].side").value("SELL"))
                 .andExpect(jsonPath("$[0].quantity").value(100))
                 .andExpect(jsonPath("$[0].price").value(25.50))
                 .andExpect(jsonPath("$[0].executedPrice").value(25.48))
                 .andExpect(jsonPath("$[0].status").value("FILLED"))
                 .andExpect(jsonPath("$[0].idempotencyKey").value(UUID))
-                .andExpect(jsonPath("$[0].createdOn").value("2026-09-28T09:14:22Z"));
+                .andExpect(jsonPath("$[0].createdOn").value("2026-09-28T09:14:22Z"))
+                .andExpect(jsonPath("$[0].realizedPnl").value(200.00))
+                .andExpect(jsonPath("$[0].realizedPnlPercent").value(8.00));
 
         mvc.perform(get("/api/v1/accounts/me/orders")
                         .header("Authorization", TOKEN)
