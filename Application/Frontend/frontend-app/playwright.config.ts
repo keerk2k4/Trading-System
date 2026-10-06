@@ -18,6 +18,8 @@ try {
 // nothing is mocked.
 export default defineConfig({
   testDir: './e2e',
+  // Starts the in-memory SMTP inbox that captures OTP emails (e2e/mail-sink.ts).
+  globalSetup: './e2e/global-setup.ts',
   // One test at a time: the Trade REST API allocates order IDs with
   // MAX(order_id) + 1, so two orders placed at the same moment can collide
   // on the primary key and come back as ERR-500.
