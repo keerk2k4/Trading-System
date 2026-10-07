@@ -81,7 +81,7 @@ describe('NotificationsComponent', () => {
 
     const status = Array.from(page.querySelectorAll('[data-testid="notification-status"]'));
     expect(status[0].textContent?.trim()).toBe('Waiting to send by SMS');
-    expect(status[1].textContent).toContain("Couldn't send by push notification");
+    expect(status[1].textContent).toContain("Couldn't send as an in-app alert");
     expect(status[1].classList).toContain('is-failed');
   });
 

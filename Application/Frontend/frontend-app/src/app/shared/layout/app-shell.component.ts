@@ -1,7 +1,13 @@
-import { Component, ElementRef, computed, inject, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, computed, inject, viewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MockAuthService } from '../services/auth.service';
 import { ThemeService } from '../services/theme.service';
+import { NotificationWatcherService } from '../services/notification-watcher.service';
+import { MAX_TOASTS, ToastService } from '../services/toast.service';
+import { ToastContainerComponent } from '../ui/toast-container.component';
+import { notificationKind } from '../ui/notification-kinds';
+import { Notification } from '../models/order.models';
 
 interface NavItem {
   label: string;
@@ -34,10 +40,12 @@ const ADMIN_NAV: NavItem[] = [
  * Frame for every signed-in screen: sidebar navigation (a scrolling tab row
  * on narrow screens), a top bar with the account, theme and sign-out, and
  * the routed page. Styles live in styles.css under "App shell" (`sh-`).
+ * For a customer it also raises a toast for every new notification, whatever
+ * their alert channel: Push is the toast alone, Email and SMS add a message.
  */
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, ToastContainerComponent],
   template: `
     <button type="button" class="sh-skip" (click)="focusMain()">Skip to main content</button>
 
@@ -99,6 +107,8 @@ const ADMIN_NAV: NavItem[] = [
         </main>
       </div>
     </div>
+
+    <app-toast-container />
   `
 })
 export class AppShellComponent {
@@ -127,11 +137,49 @@ export class AppShellComponent {
     return 'Customer';
   });
 
+  private readonly toasts = inject(ToastService);
+
+  constructor() {
+    if (!this.authService.isAdmin()) {
+      inject(NotificationWatcherService)
+        .watch()
+        .pipe(takeUntilDestroyed())
+        .subscribe((fresh) => this.toastNew(fresh));
+    }
+    inject(DestroyRef).onDestroy(() => this.toasts.clear());
+  }
+
   protected focusMain(): void {
     this.main().nativeElement.focus();
   }
 
+  /** One toast each, oldest first so the newest ends on top; a burst collapses into a summary. */
+  private toastNew(fresh: Notification[]): void {
+    const shown = fresh.length > MAX_TOASTS ? fresh.slice(-(MAX_TOASTS - 1)) : fresh;
+    const hidden = fresh.length - shown.length;
+    if (hidden > 0) {
+      this.toasts.show({
+        tone: 'accent',
+        icon: notificationKind({ type: 'PRICE_ALERT' }).icon,
+        kind: 'Notifications',
+        title: `${hidden} more new notifications`,
+        message: 'Open your inbox to see them all.'
+      });
+    }
+    for (const notification of shown) {
+      const kind = notificationKind(notification);
+      this.toasts.show({
+        tone: kind.tone,
+        icon: kind.icon,
+        kind: kind.label,
+        title: notification.title,
+        message: notification.message
+      });
+    }
+  }
+
   protected signOut(): void {
+    this.toasts.clear();
     this.authService.logout();
     this.router.navigate(['/login']);
   }

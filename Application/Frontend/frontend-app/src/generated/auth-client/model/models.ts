@@ -1,3 +1,4 @@
+export * from './contact-response';
 export * from './create-kyc-request';
 export * from './error-response';
 export * from './forgot-password-request';
