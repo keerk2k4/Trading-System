@@ -12,16 +12,6 @@ interface Contact {
 }
 
 /**
- * The two ways a customer can be alerted. Every notification shows in the app
- * (a toast and the inbox); EMAIL adds an email. SMS stays valid in the API but
- * is not offered, so a stored SMS preference shows neither option chosen.
- */
-const CHANNELS: { value: AlertChannel; label: string }[] = [
-  { value: 'PUSH', label: 'In app only' },
-  { value: 'EMAIL', label: 'In app and email' }
-];
-
-/**
  * Customer settings: default account, how alerts reach the customer, and the
  * contact details they go to. The account list comes from the account API
  * (never hardcoded); with one account per customer the dropdown holds that
@@ -73,21 +63,32 @@ const CHANNELS: { value: AlertChannel; label: string }[] = [
                 <p class="tp-hint">The account the application opens on. Only your own accounts are listed.</p>
               </div>
 
-              <fieldset class="tp-segmented">
+              <fieldset class="alerts">
                 <legend class="tp-label">Alerts</legend>
-                <div class="tp-segmented-options is-full">
-                  @for (channel of channels; track channel.value) {
-                    <input
-                      type="radio"
-                      [id]="'channel-' + channel.value"
-                      name="alertChannel"
-                      [value]="channel.value"
-                      [ngModel]="alertChannel()"
-                      (ngModelChange)="alertChannel.set($event)"
-                      [attr.data-testid]="'settings-channel-' + channel.value"
-                    />
-                    <label [for]="'channel-' + channel.value">{{ channel.label }}</label>
-                  }
+                <div class="alert-option">
+                  <input
+                    type="checkbox"
+                    id="alert-in-app"
+                    checked
+                    disabled
+                    aria-describedby="alert-in-app-note"
+                    data-testid="settings-channel-PUSH"
+                  />
+                  <label for="alert-in-app">
+                    In app
+                    <span class="tp-muted" id="alert-in-app-note">(default, always on)</span>
+                  </label>
+                </div>
+                <div class="alert-option">
+                  <input
+                    type="checkbox"
+                    id="alert-email"
+                    name="emailAlerts"
+                    [ngModel]="emailAlerts()"
+                    (ngModelChange)="emailAlerts.set($event)"
+                    data-testid="settings-channel-EMAIL"
+                  />
+                  <label for="alert-email">Email</label>
                 </div>
                 <p class="tp-hint" data-testid="settings-channel-hint">{{ channelHint() }}</p>
               </fieldset>
@@ -140,6 +141,10 @@ const CHANNELS: { value: AlertChannel; label: string }[] = [
     </div>
   `,
   styles: [`
+    .alerts { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+    .alert-option { display: flex; align-items: center; gap: 0.5rem; }
+    .alert-option input { width: 1.125rem; height: 1.125rem; margin: 0; accent-color: var(--tp-accent); }
+    .alert-option input:disabled + label { color: var(--tp-text-muted); }
     .contact { display: grid; gap: 1rem; margin: 0; }
     .contact dt { font-size: 0.8125rem; color: var(--tp-text-muted); }
     .contact dd { margin: 0.125rem 0 0; font-weight: 600; overflow-wrap: anywhere; }
@@ -152,7 +157,6 @@ export class SettingsComponent implements OnInit {
   private readonly errorMapping = inject(ErrorMappingService);
   private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly channels = CHANNELS;
   protected readonly account = signal<Account | null>(null);
   protected readonly contact = signal<Contact | null>(null);
   protected readonly contactError = signal(false);
@@ -160,7 +164,9 @@ export class SettingsComponent implements OnInit {
   protected readonly isSaving = signal(false);
   protected readonly errorMessage = signal('');
   protected readonly successMessage = signal('');
-  protected readonly alertChannel = signal<AlertChannel | null>('PUSH');
+  // In-app alerts are always on (PUSH, the default); email is the opt-in on
+  // top (EMAIL). A stored SMS preference, no longer offered, reads as off.
+  protected readonly emailAlerts = signal(false);
 
   protected defaultAccountId: number | null = null;
 
@@ -170,16 +176,11 @@ export class SettingsComponent implements OnInit {
   });
 
   protected readonly channelHint = computed(() => {
-    switch (this.alertChannel()) {
-      case 'PUSH':
-        return 'Alerts pop up in the app and stay in your inbox. Nothing is emailed.';
-      case 'EMAIL': {
-        const email = this.contact()?.email;
-        return `Alerts pop up in the app and stay in your inbox, and are also emailed${email ? ` to ${email}` : ''}.`;
-      }
-      default:
-        return 'Choose how you want to be alerted.';
+    if (!this.emailAlerts()) {
+      return 'Alerts pop up in the app and stay in your inbox. Nothing is emailed.';
     }
+    const email = this.contact()?.email;
+    return `Alerts pop up in the app and stay in your inbox, and are also emailed${email ? ` to ${email}` : ''}.`;
   });
 
   ngOnInit(): void {
@@ -220,11 +221,7 @@ export class SettingsComponent implements OnInit {
     }
     this.errorMessage.set('');
     this.successMessage.set('');
-    const channel = this.alertChannel();
-    if (!channel) {
-      this.errorMessage.set('Choose how you want to be alerted.');
-      return;
-    }
+    const channel: AlertChannel = this.emailAlerts() ? 'EMAIL' : 'PUSH';
     this.isSaving.set(true);
     this.tradeApi
       .updatePreferences({
@@ -236,7 +233,7 @@ export class SettingsComponent implements OnInit {
         next: (saved) => {
           this.isSaving.set(false);
           this.defaultAccountId = saved.defaultAccountId ?? this.defaultAccountId;
-          this.alertChannel.set(this.offered(saved.alertChannel));
+          this.emailAlerts.set(saved.alertChannel === 'EMAIL');
           this.successMessage.set('Preferences saved.');
         },
         error: (err: TradeApiError) => {
@@ -254,18 +251,13 @@ export class SettingsComponent implements OnInit {
         next: (prefs: Preferences) => {
           this.isLoading.set(false);
           this.defaultAccountId = prefs.defaultAccountId ?? fallbackAccountId;
-          this.alertChannel.set(this.offered(prefs.alertChannel));
+          this.emailAlerts.set(prefs.alertChannel === 'EMAIL');
         },
         error: (err: TradeApiError) => {
           this.isLoading.set(false);
           this.errorMessage.set(this.mapError(err));
         }
       });
-  }
-
-  /** A stored channel that is no longer offered (SMS) leaves the choice open. */
-  private offered(channel: AlertChannel): AlertChannel | null {
-    return CHANNELS.some((c) => c.value === channel) ? channel : null;
   }
 
   private mapError(err: TradeApiError): string {

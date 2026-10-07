@@ -24,6 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PreferenceService implements CustomerPreferenceResolver {
 
+    /** In app only: every notification reaches the app; email is opt-in. */
+    static final AlertChannel DEFAULT_CHANNEL = AlertChannel.PUSH;
+
     private final PreferenceMapper preferences;
     private final AccountMapper accounts;
 
@@ -34,14 +37,14 @@ public class PreferenceService implements CustomerPreferenceResolver {
 
     /**
      * Read my preferences. Never 404: without a stored row the documented
-     * defaults are returned (EMAIL channel, no default account).
+     * defaults are returned (PUSH channel -- in app only, no default account).
      */
     public PreferenceResponse getPreferences(long accountId) {
         accounts.findAccountById(accountId)
                 .orElseThrow(() -> new AccountNotFoundException(accountId));
         return preferences.findByAccountId(accountId)
                 .map(row -> new PreferenceResponse(accountId, row.defaultAccountId(), row.alertChannel()))
-                .orElseGet(() -> new PreferenceResponse(accountId, null, AlertChannel.EMAIL));
+                .orElseGet(() -> new PreferenceResponse(accountId, null, DEFAULT_CHANNEL));
     }
 
     /**
@@ -73,12 +76,12 @@ public class PreferenceService implements CustomerPreferenceResolver {
 
     /**
      * Channel resolution for notifications. In-process, current row on every
-     * call (never cached here), documented default EMAIL when nothing stored.
+     * call (never cached here), documented default PUSH when nothing stored.
      */
     @Override
     public AlertChannel resolveAlertChannel(long accountId) {
         return preferences.findByAccountId(accountId)
                 .map(PreferenceMapper.PreferenceRow::alertChannel)
-                .orElse(AlertChannel.EMAIL);
+                .orElse(DEFAULT_CHANNEL);
     }
 }

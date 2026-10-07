@@ -10,7 +10,7 @@
 
 
 /**
- * Channel a notification is delivered on, resolved from customer preferences on every send. Documented default when nothing is stored: EMAIL. 
+ * Channel a notification is delivered on, resolved from customer preferences on every send. Every notification is shown in the app; EMAIL also emails it (\"In app and email\"), PUSH does not (\"In app only\"). Documented default when nothing is stored: PUSH. 
  */
 export const AlertChannel = {
     EMAIL: 'EMAIL',

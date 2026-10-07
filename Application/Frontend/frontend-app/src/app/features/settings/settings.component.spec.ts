@@ -29,9 +29,18 @@ describe('SettingsComponent', () => {
     fixture.detectChanges();
   }
 
-  async function choose(channel: string): Promise<void> {
-    el<HTMLInputElement>(`[data-testid="settings-channel-${channel}"]`).click();
+  const inApp = () => el<HTMLInputElement>('[data-testid="settings-channel-PUSH"]');
+  const email = () => el<HTMLInputElement>('[data-testid="settings-channel-EMAIL"]');
+
+  async function toggleEmail(): Promise<void> {
+    email().click();
     fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  }
+
+  async function save(): Promise<void> {
+    el('form').dispatchEvent(new Event('submit'));
     await fixture.whenStable();
     fixture.detectChanges();
   }
@@ -51,22 +60,31 @@ describe('SettingsComponent', () => {
     await create();
 
     expect(el<HTMLSelectElement>('[data-testid="settings-default-account"]').selectedOptions[0].textContent).toContain('ACC-6');
-    expect(el<HTMLInputElement>('[data-testid="settings-channel-PUSH"]').checked).toBe(true);
+    expect(email().checked).toBe(false);
   });
 
-  it('offers only "In app only" and "In app and email"', async () => {
+  it('shows in-app alerts as the default, always on and not selectable', async () => {
     await create();
 
-    const labels = Array.from(page.querySelectorAll('.tp-segmented label')).map((l) => l.textContent?.trim());
-    expect(labels).toEqual(['In app only', 'In app and email']);
+    expect(inApp().checked).toBe(true);
+    expect(inApp().disabled).toBe(true);
+    expect(el('label[for="alert-in-app"]').textContent).toContain('(default, always on)');
     expect(page.querySelector('[data-testid="settings-channel-SMS"]')).toBeNull();
   });
 
-  it('describes the option that is chosen, and changes when another is picked', async () => {
+  it('ticks email for a stored EMAIL preference, with in-app still on', async () => {
+    tradeApi.getPreferences.and.returnValue(of({ accountId: 6, defaultAccountId: 6, alertChannel: 'EMAIL' }));
+    await create();
+
+    expect(email().checked).toBe(true);
+    expect(inApp().checked).toBe(true);
+  });
+
+  it('describes what is chosen, and changes when email is ticked', async () => {
     await create();
     expect(text('settings-channel-hint')).toContain('Nothing is emailed');
 
-    await choose('EMAIL');
+    await toggleEmail();
 
     expect(text('settings-channel-hint')).toContain('also emailed to gaurang@example.com');
   });
@@ -89,30 +107,41 @@ describe('SettingsComponent', () => {
     expect(text('settings-contact-error')).toContain("couldn't be loaded");
   });
 
-  it('leaves the choice open for a stored channel that is no longer offered, and asks for one', async () => {
+  it('reads a stored channel that is no longer offered (SMS) as email off, and saves in-app only', async () => {
     tradeApi.getPreferences.and.returnValue(of({ accountId: 6, defaultAccountId: 6, alertChannel: 'SMS' }));
+    tradeApi.updatePreferences.and.returnValue(of({ accountId: 6, defaultAccountId: 6, alertChannel: 'PUSH' }));
     await create();
 
-    expect(page.querySelectorAll('.tp-segmented input:checked').length).toBe(0);
-    el('form').dispatchEvent(new Event('submit'));
-    fixture.detectChanges();
+    expect(email().checked).toBe(false);
+    await save();
 
-    expect(text('settings-error')).toBe('Choose how you want to be alerted.');
-    expect(tradeApi.updatePreferences).not.toHaveBeenCalled();
+    expect(tradeApi.updatePreferences).toHaveBeenCalledWith(jasmine.objectContaining({ alertChannel: 'PUSH' }));
   });
 
-  it('saves the chosen channel and confirms', async () => {
+  it('saves email as EMAIL (in app and email) and confirms', async () => {
     await create();
 
-    await choose('EMAIL');
-    el('form').dispatchEvent(new Event('submit'));
-    await fixture.whenStable();
-    fixture.detectChanges();
+    await toggleEmail();
+    await save();
 
     expect(tradeApi.updatePreferences).toHaveBeenCalledWith(
       jasmine.objectContaining({ defaultAccountId: 6, alertChannel: 'EMAIL' })
     );
     expect(text('settings-success')).toContain('Preferences saved.');
+    expect(email().checked).toBe(true);
+  });
+
+  it('turns email off again by saving PUSH (in app only)', async () => {
+    tradeApi.getPreferences.and.returnValue(of({ accountId: 6, defaultAccountId: 6, alertChannel: 'EMAIL' }));
+    tradeApi.updatePreferences.and.returnValue(of({ accountId: 6, defaultAccountId: 6, alertChannel: 'PUSH' }));
+    await create();
+
+    await toggleEmail();
+    await save();
+
+    expect(tradeApi.updatePreferences).toHaveBeenCalledWith(jasmine.objectContaining({ alertChannel: 'PUSH' }));
+    expect(email().checked).toBe(false);
+    expect(inApp().checked).toBe(true);
   });
 
   it('shows a mapped error when saving fails', async () => {

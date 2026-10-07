@@ -699,7 +699,7 @@ paths:
       description: |
         JWT-derived identity only: the account comes from the verified token, so there is no
         path id to mismatch. A missing row is not a 404; the documented defaults are
-        returned (alert channel EMAIL, no default account).
+        returned (alert channel PUSH -- in app only, no default account).
       responses:
         '200':
           description: Preferences for the signed-in customer.
@@ -1485,7 +1485,8 @@ components:
       enum: [EMAIL, SMS, PUSH]
       description: |
         Channel a notification is delivered on, resolved from customer preferences on every
-        send. Documented default when nothing is stored: EMAIL.
+        send. Every notification is shown in the app; EMAIL also emails it ("In app and email"),
+        PUSH does not ("In app only"). Documented default when nothing is stored: PUSH.
 
     NotificationType:
       type: string

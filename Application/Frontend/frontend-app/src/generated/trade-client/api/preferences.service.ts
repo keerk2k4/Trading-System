@@ -41,7 +41,7 @@ export class PreferencesService extends BaseService {
 
     /**
      * Get my preferences, or the documented defaults when nothing is stored
-     * JWT-derived identity only: the account comes from the verified token, so there is no path id to mismatch. A missing row is not a 404; the documented defaults are returned (alert channel EMAIL, no default account). 
+     * JWT-derived identity only: the account comes from the verified token, so there is no path id to mismatch. A missing row is not a 404; the documented defaults are returned (alert channel PUSH -- in app only, no default account). 
      * @endpoint get /api/v1/preferences/me
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.

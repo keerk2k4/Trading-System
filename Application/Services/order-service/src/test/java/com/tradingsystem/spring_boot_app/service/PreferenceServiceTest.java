@@ -30,7 +30,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("PreferenceService stores references, resolves EMAIL by default")
+@DisplayName("PreferenceService stores references, resolves PUSH (in app only) by default")
 class PreferenceServiceTest {
 
     @Mock
@@ -60,7 +60,7 @@ class PreferenceServiceTest {
 
         assertEquals(6L, response.accountId());
         assertNull(response.defaultAccountId());
-        assertEquals(AlertChannel.EMAIL, response.alertChannel());
+        assertEquals(AlertChannel.PUSH, response.alertChannel());
     }
 
     @Test
@@ -120,11 +120,11 @@ class PreferenceServiceTest {
     }
 
     @Test
-    @DisplayName("Channel resolution falls back to EMAIL with nothing stored")
-    void channelDefaultsToEmail() {
+    @DisplayName("Channel resolution falls back to PUSH (in app only) with nothing stored")
+    void channelDefaultsToPush() {
         when(preferences.findByAccountId(6L)).thenReturn(Optional.empty());
 
-        assertEquals(AlertChannel.EMAIL, service.resolveAlertChannel(6L));
+        assertEquals(AlertChannel.PUSH, service.resolveAlertChannel(6L));
     }
 
     @Test
