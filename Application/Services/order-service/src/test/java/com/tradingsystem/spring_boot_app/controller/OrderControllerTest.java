@@ -104,12 +104,17 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.quantity").value(100))
                 .andExpect(jsonPath("$.price").value(25.50));
 
+    }
+
+    @Test
+    void placeOrderRejectsBodyAccountIdBecauseJwtIsAuthoritative() throws Exception {
         mvc.perform(post("/api/v1/orders")
                         .header("Authorization", TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validBody().replace("}", ",\"accountId\":999}")))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.errorCode").value("VAL-422"));
+        verifyNoInteractions(orders);
     }
 
     @Test

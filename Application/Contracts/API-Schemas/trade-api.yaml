@@ -73,6 +73,12 @@ tags:
     description: Placing and cancelling orders.
   - name: Accounts
     description: Account details, cash balance, holdings and order history.
+  - name: Positions
+    description: Unsettled positions and settled holdings.
+  - name: Preferences
+    description: Default account and alert channel for the signed-in customer.
+  - name: Notifications
+    description: Notification inbox fed by trade-events outcomes.
   - name: Watchlists
     description: Database-backed watchlists enriched with live market-data prices.
 
@@ -192,6 +198,11 @@ paths:
         Cancels an order that is still `NEW` and returns the updated order. An order that is already
         `FILLED`, `REJECTED` or `CANCELLED` cannot be cancelled and returns `ORD-409`.
 
+        Timing: `MARKET` orders are executed immediately by the Trade Executor, so they are
+        cancellable only for a brief instant after acceptance. `LIMIT` orders wait
+        `app.execution.limit-delay-ms` (15s by default) in `NEW` before the executor prices
+        them, which is the window where cancel and update succeed.
+
         The cancellation is a state transition guarded inside the database transaction. Checking the
         status, then updating it, without a guarded transition, races the Trade Executor.
       parameters:
@@ -245,6 +256,69 @@ paths:
                   value:
                     errorCode: ORD-409
                     message: Order is not cancellable
+    patch:
+      tags: [Orders]
+      operationId: updateOrder
+      summary: Update a working order
+      description: |
+        Updates quantity and/or limit price of an order that is still `NEW` and returns the
+        updated order. Only `LIMIT` orders can be updated, and only while `NEW`. A `MARKET`
+        order carries no limit price so only its quantity could change, and since market
+        orders execute immediately the window is effectively zero; implementations reject
+        price updates on `MARKET` orders with `VAL-422`.
+
+        The update re-validates business rules 4-7 against the new values, then applies a
+        guarded transition (`WHERE id = ? AND status = 'NEW'`) so it races safely with the
+        Trade Executor. The executor always re-reads the order row after the
+        `LIMIT` delay, so an accepted update is what gets priced.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The order identifier, without the `ORD-` display prefix.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrderRequest'
+      responses:
+        '200':
+          description: Order updated, still working.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/AccountNotActive'
+        '404':
+          description: No order exists with that identifier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notFound:
+                  value:
+                    errorCode: ORD-409
+                    message: Order not found
+        '409':
+          description: The order is not in an updatable state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                alreadyFilled:
+                  value:
+                    errorCode: ORD-409
+                    message: Order is not cancellable
+        '422':
+          $ref: '#/components/responses/InvalidInput'
 
   /api/v1/accounts/{id}:
     get:
@@ -385,6 +459,10 @@ paths:
         Net held quantity and average cost per instrument. Positions with a net quantity of zero are
         not returned. Market value is not calculated here; it needs a live quote and belongs to the
         Portfolio and P&L extension.
+
+        Settlement: a FILLED order updates positions immediately. Holdings (demat) follow after
+        `app.settlement.holdings-delay-ms` (15s by default); a background settlement job moves
+        the filled quantity from positions to holdings and persists both legs in the database.
       parameters:
         - $ref: '#/components/parameters/AccountIdPath'
       responses:
@@ -477,6 +555,127 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/PositionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+
+  /api/v1/accounts/{id}/holdings:
+    get:
+      tags: [Accounts]
+      operationId: getHoldings
+      summary: Get settled holdings
+      description: |
+        Legacy route. The backend resolves the effective account from JWT claims and does not trust
+        caller-supplied account identifiers.
+
+        Settled (demat) holdings only. A filled DELIVERY buy lands in positions first and is
+        moved here after the settlement window (about 15 seconds), when its positions row is
+        removed; sells of settled shares debit here at fill time. INTRADAY fills never appear
+        here. Zero-quantity rows are not returned.
+      parameters:
+        - $ref: '#/components/parameters/AccountIdPath'
+      responses:
+        '200':
+          description: Settled holdings for the account.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HoldingResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/AccountNotActive'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+
+  /api/v1/accounts/me/holdings:
+    get:
+      tags: [Accounts]
+      operationId: getMyHoldings
+      summary: Get settled holdings for the signed-in user
+      responses:
+        '200':
+          description: Settled holdings for the account.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HoldingResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+
+  /api/v1/preferences/me:
+    get:
+      tags: [Preferences]
+      operationId: getMyPreferences
+      summary: Get my preferences, or the documented defaults when nothing is stored
+      description: |
+        JWT-derived identity only: the account comes from the verified token, so there is no
+        path id to mismatch. A missing row is not a 404; the documented defaults are
+        returned (alert channel EMAIL, no default account).
+      responses:
+        '200':
+          description: Preferences for the signed-in customer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreferenceResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+    put:
+      tags: [Preferences]
+      operationId: updateMyPreferences
+      summary: Create or update my preferences
+      description: |
+        Partial update: default account and/or alert channel. A default account must exist
+        and belong to the caller's holder, otherwise VAL-422. Contact details are never
+        stored here; auth-service owns them.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePreferenceRequest'
+      responses:
+        '200':
+          description: Updated preferences.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreferenceResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+  /api/v1/notifications/me:
+    get:
+      tags: [Notifications]
+      operationId: getMyNotifications
+      summary: List my notifications, newest first
+      description: |
+        JWT-derived identity only: history is read for the token's account, so a token for
+        one account can never reach another's notifications. The recorded channel is the one
+        the message was actually routed on. Backend source of truth for the inbox.
+      responses:
+        '200':
+          description: Notification history for the signed-in customer.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationResponse'
         '401':
           $ref: '#/components/responses/Unauthorised'
         '404':
@@ -689,12 +888,43 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorised'
 
+  /api/v1/instruments/{symbol}/quote:
+    get:
+      tags: [Watchlists]
+      operationId: getQuote
+      summary: Get the latest live quote for one symbol
+      description: |
+        Returns the newest `market-data` quote held in the backend in-memory cache, which is
+        what a `MARKET` order is validated and priced against. The order ticket calls this
+        when the trader selects `MARKET` so the current value loads immediately. Null
+        bid/ask means no executable quote yet and a market order would be rejected.
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Latest cached quote.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuoteResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '404':
+          description: No live quote cached for that symbol yet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/accounts/me/orders:
     get:
       tags: [Accounts]
       operationId: getMyOrders
-      summary: Get order history for the signed-in user
-      parameters:
+      summary: Get order history for the signed-in user      parameters:
         - name: status
           in: query
           required: false
@@ -885,14 +1115,35 @@ components:
             constraint on `orders.idempotency_key`. Reuse returns `ORD-409`.
           example: 6f2b1c2a-6a1e-4a4f-9c0d-2f7a1b3c4d5e
 
+    UpdateOrderRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          description: New whole-unit quantity. Must be greater than zero.
+          example: 150
+        price:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+          multipleOf: 0.01
+          description: |
+            New limit price per unit. Only for `LIMIT` orders; rejected with `VAL-422` on
+            `MARKET` orders.
+          example: 26.00
+
     OrderResponse:
       type: object
       additionalProperties: false
-      required: [orderId, status, message, symbol, side, quantity, price]
+      required: [orderId, status, message, symbol, side, quantity]
       properties:
         orderId:
           type: string
-          description: The order identifier, displayed with an `ORD-` prefix over the stored UUID.
+          description: The order identifier, displayed with an `ORD-` prefix over the stored identifier.
           example: ORD-6f2b1c2a-6a1e-4a4f-9c0d-2f7a1b3c4d5e
         status:
           $ref: '#/components/schemas/OrderStatus'
@@ -905,6 +1156,8 @@ components:
           example: ACME
         side:
           $ref: '#/components/schemas/OrderSide'
+        orderType:
+          $ref: '#/components/schemas/OrderType'
         quantity:
           type: integer
           format: int32
@@ -918,7 +1171,7 @@ components:
     OrderHistoryEntry:
       type: object
       additionalProperties: false
-      required: [orderId, accountId, symbol, side, quantity, price, status, createdOn]
+      required: [orderId, accountId, symbol, side, quantity, status, createdOn]
       properties:
         orderId:
           type: string
@@ -932,6 +1185,8 @@ components:
           example: ACME
         side:
           $ref: '#/components/schemas/OrderSide'
+        orderType:
+          $ref: '#/components/schemas/OrderType'
         quantity:
           type: integer
           format: int32
@@ -939,7 +1194,7 @@ components:
         price:
           type: [number, 'null']
           format: double
-          description: The submitted limit price. Null for MARKET orders.
+          description: The limit price submitted with the order.
           example: 25.50
         executedPrice:
           type: [number, 'null']
@@ -1050,8 +1305,7 @@ components:
     PositionResponse:
       type: object
       additionalProperties: false
-      required: [accountId, symbol, quantity, averageCost]
-      properties:
+      required: [accountId, symbol, quantity, averageCost]      properties:
         accountId:
           type: integer
           format: int64
@@ -1093,6 +1347,135 @@ components:
           format: double
           description: unrealizedPnl / (averageCost x quantity) x 100, to two decimal places. Null when no quote seen yet.
           example: 8.00
+
+    HoldingResponse:
+      type: object
+      additionalProperties: false
+      required: [accountId, symbol, quantity, averageCost]
+      description: |
+        Settled (demat) holdings. Same enrichment as positions; rows here have completed
+        the settlement window, so their positions rows are gone.
+      properties:
+        accountId:
+          type: integer
+          format: int64
+          example: 1
+        symbol:
+          type: string
+          example: ACME
+        quantity:
+          type: integer
+          format: int32
+          minimum: 0
+          example: 100
+        averageCost:
+          type: number
+          format: double
+          example: 25.50
+        currentPrice:
+          type: [number, 'null']
+          format: double
+          example: 245.30
+        marketValue:
+          type: [number, 'null']
+          format: double
+          example: 2453.00
+        unrealizedPnl:
+          type: [number, 'null']
+          format: double
+          example: 200.00
+        unrealizedPnlPercent:
+          type: [number, 'null']
+          format: double
+          example: 8.00
+
+    AlertChannel:
+      type: string
+      enum: [EMAIL, SMS, PUSH]
+      description: |
+        Channel a notification is delivered on, resolved from customer preferences on every
+        send. Documented default when nothing is stored: EMAIL.
+
+    NotificationType:
+      type: string
+      enum: [ORDER_FILLED, ORDER_REJECTED, ORDER_CANCELLED, PRICE_ALERT]
+      description: What the notification is about.
+
+    NotificationStatus:
+      type: string
+      enum: [QUEUED, SENT, FAILED]
+      description: |
+        Delivery ledger state, tracked separately from the Kafka offset. QUEUED means durably
+        recorded; SENT/FAILED is the delivery outcome.
+
+    PreferenceResponse:
+      type: object
+      additionalProperties: false
+      required: [accountId, alertChannel]
+      properties:
+        accountId:
+          type: integer
+          format: int64
+          example: 6
+        defaultAccountId:
+          type: [integer, 'null']
+          format: int64
+          description: Reference to the customer's default trading account. Null when unset.
+          example: 6
+        alertChannel:
+          $ref: '#/components/schemas/AlertChannel'
+
+    UpdatePreferenceRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        defaultAccountId:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Must belong to the caller's holder, otherwise VAL-422.
+          example: 6
+        alertChannel:
+          $ref: '#/components/schemas/AlertChannel'
+
+    NotificationResponse:
+      type: object
+      additionalProperties: false
+      required: [notificationId, eventId, accountId, type, title, message, channel, status, createdOn]
+      properties:
+        notificationId:
+          type: integer
+          format: int64
+          example: 101
+        eventId:
+          type: string
+          description: The Kafka eventId; redeliveries of it are no-ops.
+          example: d47f9a10-3e2b-4c88-b0a1-7e6d5c4b3a29
+        accountId:
+          type: integer
+          format: int64
+          example: 6
+        type:
+          $ref: '#/components/schemas/NotificationType'
+        title:
+          type: string
+          example: 'Order filled: ACME'
+        message:
+          type: string
+          description: Order facts only; never credentials or contact details.
+          example: Your order for 10 ACME (BUY) has been filled at 25.50.
+        channel:
+          $ref: '#/components/schemas/AlertChannel'
+        status:
+          $ref: '#/components/schemas/NotificationStatus'
+        createdOn:
+          type: string
+          format: date-time
+          example: '2026-10-07T09:14:22Z'
+        sentOn:
+          type: [string, 'null']
+          format: date-time
 
     WatchlistResponse:
       type: object
@@ -1194,6 +1577,37 @@ components:
           format: double
         changePercent:
           type: number
+          format: double
+
+    QuoteResponse:
+      type: object
+      additionalProperties: false
+      required: [symbol, price]
+      properties:
+        symbol:
+          type: string
+          example: AAPL
+        price:
+          type: number
+          format: double
+          description: Last cached price; the value pre-filled on a MARKET ticket.
+          example: 245.30
+        bid:
+          type: [number, 'null']
+          format: double
+          description: Price a market SELL executes at. Null when no executable quote.
+        ask:
+          type: [number, 'null']
+          format: double
+          description: Price a market BUY executes at. Null when no executable quote.
+        currency:
+          type: string
+          example: USD
+        change:
+          type: [number, 'null']
+          format: double
+        changePercent:
+          type: [number, 'null']
           format: double
 
     ErrorResponse:

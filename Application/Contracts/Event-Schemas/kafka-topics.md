@@ -58,14 +58,34 @@ Adding an optional field is not a breaking change and does not increment `schema
 
 | Payload field | Type | Notes |
 |---|---|---|
-| `orderId` | string, UUID | Matches `orders.id` in Postgres. |
+| `orderId` | string | Matches `orders.id` in Postgres (`ORD-` prefix is display-only). |
 | `accountId` | integer, int64 | The numeric account key. Also the message key, as a string. |
 | `symbol` | string | Instrument symbol in the Fauxnance scheme. |
+| `orderType` | string, enum `MARKET` or `LIMIT` | `MARKET` carries a null `price`. |
 | `side` | string, enum `BUY` or `SELL` | |
-| `quantity` | integer, int32 | Greater than zero. |
-| `price` | number | Limit price per unit, two decimal places. |
+| `quantity` | integer, int32 | Greater than zero. Updatable while the order is `NEW`. |
+| `price` | number or null | Limit price per unit, two decimal places. Null for `MARKET` orders. |
 | `idempotencyKey` | string | The client key that was accepted. |
 | `createdOn` | string, date-time | When the order was recorded. |
+
+### Execution timing
+
+`MARKET` orders are executed immediately by the Trade Executor against the live
+Fauxnance quote (BUY at ask, SELL at bid): the outcome is FILLED or REJECTED with
+no cancellable window. `LIMIT` orders wait `app.execution.limit-delay-ms`
+(15 seconds by default) in `NEW` so they can be cancelled (`DELETE
+/api/v1/orders/{id}`) or updated (`PATCH /api/v1/orders/{id}`) first. The executor
+re-reads the order row after the delay, so an update applied during the window is
+what gets priced. Cancelling or updating is a guarded `WHERE status = 'NEW'`
+transition; zero rows affected means the executor already moved the order.
+
+### Settlement timing
+
+A FILLED order settles positions immediately (cash + position in one transaction).
+Holdings (demat, `DELIVERY`) follow after `app.settlement.holdings-delay-ms`
+(15 seconds by default): a scheduler moves the filled quantity from positions to
+holdings and persists both legs. The `trade-events` outcome is published at fill
+time; the delayed holdings leg is a database settlement with no second event.
 
 ```json
 {

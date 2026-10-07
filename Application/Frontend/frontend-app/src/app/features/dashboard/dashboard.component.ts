@@ -10,7 +10,7 @@ import { ErrorMappingService } from '../../shared/services/error-mapping.service
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 import { PnlValueComponent } from '../../shared/ui/pnl-value.component';
 import { AccountStatusNoticeComponent } from '../../shared/ui/account-status-notice.component';
-import { Account, Position, TradeApiError } from '../../shared/models/order.models';
+import { Account, Holding, Position, TradeApiError } from '../../shared/models/order.models';
 
 interface PortfolioSummary {
   cash: number;
@@ -66,6 +66,7 @@ interface PortfolioSummary {
           <p class="tp-stat-label">Holdings value</p>
           <p class="tp-stat-value">{{ (summary()?.holdings | currency: currency()) ?? '—' }}</p>
           <p class="tp-stat-meta" data-testid="dashboard-position-count">{{ positions().length }} open {{ positions().length === 1 ? 'position' : 'positions' }}</p>
+          <p class="tp-stat-meta" data-testid="dashboard-holding-count">{{ holdings().length }} settled {{ holdings().length === 1 ? 'holding' : 'holdings' }}</p>
         </div>
       </section>
 
@@ -89,8 +90,13 @@ interface PortfolioSummary {
       <div class="tp-grid tp-grid-main-side">
         <section class="tp-panel" aria-labelledby="positions-heading">
           <div class="tp-panel-header">
-            <h2 id="positions-heading">Positions</h2>
-            <p>Live price from market-data; falls back to average cost</p>
+            <div>
+              <h2 id="positions-heading">Positions</h2>
+              <p>Live price from market-data; falls back to average cost</p>
+            </div>
+            <div class="tp-actions">
+              <a class="tp-btn tp-btn-secondary" routerLink="/positions">All positions</a>
+            </div>
           </div>
           @if (isLoading()) {
             <p class="tp-empty">Loading positions…</p>
@@ -163,6 +169,82 @@ interface PortfolioSummary {
           </dl>
         </section>
       </div>
+
+      <div class="tp-grid tp-grid-main-side">
+        <section class="tp-panel" aria-labelledby="holdings-heading">
+          <div class="tp-panel-header">
+            <div>
+              <h2 id="holdings-heading">Holdings</h2>
+              <p>Settled shares. A filled buy shows in Positions first and moves here after settlement.</p>
+            </div>
+            <div class="tp-actions">
+              <a class="tp-btn tp-btn-secondary" routerLink="/holdings">All holdings</a>
+            </div>
+          </div>
+          @if (isLoading()) {
+            <p class="tp-empty">Loading holdings…</p>
+          } @else if (holdings().length === 0) {
+            <div class="tp-empty">
+              <strong>No settled holdings</strong>
+              Positions move here about 15 seconds after their fill settles.
+            </div>
+          } @else {
+            <div class="tp-table-wrap" tabindex="0" role="region" aria-label="Holdings table">
+              <table class="tp-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Symbol</th>
+                    <th scope="col" class="num">Quantity</th>
+                    <th scope="col" class="num">Avg cost</th>
+                    <th scope="col" class="num">Live price</th>
+                    <th scope="col" class="num">Market value</th>
+                    <th scope="col" class="num">Unrealized P&amp;L</th>
+                    <th scope="col" class="num">P&amp;L %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (holding of holdings(); track holding.symbol) {
+                    <tr data-testid="holding-row" [attr.data-symbol]="holding.symbol">
+                      <td><strong>{{ holding.symbol }}</strong></td>
+                      <td class="num">{{ holding.quantity | number }}</td>
+                      <td class="num">{{ holding.averageCost | currency: currency() }}</td>
+                      <td class="num">{{ (holding.currentPrice ?? holding.averageCost) | currency: currency() }}</td>
+                      <td class="num">{{ (holding.marketValue ?? holding.quantity * holding.averageCost) | currency: currency() }}</td>
+                      <td class="num" data-testid="holding-unrealized-pnl">
+                        <app-pnl-value [value]="holding.unrealizedPnl" [currency]="currency()" />
+                      </td>
+                      <td class="num" data-testid="holding-unrealized-pnl-percent">
+                        <app-pnl-value kind="percent" [value]="holding.unrealizedPnlPercent" />
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+                <tfoot>
+                  <tr data-testid="holdings-total-row">
+                    <th scope="row" colspan="4">Total</th>
+                    <td class="num">{{ holdingsTotal()?.value | currency: currency() }}</td>
+                    <td class="num" data-testid="holdings-total-pnl">
+                      <app-pnl-value [value]="holdingsTotal()?.pnl" [currency]="currency()" />
+                    </td>
+                    <td class="num" data-testid="holdings-total-pnl-percent">
+                      <app-pnl-value kind="percent" [value]="holdingsTotal()?.pnlPercent" />
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          }
+        </section>
+
+        <section class="tp-panel" aria-labelledby="positions-link-heading">
+          <div class="tp-panel-header">
+            <h2 id="positions-link-heading">Settlement</h2>
+          </div>
+          <div class="tp-panel-body">
+            <p class="tp-muted">Fresh fills wait in positions about 15 seconds before settling into holdings.</p>
+          </div>
+        </section>
+      </div>
     </div>
   `,
   styles: [`
@@ -187,7 +269,9 @@ export class DashboardComponent implements OnInit {
   protected readonly kycStatus = signal('NOT_SUBMITTED');
   protected readonly account = signal<Account | null>(null);
   protected readonly positions = signal<Position[]>([]);
+  protected readonly holdings = signal<Holding[]>([]);
   protected readonly summary = signal<PortfolioSummary | null>(null);
+  protected readonly holdingsTotal = signal<{ value: number; pnl: number; pnlPercent: number | null } | null>(null);
   protected readonly currency = computed(() => this.summary()?.currency || 'USD');
   protected readonly isLoading = signal(false);
   protected readonly errorMessage = signal('');
@@ -204,32 +288,52 @@ export class DashboardComponent implements OnInit {
     forkJoin({
       account: this.tradeApi.getAccount(),
       balance: this.tradeApi.getBalance(),
-      positions: this.tradeApi.getPositions()
+      positions: this.tradeApi.getPositions(),
+      holdings: this.tradeApi.getHoldings()
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: ({ account, balance, positions }) => {
+        next: ({ account, balance, positions, holdings }) => {
           // Positions carry the latest market-data price when the backend has
-          // seen a quote; otherwise fall back to average cost.
-          const holdings = positions.reduce(
+          // seen a quote; otherwise fall back to average cost. Holdings use
+          // the same maths: both count towards portfolio value and P&L.
+          const positionsValue = positions.reduce(
             (total, position) =>
               total + (position.marketValue ?? position.quantity * position.averageCost),
             0
           );
-
-          // A position without a live quote is valued at cost, so it adds
-          // nothing to P&L but still counts towards the cost basis.
-          const costBasis = positions.reduce((total, position) => total + position.quantity * position.averageCost, 0);
-          const unrealizedPnl = roundToCents(
-            positions.reduce((total, position) => total + (position.unrealizedPnl ?? 0), 0)
+          const holdingsValue = holdings.reduce(
+            (total, holding) =>
+              total + (holding.marketValue ?? holding.quantity * holding.averageCost),
+            0
           );
+
+          // A row without a live quote is valued at cost, so it adds
+          // nothing to P&L but still counts towards the cost basis.
+          const costBasis =
+            positions.reduce((total, position) => total + position.quantity * position.averageCost, 0) +
+            holdings.reduce((total, holding) => total + holding.quantity * holding.averageCost, 0);
+          const unrealizedPnl = roundToCents(
+            positions.reduce((total, position) => total + (position.unrealizedPnl ?? 0), 0) +
+            holdings.reduce((total, holding) => total + (holding.unrealizedPnl ?? 0), 0)
+          );
+          const holdingsCost = holdings.reduce(
+            (total, holding) => total + holding.quantity * holding.averageCost, 0);
+          const holdingsPnl = roundToCents(
+            holdings.reduce((total, holding) => total + (holding.unrealizedPnl ?? 0), 0));
 
           this.account.set(account);
           this.positions.set(positions);
+          this.holdings.set(holdings);
+          this.holdingsTotal.set({
+            value: holdingsValue,
+            pnl: holdingsPnl,
+            pnlPercent: holdingsCost > 0 ? roundToCents((holdingsPnl / holdingsCost) * 100) : null
+          });
           this.summary.set({
             cash: balance.cashBalance,
-            holdings,
-            total: balance.cashBalance + holdings,
+            holdings: positionsValue + holdingsValue,
+            total: balance.cashBalance + positionsValue + holdingsValue,
             unrealizedPnl,
             unrealizedPnlPercent: costBasis > 0 ? roundToCents((unrealizedPnl / costBasis) * 100) : null,
             currency: balance.currency,

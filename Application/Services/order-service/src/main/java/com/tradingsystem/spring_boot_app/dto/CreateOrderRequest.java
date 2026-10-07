@@ -15,7 +15,7 @@ import java.math.BigDecimal;
 
 /**
  * REST API request body for placing an order.
- * The accountId is extracted from the JWT token, not from the request body.
+ * The effective account always comes from the JWT token, never from the body.
  */
 public class CreateOrderRequest {
 

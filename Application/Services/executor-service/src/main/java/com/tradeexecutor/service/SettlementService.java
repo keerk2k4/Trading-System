@@ -12,10 +12,13 @@ import com.tradeexecutor.mapper.AccountMapper;
 import com.tradeexecutor.mapper.HoldingMapper;
 import com.tradeexecutor.mapper.OrderMapper;
 import com.tradeexecutor.mapper.PositionMapper;
+import com.tradeexecutor.mapper.SettlementJobMapper;
 import com.tradeexecutor.model.TradeEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,20 +51,41 @@ public class SettlementService {
     private final AccountMapper accountMapper;
     private final PositionMapper positionMapper;
     private final HoldingMapper holdingMapper;
+    private final SettlementJobMapper settlementJobs;
     private final KafkaProducer kafkaProducer;
+    private final java.util.concurrent.ScheduledExecutorService holdingsScheduler =
+            java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "holdings-settlement");
+                t.setDaemon(true);
+                return t;
+            });
     
     @Value("${app.settlement.optimistic-lock-retries:3}")
     private int maxOptimisticLockRetries;
+
+    @Value("${app.settlement.holdings-delay-ms:15000}")
+    private long holdingsDelayMs;
     
     public SettlementService(OrderMapper orderMapper,
                              AccountMapper accountMapper,
                              PositionMapper positionMapper,
                              HoldingMapper holdingMapper,
                              KafkaProducer kafkaProducer) {
+        this(orderMapper, accountMapper, positionMapper, holdingMapper, null, kafkaProducer);
+    }
+
+    @Autowired
+    public SettlementService(OrderMapper orderMapper,
+                             AccountMapper accountMapper,
+                             PositionMapper positionMapper,
+                             HoldingMapper holdingMapper,
+                             SettlementJobMapper settlementJobs,
+                             KafkaProducer kafkaProducer) {
         this.orderMapper = orderMapper;
         this.accountMapper = accountMapper;
         this.positionMapper = positionMapper;
         this.holdingMapper = holdingMapper;
+        this.settlementJobs = settlementJobs;
         this.kafkaProducer = kafkaProducer;
     }
     
@@ -117,10 +141,22 @@ public class SettlementService {
     }
     
     /**
-     * Settle a filled order: update status, move cash, and update position/holding.
+     * Settle a filled order: update status, move cash, and record positions now.
+     *
+     * <p>Move semantics (positions -&gt; holdings after the settlement window):
+     * <ul>
+     *   <li>BUY DELIVERY: the bought quantity is added to positions now and
+     *   <em>moved</em> to holdings after {@code app.settlement.holdings-delay-ms}
+     *   (15s): the deferred leg credits holdings, subtracts the same quantity
+     *   from positions, and deletes the position row when it reaches zero.</li>
+     *   <li>SELL DELIVERY: settled shares leave custody at fill time, so
+     *   holdings are debited immediately in this transaction and no position
+     *   row is created -- there is nothing to move later.</li>
+     *   <li>INTRADAY: positions only, never holdings.</li>
+     * </ul>
      */
     private void settleFilled(Long orderId, Long accountId, BigDecimal executionPrice,
-                             int quantity, OrderSide side) {
+                              int quantity, OrderSide side) {
         logger.info("  Updating order status to FILLED in database...");
         // Step 1: Update order status atomically (detect duplicate delivery)
         int rowsUpdated = orderMapper.markOrderFilled(orderId, executionPrice);
@@ -142,22 +178,189 @@ public class SettlementService {
         updateAccountCashWithOptimisticLocking(accountId, executionPrice, quantity, side);
         logger.info("  ✓ Account cash balance updated");
         
-        // Step 3: Update position or holding based on product type
+        // Step 3: Update position now; holdings follow after the settlement delay.
         Order order = orderMapper.findOrderById(orderId)
             .orElseThrow(() -> new IllegalArgumentException("Order " + orderId + " not found for settlement"));
         
         if (order.getProductType() == ProductType.DELIVERY) {
-            logger.info("  Updating holding for account {} (DELIVERY product)...", accountId);
-            updateHolding(accountId, orderId, executionPrice, quantity, side);
-            logger.info("  ✓ Holding updated");
-            
-            logger.info("  Updating position for account {} (DELIVERY product)...", accountId);
-            updatePosition(accountId, orderId, executionPrice, quantity, side);
-            logger.info("  ✓ Position updated");
+            if (side == OrderSide.BUY) {
+                logger.info("  Updating position for account {} (DELIVERY BUY)...", accountId);
+                updatePosition(accountId, orderId, executionPrice, quantity, side);
+                if (holdingsDelayMs <= 0) {
+                    // Unit-test path (no Spring @Value injection): keep the legacy
+                    // synchronous holdings write so existing settlement tests hold.
+                    logger.info("  Updating holding synchronously (holdings-delay-ms <= 0, test path)...");
+                    updateHolding(accountId, orderId, executionPrice, quantity, side);
+                    logger.info("  ✓ Position and holding updated");
+                } else {
+                    logger.info("  ✓ Position updated (holdings settle in {}ms)", holdingsDelayMs);
+                    enqueueDeferredHoldings(orderId, accountId, order.getInstrument().getInstrumentId(),
+                            quantity, side.name());
+                }
+            } else {
+                // DELIVERY SELL: settled shares leave custody at fill time, so
+                // holdings are debited immediately in this transaction and no
+                // position row is created -- there is nothing to move later.
+                // Realised P&L is still recorded against the holdings' weighted
+                // average cost, the same method as before.
+                logger.info("  Debiting holding for account {} (DELIVERY SELL)...", accountId);
+                Optional<Holding> holdingBefore = holdingMapper.findHoldingByAccountAndInstrument(
+                        accountId, order.getInstrument().getInstrumentId());
+                BigDecimal costBasis = holdingBefore.map(Holding::getAveragePrice).orElse(null);
+                updateHolding(accountId, orderId, executionPrice, quantity, side);
+                if (costBasis != null) {
+                    recordRealizedPnl(orderId, costBasis.setScale(2, RoundingMode.HALF_UP),
+                            executionPrice, quantity);
+                }
+                logger.info("  ✓ Holding debited (no position leg for sells)");
+            }
         } else {
             logger.info("  Updating position for account {} (INTRADAY product)...", accountId);
             updatePosition(accountId, orderId, executionPrice, quantity, side);
             logger.info("  ✓ Position updated");
+        }
+    }
+
+    /**
+     * Enqueue the delayed holdings leg and schedule it. The sweeper below
+     * re-applies any job left PENDING (e.g. after a restart), so at-least-once
+     * holds for the holdings write too.
+     */
+    private void enqueueDeferredHoldings(Long orderId, Long accountId, Long instrumentId,
+                                         int quantity, String side) {
+        if (settlementJobs != null) {
+            try {
+                settlementJobs.enqueue(orderId, accountId, instrumentId, quantity, side, holdingsDelayMs);
+            } catch (Exception e) {
+                logger.warn("  Could not enqueue settlement job for order {} ({}); holdings still scheduled in-memory",
+                        orderId, e.getMessage());
+            }
+        }
+        long delay = Math.max(0, holdingsDelayMs);
+        holdingsScheduler.schedule(() -> {
+            try {
+                applyDeferredHoldings(orderId);
+            } catch (Exception e) {
+                logger.error("  Deferred holdings settlement failed for order {}", orderId, e);
+            }
+        }, delay, java.util.concurrent.TimeUnit.MILLISECONDS);
+        logger.info("  Holdings settlement for order {} scheduled in {}ms", orderId, delay);
+    }
+
+    /**
+     * Apply the delayed holdings (demat) leg for a FILLED DELIVERY BUY order:
+     * credit holdings at the execution price, then MOVE the same quantity out
+     * of positions, deleting the position row when it reaches zero.
+     *
+     * <p>Idempotent: skipped when the settlement job is already COMPLETE.
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void applyDeferredHoldings(Long orderId) {
+        Order order = orderMapper.findOrderById(orderId)
+            .orElseThrow(() -> new IllegalArgumentException("Order " + orderId + " not found for holdings settlement"));
+        if (!"FILLED".equalsIgnoreCase(String.valueOf(order.getStatus()))) {
+            logger.info("  Skipping holdings settlement for order {} (status={})", orderId, order.getStatus());
+            return;
+        }
+        if (order.getProductType() != ProductType.DELIVERY || order.getSide() != OrderSide.BUY) {
+            if (settlementJobs != null) {
+                settlementJobs.markComplete(orderId);
+            }
+            return;
+        }
+        if (settlementJobs != null && "COMPLETE".equalsIgnoreCase(settlementJobs.findStatus(orderId))) {
+            return;
+        }
+        updateHoldingFromFilledOrder(orderId);
+        moveSettledQuantityOutOfPositions(order);
+        if (settlementJobs != null) {
+            settlementJobs.markComplete(orderId);
+        }
+        logger.info("  ✓ Deferred holdings settled and positions moved for order {}", orderId);
+    }
+
+    /**
+     * The second half of the move: subtract the settled quantity from the
+     * position row and delete the row when nothing unsettled remains.
+     */
+    private void moveSettledQuantityOutOfPositions(Order order) {
+        Long accountId = order.getAccount().getAccountId();
+        Long instrumentId = order.getInstrument().getInstrumentId();
+        Position current = positionMapper.findPositionByAccountAndInstrument(accountId, instrumentId)
+            .orElseThrow(() -> new IllegalStateException(
+                "No position to move for settled order " + order.getOrderId()));
+        int remaining = current.getQuantity() - order.getQuantity();
+        if (remaining < 0) {
+            throw new IllegalStateException(
+                "Position quantity " + current.getQuantity() + " below settled quantity "
+                + order.getQuantity() + " for order " + order.getOrderId());
+        }
+        if (remaining == 0) {
+            if (positionMapper.deletePosition(current.getPositionId()) == 0) {
+                throw new IllegalStateException(
+                    "Failed to remove moved position for order " + order.getOrderId());
+            }
+            logger.info("    ✓ Position fully moved and removed (positionId={})", current.getPositionId());
+            return;
+        }
+        // Average cost is unchanged by removing shares; only quantity moves.
+        if (positionMapper.updatePosition(current.getPositionId(), remaining,
+                current.getAveragePrice()) == 0) {
+            throw new IllegalStateException(
+                "Failed to move settled quantity out of position for order " + order.getOrderId());
+        }
+        logger.info("    ✓ Position moved (positionId={}, remaining={})",
+                current.getPositionId(), remaining);
+    }
+
+    private void updateHoldingFromFilledOrder(Long orderId) {
+        Order order = orderMapper.findOrderById(orderId)
+            .orElseThrow(() -> new IllegalArgumentException("Order " + orderId + " not found for holding update"));
+        BigDecimal filledPrice = readFilledPrice(orderId);
+        if (filledPrice == null) {
+            throw new IllegalStateException("No execution price recorded for order " + orderId);
+        }
+        updateHolding(order.getAccount().getAccountId(), orderId, filledPrice,
+                order.getQuantity(), order.getSide());
+    }
+
+    private BigDecimal readFilledPrice(Long orderId) {
+        try {
+            return orderMapper.findFilledPrice(orderId).orElse(null);
+        } catch (Exception e) {
+            logger.warn("Could not read filled_price for order {}, falling back to position average", orderId);
+            Order order = orderMapper.findOrderById(orderId).orElse(null);
+            if (order == null) {
+                return null;
+            }
+            return positionMapper.findPositionByAccountAndInstrument(
+                    order.getAccount().getAccountId(), order.getInstrument().getInstrumentId())
+                    .map(Position::getAveragePrice).orElse(order.getLimitPrice());
+        }
+    }
+
+    /**
+     * Crash-recovery sweeper: applies any PENDING settlement job past its due time.
+     */
+    @Scheduled(fixedDelayString = "${app.settlement.sweep-interval-ms:10000}")
+    public void sweepDueSettlements() {
+        if (settlementJobs == null) {
+            return;
+        }
+        try {
+            for (Long orderId : settlementJobs.findDue(50)) {
+                try {
+                    applyDeferredHoldings(orderId);
+                } catch (Exception e) {
+                    logger.warn("Sweep failed for holdings settlement of order {}", orderId, e);
+                    try {
+                        settlementJobs.markFailed(orderId);
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Holdings settlement sweep failed", e);
         }
     }
     

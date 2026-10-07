@@ -363,8 +363,8 @@ public class SettlementServiceTest {
     }
     
     @Test
-    @DisplayName("DELIVERY SELL order: updates both holding and position")
-    void testSettleFilled_DeliverySellOrder_UpdatesHoldingAndPosition() {
+    @DisplayName("DELIVERY SELL order: debits holdings immediately, no position leg")
+    void testSettleFilled_DeliverySellOrder_DebitsHoldingOnly() {
         Long orderId = 123L;
         Long accountId = 456L;
         Long instrumentId = 789L;
@@ -401,21 +401,18 @@ public class SettlementServiceTest {
             .thenReturn(java.util.Optional.of(existingHolding));
         when(holdingMapperMock.updateHolding(anyLong(), anyInt(), any(BigDecimal.class)))
             .thenReturn(1);
-        
-        // Position setup
-        Position existingPosition = createMockPosition(accountId, instrumentId, 10, new BigDecimal("100.00"));
-        when(positionMapperMock.findPositionByAccountAndInstrument(accountId, instrumentId))
-            .thenReturn(java.util.Optional.of(existingPosition));
-        when(positionMapperMock.updatePosition(anyLong(), anyInt(), any(BigDecimal.class)))
-            .thenReturn(1);
         when(orderMapperMock.recordRealizedPnl(anyLong(), any(), any())).thenReturn(1);
-        
+
         assertDoesNotThrow(() -> settlementService.settleOrder(
             orderId, accountId, executionPrice, quantity, side, result
         ));
-        
+
         verify(holdingMapperMock, times(1)).updateHolding(anyLong(), anyInt(), any(BigDecimal.class));
-        verify(positionMapperMock, times(1)).updatePosition(anyLong(), anyInt(), any(BigDecimal.class));
+        // Sells settle out of holdings at fill time: positions are never touched.
+        verify(positionMapperMock, never()).findPositionByAccountAndInstrument(anyLong(), anyLong());
+        verify(positionMapperMock, never()).updatePosition(anyLong(), anyInt(), any(BigDecimal.class));
+        verify(positionMapperMock, never()).insertPosition(any(Position.class));
+        verify(positionMapperMock, never()).deletePosition(anyLong());
         // (100.50 - 100.00 average cost) x 5
         verify(orderMapperMock).recordRealizedPnl(orderId, new BigDecimal("100.00"), new BigDecimal("2.5000"));
         verify(kafkaProducerMock, times(1)).publishTradeEvent(

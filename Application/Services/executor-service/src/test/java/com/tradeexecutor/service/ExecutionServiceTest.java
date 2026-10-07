@@ -1,16 +1,19 @@
 package com.tradeexecutor.service;
 
 import com.tradingsystem.domain.entities.Account;
+import com.tradingsystem.domain.entities.Holding;
 import com.tradingsystem.domain.entities.Instrument;
 import com.tradingsystem.domain.entities.Order;
 import com.tradingsystem.domain.entities.Position;
 import com.tradingsystem.domain.enums.OrderSide;
+import com.tradingsystem.domain.enums.ProductType;
 import com.tradingsystem.domain.enums.TradingStatus;
 import com.tradeexecutor.exception.PermanentProcessingException;
 import com.tradeexecutor.execution.ExecutionDecision;
 import com.tradeexecutor.execution.ExecutionResult;
 import com.tradeexecutor.execution.OrderExecutor;
 import com.tradeexecutor.mapper.AccountMapper;
+import com.tradeexecutor.mapper.HoldingMapper;
 import com.tradeexecutor.mapper.InstrumentMapper;
 import com.tradeexecutor.mapper.OrderMapper;
 import com.tradeexecutor.mapper.PositionMapper;
@@ -316,8 +319,7 @@ class ExecutionServiceTest {
 
     @Test
     @DisplayName("Missing or insufficient execution-time holdings reject a SELL")
-    void insufficientExecutionTimeHoldingsRejectFilledSell() {
-        OrderPlacedEvent event = event(String.valueOf(ORDER_ID), ACCOUNT_ID);
+    void insufficientExecutionTimeHoldingsRejectFilledSell() {        OrderPlacedEvent event = event(String.valueOf(ORDER_ID), ACCOUNT_ID);
         stubOrderLookup(2, OrderSide.SELL);
         stubInstrumentLookup();
         when(order.getInstrument()).thenReturn(instrument);
@@ -329,6 +331,75 @@ class ExecutionServiceTest {
         when(positionMapper.findPositionByAccountAndInstrument(ACCOUNT_ID, INSTRUMENT_ID))
                 .thenReturn(Optional.of(position));
         when(position.getQuantity()).thenReturn(1);
+
+        executionService.processOrderPlaced(event);
+
+        ArgumentCaptor<ExecutionResult> resultCaptor = ArgumentCaptor.forClass(ExecutionResult.class);
+        verify(settlementService).settleOrder(
+                eq(ORDER_ID), eq(ACCOUNT_ID), eq(null), eq(2), eq(OrderSide.SELL), resultCaptor.capture()
+        );
+        assertEquals(ExecutionResult.Status.REJECTED, resultCaptor.getValue().getStatus());
+        assertEquals("Insufficient holdings at execution time", resultCaptor.getValue().getReason());
+    }
+
+    @Test
+    @DisplayName("DELIVERY SELL is re-checked against holdings, not positions")
+    void deliverySellPassesExecutionTimeHoldingsLedgerCheck() {
+        com.tradeexecutor.mapper.HoldingMapper holdingMapper =
+                org.mockito.Mockito.mock(com.tradeexecutor.mapper.HoldingMapper.class);
+        executionService = new ExecutionService(
+                orderExecutor, orderMapper, instrumentMapper, accountMapper,
+                positionMapper, holdingMapper, settlementService);
+
+        OrderPlacedEvent event = event(String.valueOf(ORDER_ID), ACCOUNT_ID);
+        stubOrderLookup(2, OrderSide.SELL);
+        stubInstrumentLookup();
+        when(order.getInstrument()).thenReturn(instrument);
+        when(instrument.getInstrumentId()).thenReturn(INSTRUMENT_ID);
+        when(order.getProductType()).thenReturn(ProductType.DELIVERY);
+        BigDecimal price = new BigDecimal("30.00");
+        ExecutionResult filled = ExecutionResult.filled(price);
+        when(orderExecutor.execute(order, instrument))
+                .thenReturn(new ExecutionDecision(filled, "DEFAULT"));
+        when(accountMapper.findAccountById(ACCOUNT_ID)).thenReturn(Optional.of(account));
+        when(account.getTradingStatus()).thenReturn(TradingStatus.ACTIVE);
+        Holding holding = org.mockito.Mockito.mock(Holding.class);
+        when(holding.getQuantity()).thenReturn(5);
+        when(holdingMapper.findHoldingByAccountAndInstrument(ACCOUNT_ID, INSTRUMENT_ID))
+                .thenReturn(Optional.of(holding));
+
+        executionService.processOrderPlaced(event);
+
+        verify(holdingMapper).findHoldingByAccountAndInstrument(ACCOUNT_ID, INSTRUMENT_ID);
+        verify(positionMapper, never()).findPositionByAccountAndInstrument(any(), any());
+        verify(settlementService).settleOrder(
+                ORDER_ID, ACCOUNT_ID, price, 2, OrderSide.SELL, filled
+        );
+    }
+
+    @Test
+    @DisplayName("DELIVERY SELL with settled holdings below quantity is rejected at execution time")
+    void deliverySellWithInsufficientHoldingsIsRejected() {
+        com.tradeexecutor.mapper.HoldingMapper holdingMapper =
+                org.mockito.Mockito.mock(com.tradeexecutor.mapper.HoldingMapper.class);
+        executionService = new ExecutionService(
+                orderExecutor, orderMapper, instrumentMapper, accountMapper,
+                positionMapper, holdingMapper, settlementService);
+
+        OrderPlacedEvent event = event(String.valueOf(ORDER_ID), ACCOUNT_ID);
+        stubOrderLookup(2, OrderSide.SELL);
+        stubInstrumentLookup();
+        when(order.getInstrument()).thenReturn(instrument);
+        when(instrument.getInstrumentId()).thenReturn(INSTRUMENT_ID);
+        when(order.getProductType()).thenReturn(ProductType.DELIVERY);
+        when(orderExecutor.execute(order, instrument))
+                .thenReturn(new ExecutionDecision(ExecutionResult.filled(new BigDecimal("30.00")), "DEFAULT"));
+        when(accountMapper.findAccountById(ACCOUNT_ID)).thenReturn(Optional.of(account));
+        when(account.getTradingStatus()).thenReturn(TradingStatus.ACTIVE);
+        Holding holding = org.mockito.Mockito.mock(Holding.class);
+        when(holding.getQuantity()).thenReturn(1);
+        when(holdingMapper.findHoldingByAccountAndInstrument(ACCOUNT_ID, INSTRUMENT_ID))
+                .thenReturn(Optional.of(holding));
 
         executionService.processOrderPlaced(event);
 

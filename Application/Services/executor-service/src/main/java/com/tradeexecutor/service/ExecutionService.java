@@ -1,22 +1,26 @@
 package com.tradeexecutor.service;
 
 import com.tradingsystem.domain.entities.Account;
+import com.tradingsystem.domain.entities.Holding;
 import com.tradingsystem.domain.entities.Instrument;
 import com.tradingsystem.domain.entities.Order;
 import com.tradingsystem.domain.entities.Position;
 import com.tradingsystem.domain.enums.OrderSide;
+import com.tradingsystem.domain.enums.ProductType;
 import com.tradingsystem.domain.enums.TradingStatus;
 import com.tradeexecutor.exception.PermanentProcessingException;
 import com.tradeexecutor.execution.ExecutionDecision;
 import com.tradeexecutor.execution.ExecutionResult;
 import com.tradeexecutor.execution.OrderExecutor;
 import com.tradeexecutor.mapper.AccountMapper;
+import com.tradeexecutor.mapper.HoldingMapper;
 import com.tradeexecutor.mapper.InstrumentMapper;
 import com.tradeexecutor.mapper.OrderMapper;
 import com.tradeexecutor.mapper.PositionMapper;
 import com.tradeexecutor.model.OrderPlacedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -32,6 +36,7 @@ public class ExecutionService {
     private final InstrumentMapper instrumentMapper;
     private final AccountMapper accountMapper;
     private final PositionMapper positionMapper;
+    private final HoldingMapper holdingMapper;
     private final SettlementService settlementService;
     
     public ExecutionService(OrderExecutor orderExecutor,
@@ -40,11 +45,24 @@ public class ExecutionService {
                            AccountMapper accountMapper,
                            PositionMapper positionMapper,
                            SettlementService settlementService) {
+        this(orderExecutor, orderMapper, instrumentMapper, accountMapper,
+                positionMapper, null, settlementService);
+    }
+
+    @Autowired
+    public ExecutionService(OrderExecutor orderExecutor,
+                           OrderMapper orderMapper,
+                           InstrumentMapper instrumentMapper,
+                           AccountMapper accountMapper,
+                           PositionMapper positionMapper,
+                           HoldingMapper holdingMapper,
+                           SettlementService settlementService) {
         this.orderExecutor = orderExecutor;
         this.orderMapper = orderMapper;
         this.instrumentMapper = instrumentMapper;
         this.accountMapper = accountMapper;
         this.positionMapper = positionMapper;
+        this.holdingMapper = holdingMapper;
         this.settlementService = settlementService;
     }
     
@@ -122,6 +140,27 @@ public class ExecutionService {
                     accountId, order.getOrderId(), executionPrice, tradeValue);
                 return new ExecutionDecision(
                     ExecutionResult.rejected("Insufficient funds at execution time"),
+                    original.getFillRuleName());
+            }
+        } else if (order.getProductType() == ProductType.DELIVERY) {
+            // DELIVERY sells settle out of holdings (positions hold only
+            // unsettled buys), so the execution-time check reads the same
+            // ledger the placement check used.
+            int heldQuantity = 0;
+            if (holdingMapper != null) {
+                Optional<Holding> holding = holdingMapper.findHoldingByAccountAndInstrument(
+                    accountId, order.getInstrument().getInstrumentId());
+                heldQuantity = holding.map(Holding::getQuantity).orElse(0);
+            } else {
+                Optional<Position> position = positionMapper.findPositionByAccountAndInstrument(
+                    accountId, order.getInstrument().getInstrumentId());
+                heldQuantity = position.map(Position::getQuantity).orElse(0);
+            }
+            if (heldQuantity < order.getQuantity()) {
+                logger.warn("Account {} no longer holds enough of instrument {} for order {} (held={}, needed={})",
+                    accountId, order.getInstrument().getSymbol(), order.getOrderId(), heldQuantity, order.getQuantity());
+                return new ExecutionDecision(
+                    ExecutionResult.rejected("Insufficient holdings at execution time"),
                     original.getFillRuleName());
             }
         } else {

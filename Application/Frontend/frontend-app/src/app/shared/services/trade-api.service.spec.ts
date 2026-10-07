@@ -87,8 +87,32 @@ describe('TradeApiService', () => {
     req.flush({ orderId: 'ORD-1', status: 'NEW' });
   });
 
-  it('rethrows the server errorCode and message with the HTTP status', () => {
-    let error: TradeApiError | undefined;
+  it('fetches settled holdings, preferences and notifications', () => {
+    service.getHoldings().subscribe();
+    service.getPreferences().subscribe();
+    service.getNotifications().subscribe();
+
+    const holdings = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/accounts/me/holdings`);
+    const preferences = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/preferences/me`);
+    const notifications = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/notifications/me`);
+    for (const req of [holdings, preferences, notifications]) {
+      expect(req.request.method).toBe('GET');
+    }
+    holdings.flush([]);
+    preferences.flush({ accountId: 6, alertChannel: 'EMAIL' });
+    notifications.flush([]);
+  });
+
+  it('saves preferences with PUT', () => {
+    service.updatePreferences({ defaultAccountId: 6, alertChannel: 'SMS' }).subscribe();
+
+    const req = http.expectOne(`${TRADE_API_BASE_URL}/api/v1/preferences/me`);
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({ defaultAccountId: 6, alertChannel: 'SMS' });
+    req.flush({ accountId: 6, defaultAccountId: 6, alertChannel: 'SMS' });
+  });
+
+  it('rethrows the server errorCode and message with the HTTP status', () => {    let error: TradeApiError | undefined;
     service.getAccount().subscribe({ error: (e) => (error = e) });
 
     http

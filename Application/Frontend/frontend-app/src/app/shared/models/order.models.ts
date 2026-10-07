@@ -7,30 +7,52 @@
 import type {
   AccountResponse,
   AccountStatus as ContractAccountStatus,
+  AlertChannel as ContractAlertChannel,
   BalanceResponse,
+  HoldingResponse as ContractHoldingResponse,
+  NotificationResponse as ContractNotificationResponse,
+  NotificationStatus as ContractNotificationStatus,
+  NotificationType as ContractNotificationType,
   OrderHistoryEntry,
   OrderResponse,
   OrderSide as ContractOrderSide,
   OrderStatus as ContractOrderStatus,
   PlaceOrderType as ContractPlaceOrderType,
   PlaceOrderRequest as ContractPlaceOrderRequest,
-  PositionResponse
+  PositionResponse,
+  PreferenceResponse as ContractPreferenceResponse,
+  QuoteResponse,
+  UpdateOrderRequest as ContractUpdateOrderRequest,
+  UpdatePreferenceRequest as ContractUpdatePreferenceRequest
 } from '../../../generated/trade-client';
 
 export type OrderStatus = ContractOrderStatus;
 export type OrderSide = ContractOrderSide;
 export type OrderType = ContractPlaceOrderType;
 export type AccountStatus = ContractAccountStatus;
+export type AlertChannel = ContractAlertChannel;
+export type NotificationType = ContractNotificationType;
+export type NotificationStatus = ContractNotificationStatus;
 
 // One entry of GET /api/v1/accounts/{id}/orders.
 export type Order = OrderHistoryEntry;
 // POST /api/v1/orders request and response.
 export type PlaceOrderRequest = ContractPlaceOrderRequest;
 export type PlaceOrderResponse = OrderResponse;
-// GET /api/v1/accounts/{id}, /balance and /positions.
+// PATCH /api/v1/orders/{id} request.
+export type UpdateOrderRequest = ContractUpdateOrderRequest;
+// GET /api/v1/instruments/{symbol}/quote response.
+export type Quote = QuoteResponse;
+// GET /api/v1/accounts/{id}, /balance, /positions and /holdings.
 export type Account = AccountResponse;
 export type Balance = BalanceResponse;
 export type Position = PositionResponse;
+export type Holding = ContractHoldingResponse;
+// GET /api/v1/preferences/me and PUT.
+export type Preferences = ContractPreferenceResponse;
+export type UpdatePreferences = ContractUpdatePreferenceRequest;
+// GET /api/v1/notifications/me.
+export type Notification = ContractNotificationResponse;
 
 export interface BalanceUpdateRequest {
   cashBalance: number;

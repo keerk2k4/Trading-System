@@ -1,11 +1,13 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import {
   AccountsService,
   InstrumentResponse,
+  NotificationsService,
   OrdersService,
+  PreferencesService,
   WatchlistDetailResponse,
   WatchlistResponse,
   WatchlistStockResponse,
@@ -15,12 +17,18 @@ import {
   Account,
   Balance,
   BalanceUpdateRequest,
+  Holding,
+  Notification,
   Order,
   OrderHistoryFilter,
   PlaceOrderRequest,
   PlaceOrderResponse,
   Position,
-  TradeApiError
+  Preferences,
+  Quote,
+  TradeApiError,
+  UpdateOrderRequest,
+  UpdatePreferences
 } from '../models/order.models';
 import { TRADE_API_BASE_URL } from '../api/api-clients';
 
@@ -41,6 +49,8 @@ export class TradeApiService {
   private orders = inject(OrdersService);
   private accounts = inject(AccountsService);
   private watchlists = inject(WatchlistsService);
+  private preferences = inject(PreferencesService);
+  private notifications = inject(NotificationsService);
 
   // GET /api/v1/accounts/me
   getAccount(): Observable<Account> {
@@ -61,6 +71,70 @@ export class TradeApiService {
     return this.accounts
       .getMyPositions()
       .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // GET /api/v1/accounts/me/holdings — settled holdings only. A filled
+  // DELIVERY buy shows in positions first and moves here after settlement.
+  getHoldings(): Observable<Holding[]> {
+    return this.accounts
+      .getMyHoldings()
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  private isApi404(err: HttpErrorResponse): boolean {
+    const code = err.error?.errorCode;
+    const message = String(err.error?.message ?? '').toLowerCase();
+    return err.status === 404 && (code === 'API-404' || message === 'not found');
+  }
+
+  private defaultPreferences(): Preferences {
+    return {
+      accountId: 0,
+      defaultAccountId: null,
+      alertChannel: 'EMAIL'
+    };
+  }
+
+  // GET /api/v1/preferences/me
+  getPreferences(): Observable<Preferences> {
+    return this.preferences
+      .getMyPreferences()
+      .pipe(catchError((err) => this.fallbackPreferences(err)))
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  private fallbackPreferences(err: HttpErrorResponse): Observable<Preferences> {
+    // JWT-scoped customer APIs only. If this endpoint is missing in the
+    // running backend, use safe UI defaults instead of calling account-id
+    // routes that are not part of the customer contract.
+    if (!this.isApi404(err)) {
+      throw err;
+    }
+    return of(this.defaultPreferences());
+  }
+
+  // PUT /api/v1/preferences/me
+  updatePreferences(update: UpdatePreferences): Observable<Preferences> {
+    return this.preferences
+      .updateMyPreferences(update)
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // GET /api/v1/notifications/me — backend inbox, newest first.
+  getNotifications(): Observable<Notification[]> {
+    return this.notifications
+      .getMyNotifications()
+      .pipe(catchError((err) => this.fallbackNotifications(err)))
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  private fallbackNotifications(err: HttpErrorResponse): Observable<Notification[]> {
+    // JWT-scoped customer APIs only. Missing notifications endpoint should not
+    // trigger calls to non-contracted account-id routes from the UI.
+    if (!this.isApi404(err)) {
+      throw err;
+    }
+    return of([]);
   }
 
   // GET /api/v1/accounts/me/orders, optionally narrowed by status
@@ -88,6 +162,27 @@ export class TradeApiService {
   placeOrder(order: PlaceOrderRequest): Observable<PlaceOrderResponse> {
     return this.orders
       .placeOrder(order)
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // DELETE /api/v1/orders/{id} — cancels a NEW order.
+  cancelOrder(orderId: string): Observable<PlaceOrderResponse> {
+    return this.orders
+      .cancelOrder(orderId.replace(/^ORD-/i, ''))
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // PATCH /api/v1/orders/{id} — updates quantity and/or limit price of a NEW order.
+  updateOrder(orderId: string, update: UpdateOrderRequest): Observable<PlaceOrderResponse> {
+    return this.orders
+      .updateOrder(orderId.replace(/^ORD-/i, ''), update)
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // GET /api/v1/instruments/{symbol}/quote — latest cached quote for MARKET tickets.
+  getQuote(symbol: string): Observable<Quote> {
+    return this.watchlists
+      .getQuote(symbol.trim().toUpperCase())
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 

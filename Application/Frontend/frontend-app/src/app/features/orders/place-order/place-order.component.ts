@@ -27,7 +27,7 @@ import { WatchlistService } from '../../../shared/services/watchlist.service';
 import { StatusBadgeComponent } from '../../../shared/ui/status-badge.component';
 import { AccountStatusNoticeComponent } from '../../../shared/ui/account-status-notice.component';
 import { CandlestickChartComponent } from '../../../shared/ui/candlestick-chart.component';
-import { OrderSide, OrderType, PlaceOrderResponse, TradeApiError } from '../../../shared/models/order.models';
+import { OrderSide, OrderType, PlaceOrderRequest, PlaceOrderResponse, Quote, TradeApiError } from '../../../shared/models/order.models';
 import { WatchlistStock } from '../../../shared/models/watchlist.models';
 
 /** Results shown under the symbol field; the full list belongs on the watchlist page. */
@@ -105,16 +105,6 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                 @if (errorMessage(); as message) {
                   <div class="tp-alert tp-alert-error" role="alert" data-testid="order-error"><span>{{ message }}</span></div>
                 }
-
-                <fieldset class="tp-segmented">
-                  <legend class="tp-label">Order type</legend>
-                  <div class="tp-segmented-options is-full">
-                    <input type="radio" id="type-limit" name="orderType" value="LIMIT" formControlName="orderType" />
-                    <label for="type-limit" data-testid="order-type-limit">Limit</label>
-                    <input type="radio" id="type-market" name="orderType" value="MARKET" formControlName="orderType" />
-                    <label for="type-market" data-testid="order-type-market">Market</label>
-                  </div>
-                </fieldset>
 
                 <fieldset class="tp-segmented">
                   <legend class="tp-label">Side</legend>
@@ -200,6 +190,39 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                   }
                 </div>
 
+                <fieldset class="tp-segmented">
+                  <legend class="tp-label">Order type</legend>
+                  <div class="tp-segmented-options is-full">
+                    <input
+                      type="radio"
+                      id="type-limit"
+                      name="orderType"
+                      value="LIMIT"
+                      formControlName="orderType"
+                      data-testid="order-type-limit-input"
+                      (change)="onOrderTypeChange('LIMIT')"
+                    />
+                    <label for="type-limit" data-testid="order-type-limit">Limit</label>
+                    <input
+                      type="radio"
+                      id="type-market"
+                      name="orderType"
+                      value="MARKET"
+                      formControlName="orderType"
+                      data-testid="order-type-market-input"
+                      (change)="onOrderTypeChange('MARKET')"
+                    />
+                    <label for="type-market" data-testid="order-type-market">Market</label>
+                  </div>
+                  <p class="tp-hint" id="type-hint">
+                    @if (isMarket()) {
+                      Market orders fill immediately at the live price and cannot be cancelled or updated.
+                    } @else {
+                      Limit orders wait about 15 seconds before filling, so they can be cancelled or updated.
+                    }
+                  </p>
+                </fieldset>
+
                 <div class="tp-form-row">
                   <div>
                     <label class="tp-label" for="quantity">Quantity</label>
@@ -220,26 +243,40 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                       <p class="tp-field-error" id="quantity-error" data-testid="order-error-quantity">{{ message }}</p>
                     }
                   </div>
-                  @if (values().orderType !== 'MARKET') {
-                  <div>
-                    <label class="tp-label" for="price">Limit price</label>
-                    <input
-                      class="tp-input tp-num"
-                      id="price"
-                      data-testid="order-price"
-                      type="number"
-                      inputmode="decimal"
-                      min="0.01"
-                      step="0.01"
-                      formControlName="price"
-                      aria-required="true"
-                      [attr.aria-invalid]="priceError() ? 'true' : null"
-                      [attr.aria-describedby]="priceError() ? 'price-error' : null"
-                    />
-                    @if (priceError(); as message) {
-                      <p class="tp-field-error" id="price-error" data-testid="order-error-price">{{ message }}</p>
-                    }
-                  </div>
+                  @if (isMarket()) {
+                    <div>
+                      <span class="tp-label">Market price</span>
+                      <p class="tp-stat-value" data-testid="order-market-price">
+                        @if (marketPrice() !== null) {
+                          {{ marketPrice() | currency }}
+                        } @else {
+                          —
+                        }
+                      </p>
+                      @if (quoteStatus(); as qs) {
+                        <p class="tp-hint" data-testid="order-quote-status">{{ qs }}</p>
+                      }
+                    </div>
+                  } @else {
+                    <div>
+                      <label class="tp-label" for="price">Limit price</label>
+                      <input
+                        class="tp-input tp-num"
+                        id="price"
+                        data-testid="order-price"
+                        type="number"
+                        inputmode="decimal"
+                        min="0.01"
+                        step="0.01"
+                        formControlName="price"
+                        aria-required="true"
+                        [attr.aria-invalid]="priceError() ? 'true' : null"
+                        [attr.aria-describedby]="priceError() ? 'price-error' : null"
+                      />
+                      @if (priceError(); as message) {
+                        <p class="tp-field-error" id="price-error" data-testid="order-error-price">{{ message }}</p>
+                      }
+                    </div>
                   }
                 </div>
 
@@ -278,7 +315,11 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
               </div>
               <div><dt>Order type</dt><dd data-testid="order-summary-type">{{ values().orderType === 'MARKET' ? 'Market' : 'Limit' }}</dd></div>
               <div><dt>Quantity</dt><dd class="tp-num" data-testid="order-summary-quantity">{{ (values().quantity | number) ?? '—' }}</dd></div>
-              <div><dt>Limit price</dt><dd class="tp-num" data-testid="order-summary-price">{{ values().orderType === 'MARKET' ? 'Market' : ((values().price | currency) ?? '—') }}</dd></div>
+              @if (isMarket()) {
+                <div><dt>Market price</dt><dd class="tp-num" data-testid="order-summary-market-price">{{ (marketPrice() | currency) ?? '—' }}</dd></div>
+              } @else {
+                <div><dt>Limit price</dt><dd class="tp-num" data-testid="order-summary-price">{{ (values().price | currency) ?? '—' }}</dd></div>
+              }
             </dl>
             <div class="estimate">
               <p class="tp-stat-label">Estimated value</p>
@@ -315,26 +356,50 @@ export class PlaceOrderComponent implements OnInit {
   private readonly resultHeading = viewChild.required<ElementRef<HTMLElement>>('resultHeading');
 
   protected readonly form = inject(NonNullableFormBuilder).group({
-    orderType: ['LIMIT' as OrderType, Validators.required],
     side: ['' as OrderSide | '', Validators.required],
+    orderType: ['LIMIT' as OrderType, Validators.required],
     symbol: ['', [Validators.required, Validators.maxLength(10)]],
     quantity: [null as number | null, [Validators.required, wholeNumber, positive]],
-    price: [null as number | null, [Validators.required, positive, twoDecimals]]
+    price: [null as number | null, [positive, twoDecimals]]
   });
 
   protected readonly values = toSignal(this.form.valueChanges, { initialValue: this.form.getRawValue() });
+  protected readonly isMarket = computed(() => this.values().orderType === 'MARKET');
+  // Latest live quote for the symbol on a MARKET ticket, loaded immediately
+  // when the trader picks MARKET or a stock. Null until the first quote arrives.
+  protected readonly marketQuote = signal<Quote | null>(null);
+  protected readonly quoteStatus = signal('');
+  protected readonly marketPrice = computed(() => {
+    const quote = this.marketQuote();
+    if (!quote) {
+      return null;
+    }
+    const side = this.values().side;
+    if (side === 'BUY' && quote.ask != null) {
+      return quote.ask;
+    }
+    if (side === 'SELL' && quote.bid != null) {
+      return quote.bid;
+    }
+    return quote.price ?? null;
+  });
   protected readonly accountId = computed(() => this.authService.currentUser$()?.accountId ?? 0);
   protected readonly summarySymbol = computed(() => (this.values().symbol ?? '').trim().toUpperCase());
   protected readonly estimate = computed(() => {
-    const { orderType, quantity, price } = this.values();
-    if (orderType === 'MARKET') {
-      return null;
-    }
-    return quantity && price && quantity > 0 && price > 0 ? quantity * price : null;
+    const { quantity } = this.values();
+    const unit = this.isMarket() ? this.marketPrice() : this.values().price;
+    return quantity && unit && quantity > 0 && unit > 0 ? quantity * unit : null;
   });
   protected readonly submitLabel = computed(() => {
     const side = this.values().side;
-    return side === 'BUY' ? 'Place buy order' : side === 'SELL' ? 'Place sell order' : 'Place order';
+    const kind = this.isMarket() ? 'market' : 'limit';
+    if (side === 'BUY') {
+      return `Place ${kind} buy order`;
+    }
+    if (side === 'SELL') {
+      return `Place ${kind} sell order`;
+    }
+    return 'Place order';
   });
 
   // The symbol last chosen from the results (or deep-linked). While the field
@@ -389,6 +454,26 @@ export class PlaceOrderComponent implements OnInit {
 
   ngOnInit(): void {
     this.watchlist.loadCatalog();
+    this.applyPriceValidators(this.form.controls.orderType.value);
+    this.form.controls.orderType.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((type) => {
+        this.applyPriceValidators(type);
+        if (type === 'MARKET') {
+          this.loadQuote(this.summarySymbol());
+        } else {
+          this.marketQuote.set(null);
+          this.quoteStatus.set('');
+        }
+      });
+    // When the symbol changes on a MARKET ticket, reload the current value immediately.
+    this.form.controls.symbol.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        if (this.isMarket()) {
+          this.loadQuote(this.summarySymbol());
+        }
+      });
     this.orderService
       .getAccount()
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -405,22 +490,12 @@ export class PlaceOrderComponent implements OnInit {
         this.pickedSymbol.set(symbol);
       }
     });
-
-    this.form.controls.orderType.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((type) => {
-      const price = this.form.controls.price;
-      if (type === 'MARKET') {
-        price.setValue(null);
-        price.disable({ emitEvent: false });
-      } else {
-        price.enable({ emitEvent: false });
-      }
-      price.updateValueAndValidity({ emitEvent: false });
-    });
   }
 
   /**
-   * Fills the ticket from a search result: the symbol always, and the limit
-   * price from the live quote only when the trader has not typed one yet.
+   * Fills the ticket from a search result: the symbol always; the price from the
+   * live quote for a LIMIT ticket only when the trader has not typed one yet,
+   * and as the current market value for a MARKET ticket.
    * Focus moves on to quantity because the pressed button disappears.
    */
   protected selectStock(stock: WatchlistStock): void {
@@ -428,12 +503,63 @@ export class PlaceOrderComponent implements OnInit {
     symbol.setValue(stock.symbol);
     symbol.markAsDirty();
     this.pickedSymbol.set(stock.symbol);
-    if (orderType.value === 'LIMIT' && price.value === null && stock.price > 0) {
+    if (this.isMarket()) {
+      this.loadQuote(stock.symbol);
+    } else if (orderType.value === 'LIMIT' && price.value === null && stock.price > 0) {
       price.setValue(Math.round(stock.price * 100) / 100);
       price.markAsDirty();
     }
     afterNextRender(() => this.host.nativeElement.querySelector<HTMLElement>('#quantity')?.focus(), {
       injector: this.injector
+    });
+  }
+
+  /** Switching between LIMIT and MARKET re-validates the price field. */
+  protected onOrderTypeChange(type: OrderType): void {
+    this.form.controls.orderType.setValue(type);
+  }
+
+  private applyPriceValidators(type: OrderType): void {
+    const price = this.form.controls.price;
+    if (type === 'MARKET') {
+      price.clearValidators();
+    } else {
+      price.setValidators([Validators.required, positive, twoDecimals]);
+    }
+    price.updateValueAndValidity({ emitEvent: false });
+  }
+
+  /**
+   * Loads the current market value for the symbol into the MARKET ticket, so the
+   * trader sees what the order will execute against. Falls back to the catalog
+   * price when the quote cache has nothing yet.
+   */
+  private loadQuote(symbol: string): void {
+    const key = (symbol ?? '').trim().toUpperCase();
+    if (!key) {
+      this.marketQuote.set(null);
+      this.quoteStatus.set('');
+      return;
+    }
+    const catalogPrice = this.watchlist.search(key).find((stock) => stock.symbol === key)?.price ?? null;
+    this.quoteStatus.set('Loading live price…');
+    this.orderService.getQuote(key).subscribe({
+      next: (quote) => {
+        this.marketQuote.set(quote);
+        this.quoteStatus.set('');
+      },
+      error: () => {
+        // No cached quote yet: fall back to the catalog price so the ticket
+        // still shows a value; the server rejects the order without a quote.
+        this.marketQuote.set(
+          catalogPrice !== null
+            ? { symbol: key, price: catalogPrice, bid: null, ask: null }
+            : null
+        );
+        this.quoteStatus.set(
+          catalogPrice !== null ? 'Showing last catalog price; live quote unavailable.' : 'No live price yet for this symbol.'
+        );
+      }
     });
   }
 
@@ -468,7 +594,7 @@ export class PlaceOrderComponent implements OnInit {
   }
 
   protected priceError(): string | null {
-    if (this.values().orderType === 'MARKET') {
+    if (this.isMarket()) {
       return null;
     }
     if (!this.shows('price')) {
@@ -497,8 +623,6 @@ export class PlaceOrderComponent implements OnInit {
       return;
     }
 
-    // accountId is 0 until the trading account has been provisioned and the
-    // user has signed in again to pick it up in a fresh token.
     // Generate idempotencyKey (unique identifier for order idempotency)
     if (!this.idempotencyKey) {
       this.idempotencyKey = crypto.randomUUID();
@@ -507,23 +631,15 @@ export class PlaceOrderComponent implements OnInit {
     const { orderType, side, symbol, quantity, price } = this.form.getRawValue();
     this.isLoading.set(true);
 
-    const request = {
+    // The backend resolves the account from the JWT; the request carries no accountId.
+    const request: PlaceOrderRequest = {
       orderType,
       symbol: symbol.trim().toUpperCase(),
       side: side as OrderSide,
       quantity: quantity ?? 0,
-      idempotencyKey: this.idempotencyKey
-    } as {
-      orderType: OrderType;
-      symbol: string;
-      side: OrderSide;
-      quantity: number;
-      idempotencyKey: string;
-      price?: number;
+      idempotencyKey: this.idempotencyKey,
+      ...(orderType === 'MARKET' ? {} : { price: price ?? 0 })
     };
-    if (orderType === 'LIMIT') {
-      request.price = price ?? 0;
-    }
 
     this.orderService
       .placeOrder(request)
@@ -554,6 +670,9 @@ export class PlaceOrderComponent implements OnInit {
 
   protected resetForm(): void {
     this.form.reset();
+    this.form.controls.orderType.setValue('LIMIT');
+    this.marketQuote.set(null);
+    this.quoteStatus.set('');
     this.submitted.set(false);
     this.errorMessage.set('');
     this.placedOrder.set(null);

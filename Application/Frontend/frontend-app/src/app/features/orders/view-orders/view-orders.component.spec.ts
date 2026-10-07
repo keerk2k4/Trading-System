@@ -41,7 +41,7 @@ describe('ViewOrdersComponent', () => {
   const rows = () => Array.from(page.querySelectorAll('tbody tr'));
 
   beforeEach(() => {
-    tradeApi = jasmine.createSpyObj<TradeApiService>('TradeApiService', ['getOrders']);
+    tradeApi = jasmine.createSpyObj<TradeApiService>('TradeApiService', ['getOrders', 'cancelOrder', 'updateOrder']);
     tradeApi.getOrders.and.returnValue(
       of([
         order('ORD-OLD', '2026-01-01T10:00:00Z'),
@@ -115,7 +115,7 @@ describe('ViewOrdersComponent', () => {
     }));
 
     it('only ever repeats the GET, never placing an order again', fakeAsync(() => {
-      tradeApi = jasmine.createSpyObj<TradeApiService>('TradeApiService', ['getOrders', 'placeOrder']);
+      tradeApi = jasmine.createSpyObj<TradeApiService>('TradeApiService', ['getOrders', 'placeOrder', 'cancelOrder', 'updateOrder']);
       tradeApi.getOrders.and.returnValue(of([newOrder()]));
       create();
 

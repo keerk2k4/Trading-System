@@ -30,24 +30,173 @@ usually enough. The second decision is what a signal is allowed to claim, becaus
 number presented as a recommendation is a product and legal problem before it is an engineering
 one. One methodology computed from real candles, explained in the response and rendered in the
 UI, is worth more here than three nobody can defend.
+Implement the **Automated Strategy Execution** extension in the existing trading platform.
 
-## Automated strategy execution
+## IMPORTANT — BEFORE MAKING ANY CHANGES
 
-A customer configures a rule once and the platform trades it for them. Buy fifty of an
-instrument when its price falls through a level; sell the holding when it rises through
-another. The customer is asleep, the condition is met, and the order is placed without anyone
-confirming it. That is the whole feature, and it is also why every control in it is
-load-bearing rather than hardening added after a demonstration works. A defect here does not
-render the wrong number on a screen. It spends a customer's money. Orders are placed through
-`POST /api/v1/orders`, never published straight onto the `orders` topic and never by calling
-the order service directly, because the route's validation, authorisation and idempotency check
-are what stands between a strategy bug and an unrecoverable position. Sharing a process with
-that code makes the shortcut easy to take and no less wrong.
+First inspect the entire existing codebase and understand the current architecture.
 
-Identity is the first question and it has no obvious answer: a strategy runs when nobody is
-logged in, so it cannot borrow a customer's access token, and deciding what it does instead is
-the strongest decision log entry in the whole catalogue. The second is bounding the damage, in
-code and at the point of decision, with a maximum spend, a maximum position size and a stop
-after repeated failures. The third is state: a strategy that has been disabled must stop
-placing orders now, not at the end of its current evaluation cycle, and that is demonstrated
-live by disabling one mid-cycle.
+Specifically inspect:
+
+* Existing services and their responsibilities
+* PostgreSQL schema, migrations, tables, relationships, constraints and indexes
+* Existing order placement flow
+* `POST /api/v1/orders`
+* Existing order validation and authorization
+* Existing idempotency implementation
+* Existing order states and lifecycle
+* Existing positions and holdings implementation
+* Existing cancellation and update-order implementation
+* Existing Kafka topics and producers/consumers
+* Existing `market-data` Kafka consumer/producer
+* Existing `orders` Kafka topic
+* Existing `trade-events` Kafka topic
+* Existing authentication/JWT flow
+* Existing user/account ownership checks
+* Existing Angular order-placement UI if the UI is part of this codebase
+* Existing OpenAPI/REST contract
+
+Do NOT immediately modify code.
+
+First understand and document how the existing implementation works and identify the exact files/classes that should be extended.
+
+---
+
+# FEATURE: AUTOMATED STRATEGY EXECUTION
+
+Implement an automated trading strategy feature where a customer can configure a rule that automatically places an order when a market condition is satisfied.
+
+Example:
+
+```text
+BUY 50 TCS
+when TCS price <= 3500
+```
+
+or:
+
+```text
+SELL 50 TCS
+when TCS price >= 3800
+```
+
+The strategy must react to the existing `market-data` Kafka topic.
+
+---
+
+# 1. DO NOT CREATE A NEW MARKET-DATA KAFKA TOPIC
+
+Reuse the existing:
+
+```text
+market-data
+```
+
+topic.
+
+The strategy engine should consume the existing market data independently using its own consumer group.
+
+For example:
+
+```text
+market-data
+    |
+    +---- watchlist-service consumer
+    |
+    +---- strategy-service consumer
+```
+
+Do NOT change the existing market-data producer unnecessarily.
+
+Do NOT create another topic such as:
+
+```text
+strategy-market-data
+```
+
+because the existing `market-data` topic already contains the required information.
+
+Use a separate consumer group, for example:
+
+```text
+strategy-service
+```
+
+so the strategy consumer independently receives market-data events.
+
+---
+
+# 2. STRATEGY DATA MODEL
+
+Inspect the existing database conventions first and then add the minimum required persistent tables/migrations.
+
+A strategy should conceptually contain:
+
+```text
+strategy_id
+user_id
+symbol
+side
+quantity
+trigger_price
+max_spend
+max_position_size
+status
+failure_count
+created_at
+updated_at
+```
+
+Possible states:
+
+```text
+ACTIVE
+DISABLED
+TRIGGERED
+FAILED
+```
+
+Use the project's existing enum/naming/database conventions instead of blindly creating these names if equivalent structures already exist.
+
+Relationships must ensure that a user can only access their own strategies.
+
+Add appropriate:
+
+* Primary keys
+* Foreign keys
+* Indexes
+* Unique constraints where required
+* User ownership constraints
+
+Do not duplicate existing user/account/instrument tables.
+
+Reuse existing tables such as:
+
+```text
+users
+accounts
+instruments
+orders
+positions
+holdings
+```
+
+where appropriate.
+
+---
+
+# 3. STRATEGY REST API
+
+Inspect the existing REST API conventions and OpenAPI contract.
+
+Add endpoints following the existing versioning and naming conventions.
+
+At minimum, support:
+
+```text
+POST   /api/v1/strategies
+GET    /api/v1/strategies
+GET    /api/v1/strategies/{strategyId}
+PATCH  /api/v1/strategies/{strategyId}
+DELETE /api/v1/
+```

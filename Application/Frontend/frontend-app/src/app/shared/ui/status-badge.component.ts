@@ -4,11 +4,18 @@ type Tone = 'positive' | 'negative' | 'warning' | 'neutral';
 
 const TONES: Record<string, Tone> = {
   FILLED: 'positive',
+  ORDER_FILLED: 'positive',
   APPROVED: 'positive',
   ACTIVE: 'positive',
+  SENT: 'positive',
   PARTIALLY_FILLED: 'warning',
   PENDING: 'warning',
+  ORDER_CANCELLED: 'warning',
+  CANCELLED: 'warning',
+  QUEUED: 'warning',
   REJECTED: 'negative',
+  ORDER_REJECTED: 'negative',
+  FAILED: 'negative',
   SUSPENDED: 'negative',
   BLOCKED: 'negative',
   CLOSED: 'negative',

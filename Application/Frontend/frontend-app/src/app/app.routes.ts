@@ -89,6 +89,34 @@ export const routes: Routes = [
         canActivate: [kycApprovalGuard],
         loadComponent: () =>
           import('./features/watchlist/watchlist.component').then((m) => m.WatchlistComponent)
+      },
+      {
+        path: 'positions',
+        title: 'Positions · Trading Platform',
+        canActivate: [kycApprovalGuard],
+        loadComponent: () =>
+          import('./features/portfolio/positions.component').then((m) => m.PositionsComponent)
+      },
+      {
+        path: 'holdings',
+        title: 'Holdings · Trading Platform',
+        canActivate: [kycApprovalGuard],
+        loadComponent: () =>
+          import('./features/portfolio/holdings.component').then((m) => m.HoldingsComponent)
+      },
+      {
+        path: 'notifications',
+        title: 'Notifications · Trading Platform',
+        canActivate: [kycApprovalGuard],
+        loadComponent: () =>
+          import('./features/notifications/notifications.component').then((m) => m.NotificationsComponent)
+      },
+      {
+        path: 'settings',
+        title: 'Settings · Trading Platform',
+        canActivate: [kycApprovalGuard],
+        loadComponent: () =>
+          import('./features/settings/settings.component').then((m) => m.SettingsComponent)
       }
     ]
   },

@@ -19,6 +19,7 @@ import com.tradingsystem.exception.InstrumentNotFoundException;
 import com.tradingsystem.spring_boot_app.dto.OrderResponse;
 import com.tradingsystem.spring_boot_app.kafka.KafkaMessageEnvelope;
 import com.tradingsystem.spring_boot_app.kafka.OrderPlacedPayload;
+import com.tradingsystem.spring_boot_app.kafka.TradeEventPublisher;
 import com.tradingsystem.spring_boot_app.mapper.AccountMapper;
 import com.tradingsystem.spring_boot_app.mapper.HoldingMapper;
 import com.tradingsystem.spring_boot_app.mapper.InstrumentMapper;
@@ -85,7 +86,8 @@ class OrderSettlementCharacterisationTest {
     void setUp() {
         TransactionSynchronizationManager.initSynchronization();
         KafkaTemplate<String, KafkaMessageEnvelope<OrderPlacedPayload>> kafkaTemplate = Mockito.mock(KafkaTemplate.class);
-        service = new OrderService(accounts, instruments, orders, positions, holdingMapper, new LatestPriceCache(), kafkaTemplate);
+        service = new OrderService(accounts, instruments, orders, positions, holdingMapper,
+                new LatestPriceCache(), kafkaTemplate, Mockito.mock(TradeEventPublisher.class));
     }
 
     @AfterEach

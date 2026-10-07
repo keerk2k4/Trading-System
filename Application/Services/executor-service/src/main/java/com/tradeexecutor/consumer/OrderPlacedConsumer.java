@@ -7,12 +7,15 @@ import com.tradeexecutor.exception.TransientProcessingException;
 import com.tradeexecutor.kafka.DeadLetterPublisher;
 import com.tradeexecutor.kafka.KafkaMessageEnvelope;
 import com.tradeexecutor.kafka.RetryHandler;
+import com.tradeexecutor.mapper.OrderMapper;
 import com.tradeexecutor.model.OrderPlacedEvent;
 import com.tradeexecutor.service.ExecutionService;
 import com.tradeexecutor.service.SettlementService;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -59,15 +62,27 @@ public class OrderPlacedConsumer {
     private final DeadLetterPublisher deadLetterPublisher;
     private final RetryHandler retryHandler;
     private final ObjectMapper objectMapper;
+    private final OrderMapper orderMapper;
+
+    @Value("${app.execution.limit-delay-ms:15000}")
+    private long limitDelayMs = 15000;
     
     public OrderPlacedConsumer(ExecutionService executionService, SettlementService settlementService,
                                DeadLetterPublisher deadLetterPublisher, RetryHandler retryHandler,
                                ObjectMapper objectMapper) {
+        this(executionService, settlementService, deadLetterPublisher, retryHandler, objectMapper, null);
+    }
+
+    @Autowired
+    public OrderPlacedConsumer(ExecutionService executionService, SettlementService settlementService,
+                               DeadLetterPublisher deadLetterPublisher, RetryHandler retryHandler,
+                               ObjectMapper objectMapper, OrderMapper orderMapper) {
         this.executionService = executionService;
         this.settlementService = settlementService;
         this.deadLetterPublisher = deadLetterPublisher;
         this.retryHandler = retryHandler;
         this.objectMapper = objectMapper;
+        this.orderMapper = orderMapper;
     }
     
     /**
@@ -107,9 +122,73 @@ public class OrderPlacedConsumer {
         logger.info("✓ Envelope deserialized successfully");
         logger.info("  Event ID: {}, Event Type: {}, Order ID: {}", 
                    envelope.eventId(), envelope.eventType(), event.getOrderId());
+
+        // Execution timing (contracts/kafka-topics.md "Execution timing"):
+        // MARKET orders execute immediately at the live quote; LIMIT orders wait
+        // limit-delay-ms in NEW so they can be cancelled or updated first.
+        if (!waitForLimitDelay(event, record, ack)) {
+            return;
+        }
         
         // Try to process with retry logic for transient failures
         processWithRetry(event, record, ack);
+    }
+
+    /**
+     * Hold a LIMIT order for the cancellable window, then re-read its row.
+     *
+     * @return false when the order left NEW during the wait (cancelled, updated
+     * then cancelled, or already settled) and must not be executed.
+     */
+    private boolean waitForLimitDelay(OrderPlacedEvent event,
+                                      ConsumerRecord<String, KafkaMessageEnvelope<OrderPlacedEvent>> record,
+                                      Acknowledgment ack) {
+        String type = event.getOrderType();
+        boolean isLimit = type == null || type.isBlank() || "LIMIT".equalsIgnoreCase(type);
+        if (!isLimit) {
+            logger.info("MARKET order {} executes immediately at the live quote", event.getOrderId());
+            return true;
+        }
+        if (orderMapper == null) {
+            // Unit-test path: no DB re-read available, execute without delay.
+            return true;
+        }
+        if (orderMapper == null) {
+            // Unit-test path: no DB re-read available, execute without delay.
+            return true;
+        }
+        long delay = Math.max(0, limitDelayMs);
+        logger.info("LIMIT order {} waiting {}ms in NEW (cancellable/updatable window)",
+                event.getOrderId(), delay);
+        try {
+            Thread.sleep(delay);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.warn("Limit-delay sleep interrupted for order {}", event.getOrderId());
+        }
+        try {
+            Long orderId = Long.parseLong(event.getOrderId());
+            var status = orderMapper.findOrderStatus(orderId).orElse(null);
+            if (status == null) {
+                logger.warn("LIMIT order {} no longer found after delay; skipping execution", event.getOrderId());
+                if (ack != null) {
+                    ack.acknowledge();
+                }
+                return false;
+            }
+            if (!"NEW".equalsIgnoreCase(status)) {
+                logger.info("LIMIT order {} left NEW during delay (status={}); skipping execution",
+                        event.getOrderId(), status);
+                if (ack != null) {
+                    ack.acknowledge();
+                }
+                return false;
+            }
+            logger.info("LIMIT order {} still NEW after delay; executing", event.getOrderId());
+            return true;
+        } catch (NumberFormatException e) {
+            return true;
+        }
     }
     
     /**

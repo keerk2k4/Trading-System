@@ -1,22 +1,26 @@
 package com.tradingsystem.spring_boot_app.service;
 
 import com.tradingsystem.domain.entities.Account;
+import com.tradingsystem.domain.entities.Holding;
 import com.tradingsystem.domain.entities.Instrument;
 import com.tradingsystem.domain.entities.Position;
 import com.tradingsystem.domain.entities.User;
 import com.tradingsystem.domain.enums.OrderSide;
 import com.tradingsystem.domain.enums.OrderStatus;
+import com.tradingsystem.domain.enums.OrderType;
 import com.tradingsystem.domain.enums.TradingStatus;
 import com.tradingsystem.exception.AccountNotFoundException;
 import com.tradingsystem.exception.OptimisticLockException;
 import com.tradingsystem.spring_boot_app.dto.AccountResponse;
 import com.tradingsystem.spring_boot_app.dto.AccountStatus;
 import com.tradingsystem.spring_boot_app.dto.BalanceResponse;
+import com.tradingsystem.spring_boot_app.dto.HoldingResponse;
 import com.tradingsystem.spring_boot_app.dto.OrderHistoryEntry;
 import com.tradingsystem.spring_boot_app.dto.OrderHistoryRow;
 import com.tradingsystem.spring_boot_app.dto.PositionResponse;
 import com.tradingsystem.spring_boot_app.kafka.QuotePayload;
 import com.tradingsystem.spring_boot_app.mapper.AccountMapper;
+import com.tradingsystem.spring_boot_app.mapper.HoldingMapper;
 import com.tradingsystem.spring_boot_app.mapper.OrderMapper;
 import com.tradingsystem.spring_boot_app.mapper.PositionMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -56,7 +60,7 @@ class AccountServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AccountService(accounts, positions, orders,
+        service = new AccountService(accounts, positions, orders, mock(HoldingMapper.class),
                 new com.tradingsystem.spring_boot_app.service.LatestPriceCache());
     }
 
@@ -188,7 +192,7 @@ class AccountServiceTest {
         QuotePayload quote = mock(QuotePayload.class);
         when(quote.price()).thenReturn(new BigDecimal("27.00"));
         when(cache.get("ACME")).thenReturn(Optional.of(quote));
-        service = new AccountService(accounts, positions, orders, cache);
+        service = new AccountService(accounts, positions, orders, mock(HoldingMapper.class), cache);
 
         Account account = mock(Account.class);
         when(account.getAccountId()).thenReturn(7L);
@@ -216,7 +220,7 @@ class AccountServiceTest {
         Account account = mock(Account.class);
         when(accounts.findAccountById(7L)).thenReturn(Optional.of(account));
         LocalDateTime createdAt = LocalDateTime.of(2026, 10, 1, 9, 0);
-        OrderHistoryRow sell = new OrderHistoryRow("ORD-3", 7L, "ACME", OrderSide.SELL, 2,
+        OrderHistoryRow sell = new OrderHistoryRow("ORD-3", 7L, "ACME", OrderSide.SELL, OrderType.LIMIT, 2,
                 new BigDecimal("96.00"), new BigDecimal("96.00"), OrderStatus.FILLED, "k3", createdAt,
                 new BigDecimal("-0.50"), new BigDecimal("-0.26"));
         when(orders.findOrderHistoryByAccountId(7L)).thenReturn(List.of(sell, row("ORD-1", OrderStatus.FILLED, createdAt)));
@@ -275,12 +279,46 @@ class AccountServiceTest {
         verifyNoInteractions(positions, orders);
     }
 
+    @Test
+    void getHoldingsMapsEntitiesWithLivePrice() {
+        LatestPriceCache cache = mock(LatestPriceCache.class);
+        QuotePayload quote = mock(QuotePayload.class);
+        when(quote.price()).thenReturn(new BigDecimal("30.00"));
+        when(cache.get("ACME")).thenReturn(Optional.of(quote));
+        HoldingMapper holdings = mock(HoldingMapper.class);
+        service = new AccountService(accounts, positions, orders, holdings, cache);
+
+        Account account = mock(Account.class);
+        when(account.getAccountId()).thenReturn(7L);
+        when(accounts.findAccountById(7L)).thenReturn(Optional.of(account));
+        Holding holding = mock(Holding.class);
+        Instrument instrument = mock(Instrument.class);
+        when(holding.getAccount()).thenReturn(account);
+        when(holding.getInstrument()).thenReturn(instrument);
+        when(instrument.getSymbol()).thenReturn("ACME");
+        when(holding.getQuantity()).thenReturn(50);
+        when(holding.getAveragePrice()).thenReturn(new BigDecimal("25.00"));
+        when(holdings.findHoldingsByAccountId(7L)).thenReturn(List.of(holding));
+
+        List<HoldingResponse> result = service.getHoldings(7L);
+
+        assertAll(
+                () -> assertEquals(1, result.size()),
+                () -> assertEquals("ACME", result.get(0).symbol()),
+                () -> assertEquals(50, result.get(0).quantity()),
+                () -> assertEquals(new BigDecimal("1500.00"), result.get(0).marketValue()),
+                () -> assertEquals(new BigDecimal("250.00"), result.get(0).unrealizedPnl()),
+                () -> assertEquals(new BigDecimal("20.00"), result.get(0).unrealizedPnlPercent())
+        );
+    }
+
     private static OrderHistoryRow row(String orderId, OrderStatus status, LocalDateTime createdOn) {
         return new OrderHistoryRow(
                 orderId,
                 7L,
                 "ACME",
                 OrderSide.BUY,
+                OrderType.LIMIT,
                 100,
                 new BigDecimal("25.50"),
                 new BigDecimal("25.48"),

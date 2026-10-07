@@ -9,6 +9,7 @@ import com.tradingsystem.domain.enums.TradingStatus;
 import com.tradingsystem.exception.OptimisticLockException;
 import com.tradingsystem.spring_boot_app.dto.*;
 import com.tradingsystem.spring_boot_app.mapper.AccountMapper;
+import com.tradingsystem.spring_boot_app.mapper.HoldingMapper;
 import com.tradingsystem.spring_boot_app.mapper.OrderMapper;
 import com.tradingsystem.spring_boot_app.mapper.PositionMapper;
 import org.springframework.stereotype.Service;
@@ -25,13 +26,15 @@ public class AccountService {
     private final AccountMapper accounts;
     private final PositionMapper positions;
     private final OrderMapper orders;
+    private final HoldingMapper holdings;
     private final LatestPriceCache prices;
 
     public AccountService(AccountMapper accounts, PositionMapper positions, OrderMapper orders,
-                          LatestPriceCache prices) {
+                          HoldingMapper holdings, LatestPriceCache prices) {
         this.accounts = accounts;
         this.positions = positions;
         this.orders = orders;
+        this.holdings = holdings;
         this.prices = prices != null ? prices : new LatestPriceCache();
     }
 
@@ -65,6 +68,19 @@ public class AccountService {
             .map(this::position).toList();
     }
 
+    /**
+     * Settled (demat) holdings. A filled DELIVERY buy lands in positions
+     * first and is moved here after the settlement window, so this list only
+     * ever shows settled shares. Enriched with the same live-price maths as
+     * positions.
+     */
+    public List<HoldingResponse> getHoldings(long id) {
+        account(id);
+        return holdings.findHoldingsByAccountId(id).stream()
+            .filter(h -> h.getQuantity() > 0)
+            .map(this::holding).toList();
+    }
+
     public List<OrderHistoryEntry> getOrders(long id, OrderStatus status,
                                               java.time.OffsetDateTime from,
                                               java.time.OffsetDateTime to) {
@@ -79,8 +95,7 @@ public class AccountService {
                 new com.tradingsystem.exception.AccountNotFoundException(id));
     }
 
-    private PositionResponse position(Position position) {
-        String symbol = position.getInstrument().getSymbol();
+    private PositionResponse position(Position position) {        String symbol = position.getInstrument().getSymbol();
         java.math.BigDecimal currentPrice = prices.get(symbol)
                 .map(com.tradingsystem.spring_boot_app.kafka.QuotePayload::price)
                 .orElse(null);
@@ -98,10 +113,29 @@ public class AccountService {
                 currentPrice, marketValue, unrealizedPnl, unrealizedPnlPercent);
     }
 
+    private HoldingResponse holding(com.tradingsystem.domain.entities.Holding holding) {
+        String symbol = holding.getInstrument().getSymbol();
+        java.math.BigDecimal currentPrice = prices.get(symbol)
+                .map(com.tradingsystem.spring_boot_app.kafka.QuotePayload::price)
+                .orElse(null);
+        BigDecimal quantity = BigDecimal.valueOf(holding.getQuantity());
+        BigDecimal marketValue = currentPrice == null ? null : currentPrice.multiply(quantity);
+        BigDecimal costBasis = holding.getAveragePrice() == null ? null
+                : holding.getAveragePrice().multiply(quantity);
+        BigDecimal unrealizedPnl = marketValue == null || costBasis == null ? null
+                : marketValue.subtract(costBasis).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal unrealizedPnlPercent = unrealizedPnl == null || costBasis.signum() == 0 ? null
+                : marketValue.subtract(costBasis).multiply(BigDecimal.valueOf(100))
+                        .divide(costBasis, 2, RoundingMode.HALF_UP);
+        return new HoldingResponse(holding.getAccount().getAccountId(),
+                symbol, holding.getQuantity(), holding.getAveragePrice(),
+                currentPrice, marketValue, unrealizedPnl, unrealizedPnlPercent);
+    }
+
     private OrderHistoryEntry order(Order order) {
         return new OrderHistoryEntry("ORD-" + order.getOrderId(), order.getAccount().getAccountId(),
-                order.getInstrument().getSymbol(), order.getSide(), order.getQuantity(), order.getLimitPrice(),
-                order.getLimitPrice(), order.getStatus(), order.getIdempotencyKey(), now());
+                order.getInstrument().getSymbol(), order.getSide(), order.getOrderType(), order.getQuantity(), order.getLimitPrice(),
+                order.getLimitPrice(), order.getStatus(), order.getIdempotencyKey(), now(), null, null);
     }
 
     private OrderHistoryEntry orderEntry(OrderHistoryRow row) {
@@ -110,6 +144,7 @@ public class AccountService {
                 row.accountId(),
                 row.symbol(),
                 row.side(),
+                row.orderType(),
                 row.quantity(),
                 row.price(),
                 row.executedPrice(),

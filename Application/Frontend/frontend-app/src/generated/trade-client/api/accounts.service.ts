@@ -25,6 +25,8 @@ import { BalanceUpdateRequest } from '../model/balance-update-request';
 // @ts-ignore
 import { ErrorResponse } from '../model/error-response';
 // @ts-ignore
+import { HoldingResponse } from '../model/holding-response';
+// @ts-ignore
 import { OrderHistoryEntry } from '../model/order-history-entry';
 // @ts-ignore
 import { OrderStatus } from '../model/order-status';
@@ -633,6 +635,62 @@ export class AccountsService extends BaseService {
             {
                 context: localVarHttpContext,
                 body: balanceUpdateRequest,
+                responseType: <any>responseType_,
+                ...(withCredentials ? { withCredentials } : {}),
+                headers: localVarHeaders,
+                observe: observe,
+                ...(localVarTransferCache !== undefined ? { transferCache: localVarTransferCache } : {}),
+                reportProgress: reportProgress
+            }
+        );
+    }
+
+    /**
+     * Get settled holdings for the signed-in user
+     * Settled (demat) holdings only. A filled DELIVERY buy lands in positions first and is moved here after the settlement window, when its positions row is removed.
+     * @endpoint get /api/v1/accounts/me/holdings
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
+     */
+    public getMyHoldings(observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<HoldingResponse>>;
+    public getMyHoldings(observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<HoldingResponse>>>;
+    public getMyHoldings(observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<HoldingResponse>>>;
+    public getMyHoldings(observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+
+        let localVarHeaders = this.defaultHeaders;
+
+        // authentication (bearerAuth) required
+        localVarHeaders = this.configuration.addCredentialToHeaders('bearerAuth', 'Authorization', localVarHeaders, 'Bearer ');
+
+        const localVarHttpHeaderAcceptSelected: string | undefined = options?.httpHeaderAccept ?? this.configuration.selectHeaderAccept([
+            'application/json'
+        ]);
+        if (localVarHttpHeaderAcceptSelected !== undefined) {
+            localVarHeaders = localVarHeaders.set('Accept', localVarHttpHeaderAcceptSelected);
+        }
+
+        const localVarHttpContext: HttpContext = options?.context ?? new HttpContext();
+
+        const localVarTransferCache: boolean = options?.transferCache ?? true;
+
+
+        let responseType_: 'text' | 'json' | 'blob' = 'json';
+        if (localVarHttpHeaderAcceptSelected) {
+            if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
+                responseType_ = 'text';
+            } else if (this.configuration.isJsonMime(localVarHttpHeaderAcceptSelected)) {
+                responseType_ = 'json';
+            } else {
+                responseType_ = 'blob';
+            }
+        }
+
+        let localVarPath = `/api/v1/accounts/me/holdings`;
+        const { basePath, withCredentials } = this.configuration;
+        return this.httpClient.request<Array<HoldingResponse>>('get', `${basePath}${localVarPath}`,
+            {
+                context: localVarHttpContext,
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,

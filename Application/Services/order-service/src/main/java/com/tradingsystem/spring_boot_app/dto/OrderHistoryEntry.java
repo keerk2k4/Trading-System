@@ -2,6 +2,7 @@ package com.tradingsystem.spring_boot_app.dto;
 
 import com.tradingsystem.domain.enums.OrderSide;
 import com.tradingsystem.domain.enums.OrderStatus;
+import com.tradingsystem.domain.enums.OrderType;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -11,7 +12,7 @@ import java.time.OffsetDateTime;
  * known average cost (recorded by the executor at settlement); null otherwise.
  */
 public record OrderHistoryEntry(String orderId, Long accountId, String symbol,
-                                OrderSide side, int quantity, BigDecimal price,
+                                OrderSide side, OrderType orderType, int quantity, BigDecimal price,
                                 BigDecimal executedPrice, OrderStatus status,
                                 String idempotencyKey, OffsetDateTime createdOn,
                                 BigDecimal realizedPnl, BigDecimal realizedPnlPercent) {
@@ -19,7 +20,7 @@ public record OrderHistoryEntry(String orderId, Long accountId, String symbol,
                              OrderSide side, int quantity, BigDecimal price,
                              BigDecimal executedPrice, OrderStatus status,
                              String idempotencyKey, OffsetDateTime createdOn) {
-        this(orderId, accountId, symbol, side, quantity, price, executedPrice, status,
+        this(orderId, accountId, symbol, side, OrderType.LIMIT, quantity, price, executedPrice, status,
                 idempotencyKey, createdOn, null, null);
     }
 }
