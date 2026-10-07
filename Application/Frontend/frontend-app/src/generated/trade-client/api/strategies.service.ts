@@ -17,13 +17,11 @@ import { Observable }                                        from 'rxjs';
 import { OpenApiHttpParams, QueryParamStyle } from '../query.params';
 
 // @ts-ignore
+import { CreateStrategyRequest } from '../model/create-strategy-request';
+// @ts-ignore
 import { ErrorResponse } from '../model/error-response';
 // @ts-ignore
-import { OrderResponse } from '../model/order-response';
-// @ts-ignore
-import { PlaceOrderRequest } from '../model/place-order-request';
-// @ts-ignore
-import { UpdateOrderRequest } from '../model/update-order-request';
+import { StrategyPreferenceResponse } from '../model/strategy-preference-response';
 
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS }                     from '../variables';
@@ -35,27 +33,26 @@ import { BaseService } from '../api.base.service';
 @Injectable({
   providedIn: 'root'
 })
-export class OrdersService extends BaseService {
+export class StrategiesService extends BaseService {
 
     constructor(protected httpClient: HttpClient, @Optional() @Inject(BASE_PATH) basePath: string|string[], @Optional() configuration?: Configuration) {
         super(basePath, configuration);
     }
 
     /**
-     * Cancel a working order
-     * Cancels an order that is still &#x60;NEW&#x60; and returns the updated order. An order that is already &#x60;FILLED&#x60;, &#x60;REJECTED&#x60; or &#x60;CANCELLED&#x60; cannot be cancelled and returns &#x60;ORD-409&#x60;.  Timing: &#x60;MARKET&#x60; orders are executed immediately by the Trade Executor, so they are cancellable only for a brief instant after acceptance. &#x60;LIMIT&#x60; orders wait &#x60;app.execution.limit-delay-ms&#x60; (15s by default) in &#x60;NEW&#x60; before the executor prices them, which is the window where cancel and update succeed.  The cancellation is a state transition guarded inside the database transaction. Checking the status, then updating it, without a guarded transition, races the Trade Executor. 
-     * @endpoint delete /api/v1/orders/{id}
-     * @param id The order UUID, without the &#x60;ORD-&#x60; display prefix.
+     * Cancel one strategy rule
+     * @endpoint delete /api/v1/strategies/{strategyId}
+     * @param strategyId 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public cancelOrder(id: string, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<OrderResponse>;
-    public cancelOrder(id: string, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<OrderResponse>>;
-    public cancelOrder(id: string, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<OrderResponse>>;
-    public cancelOrder(id: string, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
-        if (id === null || id === undefined) {
-            throw new Error('Required parameter id was null or undefined when calling cancelOrder.');
+    public cancelStrategy(strategyId: number, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any>;
+    public cancelStrategy(strategyId: number, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<any>>;
+    public cancelStrategy(strategyId: number, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<any>>;
+    public cancelStrategy(strategyId: number, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (strategyId === null || strategyId === undefined) {
+            throw new Error('Required parameter strategyId was null or undefined when calling cancelStrategy.');
         }
 
         let localVarHeaders = this.defaultHeaders;
@@ -86,9 +83,9 @@ export class OrdersService extends BaseService {
             }
         }
 
-        let localVarPath = `/api/v1/orders/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: "uuid"})}`;
+        let localVarPath = `/api/v1/strategies/${this.configuration.encodeParam({name: "strategyId", value: strategyId, in: "path", style: "simple", explode: false, dataType: "number", dataFormat: "int64"})}`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<OrderResponse>('delete', `${basePath}${localVarPath}`,
+        return this.httpClient.request<any>('delete', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
                 responseType: <any>responseType_,
@@ -102,20 +99,20 @@ export class OrdersService extends BaseService {
     }
 
     /**
-     * Place an order
-     * Validates the request against business rules 1 to 8 and records the order. Returns &#x60;NEW&#x60; once the Trade Executor exists, or the terminal status when the service fills synchronously in Sprint 6.  Retrying with the same &#x60;idempotencyKey&#x60; is not a way to poll for status. It returns &#x60;ORD-409&#x60;. Poll &#x60;GET /api/v1/accounts/{id}/orders&#x60; instead. 
-     * @endpoint post /api/v1/orders
-     * @param placeOrderRequest 
+     * Create a quote-triggered strategy rule
+     * Creates a strategy that watches live market-data quotes. When its trigger condition is matched, the backend submits a MARKET order on behalf of the signed-in account. 
+     * @endpoint post /api/v1/strategies
+     * @param createStrategyRequest 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public placeOrder(placeOrderRequest: PlaceOrderRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<OrderResponse>;
-    public placeOrder(placeOrderRequest: PlaceOrderRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<OrderResponse>>;
-    public placeOrder(placeOrderRequest: PlaceOrderRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<OrderResponse>>;
-    public placeOrder(placeOrderRequest: PlaceOrderRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
-        if (placeOrderRequest === null || placeOrderRequest === undefined) {
-            throw new Error('Required parameter placeOrderRequest was null or undefined when calling placeOrder.');
+    public createStrategy(createStrategyRequest: CreateStrategyRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<StrategyPreferenceResponse>;
+    public createStrategy(createStrategyRequest: CreateStrategyRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<StrategyPreferenceResponse>>;
+    public createStrategy(createStrategyRequest: CreateStrategyRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<StrategyPreferenceResponse>>;
+    public createStrategy(createStrategyRequest: CreateStrategyRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
+        if (createStrategyRequest === null || createStrategyRequest === undefined) {
+            throw new Error('Required parameter createStrategyRequest was null or undefined when calling createStrategy.');
         }
 
         let localVarHeaders = this.defaultHeaders;
@@ -155,12 +152,12 @@ export class OrdersService extends BaseService {
             }
         }
 
-        let localVarPath = `/api/v1/orders`;
+        let localVarPath = `/api/v1/strategies`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<OrderResponse>('post', `${basePath}${localVarPath}`,
+        return this.httpClient.request<StrategyPreferenceResponse>('post', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
-                body: placeOrderRequest,
+                body: createStrategyRequest,
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,
@@ -172,25 +169,17 @@ export class OrdersService extends BaseService {
     }
 
     /**
-     * Update a working order
-     * Updates quantity and/or limit price of an order that is still &#x60;NEW&#x60; and returns the updated order. Only &#x60;LIMIT&#x60; orders can be updated, and only while &#x60;NEW&#x60;. A &#x60;MARKET&#x60; order carries no limit price so only its quantity could change, and since market orders execute immediately the window is effectively zero; implementations reject price updates on &#x60;MARKET&#x60; orders with &#x60;VAL-422&#x60;.  The update re-validates business rules 4-7 against the new values, then applies a guarded transition (&#x60;WHERE id &#x3D; ? AND status &#x3D; \&#39;NEW\&#39;&#x60;) so it races safely with the Trade Executor. The executor always re-reads the order row after the &#x60;LIMIT&#x60; delay, so an accepted update is what gets priced. 
-     * @endpoint patch /api/v1/orders/{id}
-     * @param id The order identifier, without the &#x60;ORD-&#x60; display prefix.
-     * @param updateOrderRequest 
+     * List my quote-triggered strategy rules
+     * JWT-derived identity only: strategies are always read for the signed-in account and never by caller-supplied account id. 
+     * @endpoint get /api/v1/strategies
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.
      * @param options additional options
      */
-    public updateOrder(id: string, updateOrderRequest: UpdateOrderRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<OrderResponse>;
-    public updateOrder(id: string, updateOrderRequest: UpdateOrderRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<OrderResponse>>;
-    public updateOrder(id: string, updateOrderRequest: UpdateOrderRequest, observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<OrderResponse>>;
-    public updateOrder(id: string, updateOrderRequest: UpdateOrderRequest, observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
-        if (id === null || id === undefined) {
-            throw new Error('Required parameter id was null or undefined when calling updateOrder.');
-        }
-        if (updateOrderRequest === null || updateOrderRequest === undefined) {
-            throw new Error('Required parameter updateOrderRequest was null or undefined when calling updateOrder.');
-        }
+    public getMyStrategies(observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<Array<StrategyPreferenceResponse>>;
+    public getMyStrategies(observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<Array<StrategyPreferenceResponse>>>;
+    public getMyStrategies(observe?: 'events', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpEvent<Array<StrategyPreferenceResponse>>>;
+    public getMyStrategies(observe: any = 'body', reportProgress: boolean = false, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<any> {
 
         let localVarHeaders = this.defaultHeaders;
 
@@ -209,15 +198,6 @@ export class OrdersService extends BaseService {
         const localVarTransferCache: boolean = options?.transferCache ?? true;
 
 
-        // to determine the Content-Type header
-        const consumes: string[] = [
-            'application/json'
-        ];
-        const httpContentTypeSelected: string | undefined = this.configuration.selectHeaderContentType(consumes);
-        if (httpContentTypeSelected !== undefined) {
-            localVarHeaders = localVarHeaders.set('Content-Type', httpContentTypeSelected);
-        }
-
         let responseType_: 'text' | 'json' | 'blob' = 'json';
         if (localVarHttpHeaderAcceptSelected) {
             if (localVarHttpHeaderAcceptSelected.startsWith('text')) {
@@ -229,12 +209,11 @@ export class OrdersService extends BaseService {
             }
         }
 
-        let localVarPath = `/api/v1/orders/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
+        let localVarPath = `/api/v1/strategies`;
         const { basePath, withCredentials } = this.configuration;
-        return this.httpClient.request<OrderResponse>('patch', `${basePath}${localVarPath}`,
+        return this.httpClient.request<Array<StrategyPreferenceResponse>>('get', `${basePath}${localVarPath}`,
             {
                 context: localVarHttpContext,
-                body: updateOrderRequest,
                 responseType: <any>responseType_,
                 ...(withCredentials ? { withCredentials } : {}),
                 headers: localVarHeaders,

@@ -16,6 +16,7 @@ const CUSTOMER_NAV: NavItem[] = [
   { label: 'Funds', link: '/funds', icon: 'var(--tp-icon-wallet)' },
   { label: 'Place order', link: '/orders/new', icon: 'var(--tp-icon-order)' },
   { label: 'Orders', link: '/orders/history', icon: 'var(--tp-icon-list)' },
+  { label: 'Strategies', link: '/strategies', icon: 'var(--tp-icon-refresh)' },
   { label: 'Positions', link: '/positions', icon: 'var(--tp-icon-list)' },
   { label: 'Holdings', link: '/holdings', icon: 'var(--tp-icon-grid)' },
   { label: 'Notifications', link: '/notifications', icon: 'var(--tp-icon-eye)' },

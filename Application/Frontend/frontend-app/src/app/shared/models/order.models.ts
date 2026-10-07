@@ -9,6 +9,7 @@ import type {
   AccountStatus as ContractAccountStatus,
   AlertChannel as ContractAlertChannel,
   BalanceResponse,
+  CreateStrategyRequest as ContractCreateStrategyRequest,
   HoldingResponse as ContractHoldingResponse,
   NotificationResponse as ContractNotificationResponse,
   NotificationStatus as ContractNotificationStatus,
@@ -22,6 +23,8 @@ import type {
   PositionResponse,
   PreferenceResponse as ContractPreferenceResponse,
   QuoteResponse,
+  StrategyPreferenceResponse as ContractStrategyPreferenceResponse,
+  StrategyStatus as ContractStrategyStatus,
   UpdateOrderRequest as ContractUpdateOrderRequest,
   UpdatePreferenceRequest as ContractUpdatePreferenceRequest
 } from '../../../generated/trade-client';
@@ -33,6 +36,7 @@ export type AccountStatus = ContractAccountStatus;
 export type AlertChannel = ContractAlertChannel;
 export type NotificationType = ContractNotificationType;
 export type NotificationStatus = ContractNotificationStatus;
+export type StrategyStatus = ContractStrategyStatus;
 
 // One entry of GET /api/v1/accounts/{id}/orders.
 export type Order = OrderHistoryEntry;
@@ -53,6 +57,8 @@ export type Preferences = ContractPreferenceResponse;
 export type UpdatePreferences = ContractUpdatePreferenceRequest;
 // GET /api/v1/notifications/me.
 export type Notification = ContractNotificationResponse;
+export type CreateStrategyRequest = ContractCreateStrategyRequest;
+export type StrategyPreference = ContractStrategyPreferenceResponse;
 
 export interface BalanceUpdateRequest {
   cashBalance: number;

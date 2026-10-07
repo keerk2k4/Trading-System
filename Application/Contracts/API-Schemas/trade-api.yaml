@@ -71,6 +71,8 @@ servers:
 tags:
   - name: Orders
     description: Placing and cancelling orders.
+  - name: Strategies
+    description: Quote-triggered strategy rules that submit market orders.
   - name: Accounts
     description: Account details, cash balance, holdings and order history.
   - name: Positions
@@ -610,6 +612,85 @@ paths:
         '404':
           $ref: '#/components/responses/AccountNotFound'
 
+  /api/v1/strategies:
+    get:
+      tags: [Strategies]
+      operationId: getMyStrategies
+      summary: List my quote-triggered strategy rules
+      description: |
+        JWT-derived identity only: strategies are always read for the signed-in
+        account and never by caller-supplied account id.
+      responses:
+        '200':
+          description: Strategy rules owned by the signed-in customer.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StrategyPreferenceResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+    post:
+      tags: [Strategies]
+      operationId: createStrategy
+      summary: Create a quote-triggered strategy rule
+      description: |
+        Creates a strategy that watches live market-data quotes. When its
+        trigger condition is matched, the backend submits a MARKET order on
+        behalf of the signed-in account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStrategyRequest'
+      responses:
+        '200':
+          description: Strategy created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StrategyPreferenceResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+  /api/v1/strategies/{strategyId}:
+    delete:
+      tags: [Strategies]
+      operationId: cancelStrategy
+      summary: Cancel one strategy rule
+      parameters:
+        - name: strategyId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '204':
+          description: Strategy cancelled.
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '404':
+          description: Strategy not found for this customer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                strategyMissing:
+                  value:
+                    errorCode: STR-404
+                    message: Strategy not found
+
   /api/v1/preferences/me:
     get:
       tags: [Preferences]
@@ -924,7 +1005,8 @@ paths:
     get:
       tags: [Accounts]
       operationId: getMyOrders
-      summary: Get order history for the signed-in user      parameters:
+      summary: Get order history for the signed-in user
+      parameters:
         - name: status
           in: query
           required: false
@@ -1051,6 +1133,14 @@ components:
       description: |
         Supported order-entry types on `POST /api/v1/orders`.
         LIMIT requires `price`; MARKET must omit `price`.
+
+    StrategyStatus:
+      type: string
+      enum: [ACTIVE, TRIGGERING, TRIGGERED, CANCELLED]
+      description: |
+        ACTIVE rules are evaluated on each quote. TRIGGERING means a matching
+        quote is currently creating an order. TRIGGERED and CANCELLED are
+        terminal.
 
     OrderStatus:
       type: string
@@ -1305,7 +1395,8 @@ components:
     PositionResponse:
       type: object
       additionalProperties: false
-      required: [accountId, symbol, quantity, averageCost]      properties:
+      required: [accountId, symbol, quantity, averageCost]
+      properties:
         accountId:
           type: integer
           format: int64
@@ -1560,6 +1651,65 @@ components:
           maxLength: 20
           example: AAPL
 
+    CreateStrategyRequest:
+      type: object
+      additionalProperties: false
+      required: [symbol, side, targetPrice, quantity]
+      properties:
+        symbol:
+          type: string
+          minLength: 1
+          maxLength: 20
+          example: GOOGL
+        side:
+          $ref: '#/components/schemas/OrderSide'
+        targetPrice:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+          multipleOf: 0.01
+          example: 300.00
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          example: 5
+
+    StrategyPreferenceResponse:
+      type: object
+      additionalProperties: false
+      required: [strategyId, symbol, side, targetPrice, quantity, status, createdOn]
+      properties:
+        strategyId:
+          type: integer
+          format: int64
+          example: 42
+        symbol:
+          type: string
+          example: GOOGL
+        side:
+          $ref: '#/components/schemas/OrderSide'
+        targetPrice:
+          type: number
+          format: double
+          example: 300.00
+        quantity:
+          type: integer
+          format: int32
+          example: 5
+        status:
+          $ref: '#/components/schemas/StrategyStatus'
+        triggeredOrderId:
+          type: [string, 'null']
+          example: ORD-6f2b1c2a-6a1e-4a4f-9c0d-2f7a1b3c4d5e
+        createdOn:
+          type: string
+          format: date-time
+          example: '2026-10-07T09:14:22Z'
+        triggeredOn:
+          type: [string, 'null']
+          format: date-time
+
     InstrumentResponse:
       type: object
       additionalProperties: false
@@ -1620,7 +1770,7 @@ components:
       properties:
         errorCode:
           type: string
-          enum: [ACC-404, ACC-403, INS-404, ORD-400, ORD-409, VAL-422, AUTH-401]
+          enum: [ACC-404, ACC-403, INS-404, ORD-400, ORD-409, STR-404, VAL-422, AUTH-401]
           description: |
             | Code | HTTP | Meaning |
             |---|---|---|
@@ -1629,6 +1779,7 @@ components:
             | `INS-404` | 404 | Instrument not found or not tradable |
             | `ORD-400` | 400 | Insufficient funds |
             | `ORD-409` | 409 | Insufficient holdings, duplicate order, or order not cancellable |
+            | `STR-404` | 404 | Strategy not found |
             | `VAL-422` | 422 | Invalid input |
             | `AUTH-401` | 401 | Unauthorised or invalid token |
           example: ORD-409

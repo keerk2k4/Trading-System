@@ -77,6 +77,13 @@ export const routes: Routes = [
           import('./features/orders/view-orders/view-orders.component').then((m) => m.ViewOrdersComponent)
       },
       {
+        path: 'strategies',
+        title: 'Strategies · Trading Platform',
+        canActivate: [kycApprovalGuard],
+        loadComponent: () =>
+          import('./features/strategies/strategies.component').then((m) => m.StrategiesComponent)
+      },
+      {
         path: 'funds',
         title: 'Funds · Trading Platform',
         canActivate: [kycApprovalGuard],

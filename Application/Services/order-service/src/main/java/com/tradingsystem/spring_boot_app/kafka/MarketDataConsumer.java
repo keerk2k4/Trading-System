@@ -3,8 +3,10 @@ package com.tradingsystem.spring_boot_app.kafka;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tradingsystem.spring_boot_app.service.LatestPriceCache;
+import com.tradingsystem.spring_boot_app.service.StrategyService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -26,10 +28,19 @@ public class MarketDataConsumer {
 
     private final ObjectMapper objectMapper;
     private final LatestPriceCache cache;
+    private final StrategyService strategies;
 
-    public MarketDataConsumer(ObjectMapper objectMapper, LatestPriceCache cache) {
+    @Autowired
+    public MarketDataConsumer(ObjectMapper objectMapper, LatestPriceCache cache,
+                              StrategyService strategies) {
         this.objectMapper = objectMapper;
         this.cache = cache;
+        this.strategies = strategies;
+    }
+
+    // Backward-compatible constructor for focused unit tests.
+    public MarketDataConsumer(ObjectMapper objectMapper, LatestPriceCache cache) {
+        this(objectMapper, cache, null);
     }
 
     @KafkaListener(
@@ -68,6 +79,11 @@ public class MarketDataConsumer {
             }
 
             cache.update(quote);
+            if (strategies != null) {
+                strategies.evaluateAgainstQuote(
+                        quote.symbol(),
+                        new StrategyService.QuoteTriggerPrice(quote.price(), quote.bid(), quote.ask()));
+            }
             LOGGER.debug("Cached latest quote for {} price={}", quote.symbol(), quote.price());
         } catch (Exception e) {
             LOGGER.error("Failed processing market-data message", e);

@@ -8,6 +8,7 @@ import {
   NotificationsService,
   OrdersService,
   PreferencesService,
+  StrategiesService,
   WatchlistDetailResponse,
   WatchlistResponse,
   WatchlistStockResponse,
@@ -17,6 +18,7 @@ import {
   Account,
   Balance,
   BalanceUpdateRequest,
+  CreateStrategyRequest,
   Holding,
   Notification,
   Order,
@@ -26,6 +28,7 @@ import {
   Position,
   Preferences,
   Quote,
+  StrategyPreference,
   TradeApiError,
   UpdateOrderRequest,
   UpdatePreferences
@@ -51,6 +54,7 @@ export class TradeApiService {
   private watchlists = inject(WatchlistsService);
   private preferences = inject(PreferencesService);
   private notifications = inject(NotificationsService);
+  private strategies = inject(StrategiesService);
 
   // GET /api/v1/accounts/me
   getAccount(): Observable<Account> {
@@ -149,6 +153,28 @@ export class TradeApiService {
     return this.accounts
       .getMyOrders(status, from, to)
       .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // GET /api/v1/strategies
+  getStrategies(): Observable<StrategyPreference[]> {
+    return this.strategies
+      .getMyStrategies()
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // POST /api/v1/strategies
+  createStrategy(request: CreateStrategyRequest): Observable<StrategyPreference> {
+    return this.strategies
+      .createStrategy(request)
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // DELETE /api/v1/strategies/{strategyId}
+  cancelStrategy(strategyId: number): Observable<void> {
+    return this.strategies.cancelStrategy(strategyId).pipe(
+      map(() => undefined),
+      catchError((err) => this.rethrowServerError(err))
+    );
   }
 
   // PATCH /api/v1/accounts/me/balance

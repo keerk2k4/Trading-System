@@ -14,7 +14,7 @@
  */
 export interface ErrorResponse { 
     /**
-     * | Code | HTTP | Meaning | |---|---|---| | `ACC-404` | 404 | Account not found | | `ACC-403` | 403 | Account not active, or not reachable with this token | | `INS-404` | 404 | Instrument not found or not tradable | | `ORD-400` | 400 | Insufficient funds | | `ORD-409` | 409 | Insufficient holdings, duplicate order, or order not cancellable | | `VAL-422` | 422 | Invalid input | | `AUTH-401` | 401 | Unauthorised or invalid token | 
+     * | Code | HTTP | Meaning | |---|---|---| | `ACC-404` | 404 | Account not found | | `ACC-403` | 403 | Account not active, or not reachable with this token | | `INS-404` | 404 | Instrument not found or not tradable | | `ORD-400` | 400 | Insufficient funds | | `ORD-409` | 409 | Insufficient holdings, duplicate order, or order not cancellable | | `STR-404` | 404 | Strategy not found | | `VAL-422` | 422 | Invalid input | | `AUTH-401` | 401 | Unauthorised or invalid token | 
      */
     errorCode: ErrorResponse.ErrorCodeEnum;
     /**
@@ -29,6 +29,7 @@ export namespace ErrorResponse {
         INS_404: 'INS-404',
         ORD_400: 'ORD-400',
         ORD_409: 'ORD-409',
+        STR_404: 'STR-404',
         VAL_422: 'VAL-422',
         AUTH_401: 'AUTH-401',
     } as const;
