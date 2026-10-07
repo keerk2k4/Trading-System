@@ -3,6 +3,7 @@ import { provideApi as provideAuthApi } from '../../../generated/auth-client';
 import { provideApi as provideTradeApi } from '../../../generated/trade-client';
 import { provideApi as provideAuthAdminApi } from '../../../generated/auth-admin-client';
 import { provideApi as provideTradeAdminApi } from '../../../generated/trade-admin-client';
+import { provideApi as providePortfolioApi } from '../../../generated/portfolio-client';
 import { environment } from '../../../environments/environment';
 import { accessTokenStore } from '../services/access-token.store';
 
@@ -39,5 +40,8 @@ export function provideApiClients(): EnvironmentProviders[] {
       credentials: { bearerAuth: readAccessToken }
     }),
     provideTradeAdminApi(TRADE_API_BASE_URL),
+    // Portfolio and P&L (Contracts/API-Schemas/portfolio-api.yaml), served by
+    // the trade API; authTokenInterceptor adds the bearer token.
+    providePortfolioApi(TRADE_API_BASE_URL),
   ];
 }

@@ -59,6 +59,20 @@
           "enumPropertyNaming": "original",
           "supportsES6": true
         }
+      },
+      "portfolio-client": {
+        "generatorName": "typescript-angular",
+        "inputSpec": "../../Contracts/API-Schemas/portfolio-api.yaml",
+        "output": "src/generated/portfolio-client",
+        "skipValidateSpec": true,
+        "additionalProperties": {
+          "ngVersion": "21.0.0",
+          "providedIn": "root",
+          "fileNaming": "kebab-case",
+          "stringEnums": false,
+          "enumPropertyNaming": "original",
+          "supportsES6": true
+        }
       }
     }
   }

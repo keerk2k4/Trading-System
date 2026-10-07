@@ -4,6 +4,8 @@ import com.tradingsystem.exception.AccountNotActiveException;
 import com.tradingsystem.spring_boot_app.exception.ForbiddenException;
 import com.tradingsystem.spring_boot_app.exception.UnauthorisedException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.Collection;
@@ -22,7 +24,9 @@ import java.util.Collection;
  */
 @Service
 public class AuthService {
-    
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AuthService.class);
+
     private static final String ACCOUNT_ID_ATTRIBUTE = "accountId";
     private static final String ROLES_ATTRIBUTE = "roles";
     private static final String ADMIN_ROLE = "ADMIN";
@@ -56,6 +60,10 @@ public class AuthService {
         Long tokenAccountId = (Long) request.getAttribute(ACCOUNT_ID_ATTRIBUTE);
         
         if (tokenAccountId == null || !tokenAccountId.equals(requestedAccountId)) {
+            // A customer probing another customer's account is an access-control
+            // failure, not a lookup miss, so it is logged.
+            LOGGER.warn("Account access denied: token account {} requested account {} on {} {}",
+                    tokenAccountId, requestedAccountId, request.getMethod(), request.getRequestURI());
             // Return ACC-403 with the same message as a suspended account
             // to prevent enumeration of valid account IDs
             throw new AccountNotActiveException(requestedAccountId);

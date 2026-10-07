@@ -10,6 +10,7 @@ import com.tradingsystem.exception.InstrumentNotFoundException;
 import com.tradingsystem.exception.InvalidOrderArgumentException;
 import com.tradingsystem.exception.OptimisticLockException;
 import com.tradingsystem.spring_boot_app.dto.ErrorResponse;
+import com.tradingsystem.spring_boot_app.portfolio.PricingUnavailableException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -106,6 +107,12 @@ public class ApiExceptionHandler {
     ResponseEntity<ErrorResponse> invalidInput(Exception exception) {
         LOGGER.warn("Invalid order input: {} - {}", exception.getClass().getSimpleName(), exception.getMessage());
         return response(HttpStatus.UNPROCESSABLE_ENTITY, "VAL-422", "Invalid input");
+    }
+
+    @ExceptionHandler(PricingUnavailableException.class)
+    ResponseEntity<ErrorResponse> pricingUnavailable(PricingUnavailableException exception) {
+        LOGGER.warn("Pricing unavailable: {}", exception.getMessage());
+        return response(HttpStatus.SERVICE_UNAVAILABLE, "MKT-503", "Pricing unavailable");
     }
 
     @ExceptionHandler(NoHandlerFoundException.class)

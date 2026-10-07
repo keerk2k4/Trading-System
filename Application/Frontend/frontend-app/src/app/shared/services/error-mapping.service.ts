@@ -10,6 +10,7 @@ export class ErrorMappingService {
     'INS-404': 'The instrument cannot be traded.',
     'ORD-400': 'There is not enough cash to place this order.',
     'ORD-409': 'There are not enough holdings to sell, or this order has already been placed.',
+    'MKT-503': 'Prices are unavailable right now. Please try again shortly.',
     'VAL-422': 'A field is not acceptable. Please review and try again.',
     'AUTH-401': 'Your session has expired or sign-in was refused. Please log in again.',
     'AUTH-409': 'This username is already taken. Please choose another.',

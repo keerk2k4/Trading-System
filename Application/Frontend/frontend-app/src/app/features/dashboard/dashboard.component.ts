@@ -33,6 +33,7 @@ interface PortfolioSummary {
           <p>Your cash, holdings and account at a glance.</p>
         </div>
         <div class="tp-actions">
+          <a class="tp-btn tp-btn-secondary" routerLink="/portfolio" data-testid="dashboard-view-portfolio">View portfolio</a>
           <a class="tp-btn tp-btn-secondary" routerLink="/orders/history">Order history</a>
           <a class="tp-btn tp-btn-primary tp-btn-icon-plus" data-icon routerLink="/orders/new">Place order</a>
         </div>

@@ -56,6 +56,13 @@ export const routes: Routes = [
           import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent)
       },
       {
+        path: 'portfolio',
+        title: 'Portfolio · Trading Platform',
+        canActivate: [kycApprovalGuard],
+        loadComponent: () =>
+          import('./features/portfolio/portfolio.component').then((m) => m.PortfolioComponent)
+      },
+      {
         path: 'orders/new',
         title: 'Place order · Trading Platform',
         canActivate: [kycApprovalGuard],

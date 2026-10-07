@@ -60,6 +60,12 @@ describe('DashboardComponent', () => {
     expect(page.querySelector('[data-testid="account-suspended-notice"]')).toBeNull();
   });
 
+  it('links to the portfolio screen', () => {
+    create({ id: 'u-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] });
+
+    expect(page.querySelector('[data-testid="dashboard-view-portfolio"]')?.getAttribute('href')).toBe('/portfolio');
+  });
+
   it('summarises cash, holdings at cost and the total', () => {
     create({ id: 'u-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] });
 

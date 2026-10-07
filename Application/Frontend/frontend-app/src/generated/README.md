@@ -10,6 +10,7 @@ so a contract change shows up as a reviewable diff and the app builds without Ja
 | `sprint09/contracts/trade-api.yaml` | `src/generated/trade-client/` | `AccountsService`, `OrdersService` |
 | `Contracts/API-Schemas/auth-admin-api.yaml` (the team's own) | `src/generated/auth-admin-client/` | `HealthService` |
 | `Contracts/API-Schemas/trade-admin-api.yaml` (the team's own) | `src/generated/trade-admin-client/` | `AdminService` |
+| `Contracts/API-Schemas/portfolio-api.yaml` (Sprint 10 Portfolio and P&L) | `src/generated/portfolio-client/` | `PortfolioService`, `PLService`, `OperationsService` |
 
 The two `*-admin-api.yaml` contracts were written by the team for the admin dashboard; the
 programme's `auth-api.yaml` and `trade-api.yaml` stay untouched. Their wrapper is
@@ -22,6 +23,7 @@ programme's `auth-api.yaml` and `trade-api.yaml` stay untouched. Their wrapper i
 - **Never import from here in components.** Use the wrappers instead:
   - `src/app/shared/api/api-clients.ts`: base URLs and bearer-token wiring (`provideApiClients()`)
   - `src/app/shared/services/trade-api.service.ts`: trade client wrapper
+  - `src/app/shared/services/portfolio-api.service.ts`: portfolio client wrapper
   - `src/app/shared/services/auth.service.ts`: auth client wrapper
   - `src/app/shared/services/kyc.service.ts`: KYC client wrapper
   - `src/app/shared/models/*.models.ts`: app types are aliases of the generated models
