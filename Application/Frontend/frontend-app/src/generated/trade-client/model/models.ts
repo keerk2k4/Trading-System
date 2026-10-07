@@ -11,6 +11,7 @@ export * from './order-response';
 export * from './order-side';
 export * from './order-status';
 export * from './place-order-request';
+export * from './place-order-type';
 export * from './position-response';
 export * from './watchlist-detail-response';
 export * from './watchlist-response';

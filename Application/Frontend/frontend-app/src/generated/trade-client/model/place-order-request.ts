@@ -7,14 +7,12 @@
  * https://openapi-generator.tech
  * Do not edit the class manually.
  */
+import { PlaceOrderType } from './place-order-type';
 import { OrderSide } from './order-side';
 
 
 export interface PlaceOrderRequest { 
-    /**
-     * The numeric account key, `ACCOUNTS.id`. Must match the token\'s `accountId` claim.
-     */
-    accountId: number;
+    orderType?: PlaceOrderType;
     /**
      * Instrument symbol, matching `INSTRUMENTS.symbol` and the Fauxnance symbol scheme: a plain ticker for US equities, a `.NS` or `.BO` suffix for NSE or BSE, `FX:` for a currency pair, `X:` for crypto. 
      */
@@ -25,9 +23,9 @@ export interface PlaceOrderRequest {
      */
     quantity: number;
     /**
-     * Limit price per unit, to two decimal places. Must be greater than zero, business rule 5. Serialise as a JSON number and hold it as `BigDecimal` in Java. Never use `double` for money in the domain. 
+     * LIMIT only: limit price per unit, to two decimal places. Omit or set null for MARKET orders. Serialise as a JSON number and hold it as `BigDecimal` in Java. Never use `double` for money in the domain. 
      */
-    price: number;
+    price?: number | null;
     /**
      * Client-generated unique request identifier, normally a UUID. Enforced by a unique constraint on `orders.idempotency_key`. Reuse returns `ORD-409`. 
      */

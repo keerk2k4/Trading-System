@@ -12,12 +12,14 @@ import type {
   OrderResponse,
   OrderSide as ContractOrderSide,
   OrderStatus as ContractOrderStatus,
+  PlaceOrderType as ContractPlaceOrderType,
   PlaceOrderRequest as ContractPlaceOrderRequest,
   PositionResponse
 } from '../../../generated/trade-client';
 
 export type OrderStatus = ContractOrderStatus;
 export type OrderSide = ContractOrderSide;
+export type OrderType = ContractPlaceOrderType;
 export type AccountStatus = ContractAccountStatus;
 
 // One entry of GET /api/v1/accounts/{id}/orders.

@@ -94,7 +94,7 @@ describe('PlaceOrderComponent', () => {
 
     const order = sentOrder();
     expect(order).toEqual(
-      jasmine.objectContaining({ accountId: 6, symbol: 'AAPL', side: 'BUY', quantity: 10, price: 150.25 })
+      jasmine.objectContaining({ orderType: 'LIMIT', symbol: 'AAPL', side: 'BUY', quantity: 10, price: 150.25 })
     );
     expect(order.idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
     expect(el('h2').textContent).toContain('Order submitted');
@@ -220,6 +220,22 @@ describe('PlaceOrderComponent', () => {
     submit();
 
     expect(tradeApi.placeOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('submits a market order without price', async () => {
+    el<HTMLInputElement>('#side-buy').click();
+    el<HTMLInputElement>('[data-testid="order-type-market"]').click();
+    type('symbol', 'AAPL');
+    type('quantity', '1');
+    fixture.detectChanges();
+    submit();
+    await fixture.whenStable();
+
+    expect(page.querySelector('#price')).toBeNull();
+    expect(sentOrder()).toEqual(
+      jasmine.objectContaining({ orderType: 'MARKET', symbol: 'AAPL', side: 'BUY', quantity: 1 })
+    );
+    expect((sentOrder() as { price?: number }).price).toBeUndefined();
   });
 
   it('announces how many stocks match for screen readers', () => {

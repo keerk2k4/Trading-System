@@ -18,9 +18,9 @@ export interface OrderHistoryEntry {
     side: OrderSide;
     quantity: number;
     /**
-     * The limit price submitted with the order.
+     * The submitted limit price. Null for MARKET orders.
      */
-    price: number;
+    price: number | null;
     /**
      * The price the Trade Executor filled at. Null until the order is FILLED.
      */

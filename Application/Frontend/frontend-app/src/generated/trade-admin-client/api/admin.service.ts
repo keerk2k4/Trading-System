@@ -39,7 +39,7 @@ export class AdminService extends BaseService {
 
     /**
      * Health of the Trade API and its database, Kafka and the Trade Executor
-     * Runs the three checks at the same time, each limited to 2 seconds, and reuses the answer for 5 seconds. Always 200 for an admin: a service that is down is part of the report, not a failed request.  The Auth service is not included. The browser asks it directly (&#x60;auth-admin-api.yaml&#x60;, &#x60;GET /health/details&#x60;), so calls between services stay one-way. 
+     * Runs the three checks at the same time, each limited to 4 seconds, and reuses the answer for 5 seconds. Always 200 for an admin: a service that is down is part of the report, not a failed request.  The Auth service is not included. The browser asks it directly (&#x60;auth-admin-api.yaml&#x60;, &#x60;GET /health/details&#x60;), so calls between services stay one-way. 
      * @endpoint get /api/v1/admin/health
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
      * @param reportProgress flag to report request and response progress.

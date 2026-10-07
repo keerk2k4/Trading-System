@@ -26,7 +26,7 @@ import { ErrorMappingService } from '../../../shared/services/error-mapping.serv
 import { WatchlistService } from '../../../shared/services/watchlist.service';
 import { StatusBadgeComponent } from '../../../shared/ui/status-badge.component';
 import { AccountStatusNoticeComponent } from '../../../shared/ui/account-status-notice.component';
-import { OrderSide, PlaceOrderResponse, TradeApiError } from '../../../shared/models/order.models';
+import { OrderSide, OrderType, PlaceOrderResponse, TradeApiError } from '../../../shared/models/order.models';
 import { WatchlistStock } from '../../../shared/models/watchlist.models';
 
 /** Results shown under the symbol field; the full list belongs on the watchlist page. */
@@ -59,7 +59,7 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
       <header class="tp-page-header">
         <div>
           <h1>Place order</h1>
-          <p>Submit a limit order to buy or sell an instrument.</p>
+          <p>Submit a limit or market order to buy or sell an instrument.</p>
         </div>
         <div class="tp-actions">
           <a class="tp-btn tp-btn-secondary" routerLink="/orders/history">Order history</a>
@@ -96,6 +96,16 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                 @if (errorMessage(); as message) {
                   <div class="tp-alert tp-alert-error" role="alert" data-testid="order-error"><span>{{ message }}</span></div>
                 }
+
+                <fieldset class="tp-segmented">
+                  <legend class="tp-label">Order type</legend>
+                  <div class="tp-segmented-options is-full">
+                    <input type="radio" id="type-limit" name="orderType" value="LIMIT" formControlName="orderType" />
+                    <label for="type-limit" data-testid="order-type-limit">Limit</label>
+                    <input type="radio" id="type-market" name="orderType" value="MARKET" formControlName="orderType" />
+                    <label for="type-market" data-testid="order-type-market">Market</label>
+                  </div>
+                </fieldset>
 
                 <fieldset class="tp-segmented">
                   <legend class="tp-label">Side</legend>
@@ -197,6 +207,7 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                       <p class="tp-field-error" id="quantity-error" data-testid="order-error-quantity">{{ message }}</p>
                     }
                   </div>
+                  @if (values().orderType !== 'MARKET') {
                   <div>
                     <label class="tp-label" for="price">Limit price</label>
                     <input
@@ -216,6 +227,7 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                       <p class="tp-field-error" id="price-error" data-testid="order-error-price">{{ message }}</p>
                     }
                   </div>
+                  }
                 </div>
 
                 <button
@@ -251,8 +263,9 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                   {{ values().side === 'BUY' ? 'Buy' : values().side === 'SELL' ? 'Sell' : '—' }}
                 </dd>
               </div>
+              <div><dt>Order type</dt><dd data-testid="order-summary-type">{{ values().orderType === 'MARKET' ? 'Market' : 'Limit' }}</dd></div>
               <div><dt>Quantity</dt><dd class="tp-num" data-testid="order-summary-quantity">{{ (values().quantity | number) ?? '—' }}</dd></div>
-              <div><dt>Limit price</dt><dd class="tp-num" data-testid="order-summary-price">{{ (values().price | currency) ?? '—' }}</dd></div>
+              <div><dt>Limit price</dt><dd class="tp-num" data-testid="order-summary-price">{{ values().orderType === 'MARKET' ? 'Market' : ((values().price | currency) ?? '—') }}</dd></div>
             </dl>
             <div class="estimate">
               <p class="tp-stat-label">Estimated value</p>
@@ -289,6 +302,7 @@ export class PlaceOrderComponent implements OnInit {
   private readonly resultHeading = viewChild.required<ElementRef<HTMLElement>>('resultHeading');
 
   protected readonly form = inject(NonNullableFormBuilder).group({
+    orderType: ['LIMIT' as OrderType, Validators.required],
     side: ['' as OrderSide | '', Validators.required],
     symbol: ['', [Validators.required, Validators.maxLength(10)]],
     quantity: [null as number | null, [Validators.required, wholeNumber, positive]],
@@ -299,7 +313,10 @@ export class PlaceOrderComponent implements OnInit {
   protected readonly accountId = computed(() => this.authService.currentUser$()?.accountId ?? 0);
   protected readonly summarySymbol = computed(() => (this.values().symbol ?? '').trim().toUpperCase());
   protected readonly estimate = computed(() => {
-    const { quantity, price } = this.values();
+    const { orderType, quantity, price } = this.values();
+    if (orderType === 'MARKET') {
+      return null;
+    }
     return quantity && price && quantity > 0 && price > 0 ? quantity * price : null;
   });
   protected readonly submitLabel = computed(() => {
@@ -369,6 +386,17 @@ export class PlaceOrderComponent implements OnInit {
         this.pickedSymbol.set(symbol);
       }
     });
+
+    this.form.controls.orderType.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((type) => {
+      const price = this.form.controls.price;
+      if (type === 'MARKET') {
+        price.setValue(null);
+        price.disable({ emitEvent: false });
+      } else {
+        price.enable({ emitEvent: false });
+      }
+      price.updateValueAndValidity({ emitEvent: false });
+    });
   }
 
   /**
@@ -377,11 +405,11 @@ export class PlaceOrderComponent implements OnInit {
    * Focus moves on to quantity because the pressed button disappears.
    */
   protected selectStock(stock: WatchlistStock): void {
-    const { symbol, price } = this.form.controls;
+    const { symbol, price, orderType } = this.form.controls;
     symbol.setValue(stock.symbol);
     symbol.markAsDirty();
     this.pickedSymbol.set(stock.symbol);
-    if (price.value === null && stock.price > 0) {
+    if (orderType.value === 'LIMIT' && price.value === null && stock.price > 0) {
       price.setValue(Math.round(stock.price * 100) / 100);
       price.markAsDirty();
     }
@@ -421,6 +449,9 @@ export class PlaceOrderComponent implements OnInit {
   }
 
   protected priceError(): string | null {
+    if (this.values().orderType === 'MARKET') {
+      return null;
+    }
     if (!this.shows('price')) {
       return null;
     }
@@ -449,29 +480,34 @@ export class PlaceOrderComponent implements OnInit {
 
     // accountId is 0 until the trading account has been provisioned and the
     // user has signed in again to pick it up in a fresh token.
-    const accountId = this.accountId();
-    if (!accountId) {
-      this.errorMessage.set(this.errorMapping.getErrorMessage('ACC-404'));
-      return;
-    }
-
     // Generate idempotencyKey (unique identifier for order idempotency)
     if (!this.idempotencyKey) {
       this.idempotencyKey = crypto.randomUUID();
     }
 
-    const { side, symbol, quantity, price } = this.form.getRawValue();
+    const { orderType, side, symbol, quantity, price } = this.form.getRawValue();
     this.isLoading.set(true);
 
+    const request = {
+      orderType,
+      symbol: symbol.trim().toUpperCase(),
+      side: side as OrderSide,
+      quantity: quantity ?? 0,
+      idempotencyKey: this.idempotencyKey
+    } as {
+      orderType: OrderType;
+      symbol: string;
+      side: OrderSide;
+      quantity: number;
+      idempotencyKey: string;
+      price?: number;
+    };
+    if (orderType === 'LIMIT') {
+      request.price = price ?? 0;
+    }
+
     this.orderService
-      .placeOrder({
-        accountId,
-        symbol: symbol.trim().toUpperCase(),
-        side: side as OrderSide,
-        quantity: quantity ?? 0,
-        price: price ?? 0,
-        idempotencyKey: this.idempotencyKey
-      })
+      .placeOrder(request)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (response) => {

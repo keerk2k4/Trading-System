@@ -24,7 +24,10 @@ export interface OrderResponse {
     symbol: string;
     side: OrderSide;
     quantity: number;
-    price: number;
+    /**
+     * LIMIT price when provided; null for MARKET orders.
+     */
+    price: number | null;
 }
 export namespace OrderResponse {
 }

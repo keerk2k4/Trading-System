@@ -72,7 +72,7 @@ describe('TradeApiService', () => {
 
   it('posts the order body to /api/v1/orders', () => {
     const order: PlaceOrderRequest = {
-      accountId: 17,
+      orderType: 'LIMIT',
       symbol: 'AAPL',
       side: 'BUY',
       quantity: 10,
