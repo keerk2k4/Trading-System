@@ -177,148 +177,6 @@ interface AdvisorData {
               }
             </div>
           </section>
-
-          <section class="tp-panel" aria-labelledby="technical-heading">
-            <div class="tp-panel-header">
-              <h2 id="technical-heading">Technical analysis</h2>
-              <p>From daily closes; score out of 100</p>
-            </div>
-            <div class="tp-table-wrap" tabindex="0" role="region" aria-label="Technical analysis">
-              <table class="tp-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Symbol</th>
-                    <th scope="col">Trend</th>
-                    <th scope="col" class="num">SMA 50</th>
-                    <th scope="col" class="num">SMA 200</th>
-                    <th scope="col" class="num">RSI 14</th>
-                    <th scope="col" class="num">MACD hist.</th>
-                    <th scope="col" class="num">Bollinger %B</th>
-                    <th scope="col" class="num">ATR 14</th>
-                    <th scope="col" class="num">Support</th>
-                    <th scope="col" class="num">Resistance</th>
-                    <th scope="col" class="num">3-mo change</th>
-                    <th scope="col" class="num">Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (h of r.holdings; track h.symbol) {
-                    @let t = h.analysis.technical;
-                    <tr data-testid="technical-row">
-                      <td><strong>{{ h.symbol }}</strong></td>
-                      <td>{{ t.trend }}</td>
-                      <td class="num">{{ (t.sma50 | number: '1.2-2') ?? '—' }}</td>
-                      <td class="num">{{ (t.sma200 | number: '1.2-2') ?? '—' }}</td>
-                      <td class="num">{{ (t.rsi14 | number: '1.0-0') ?? '—' }}</td>
-                      <td class="num">{{ (t.macd?.histogram | number: '1.2-2') ?? '—' }}</td>
-                      <td class="num">{{ (t.bollinger?.percentB | number: '1.2-2') ?? '—' }}</td>
-                      <td class="num">{{ (t.atr14 | number: '1.2-2') ?? '—' }}</td>
-                      <td class="num">{{ (t.support | number: '1.2-2') ?? '—' }}</td>
-                      <td class="num">{{ (t.resistance | number: '1.2-2') ?? '—' }}</td>
-                      <td class="num"><app-pnl-value kind="percent" [value]="t.momentum3m === null ? null : t.momentum3m * 100" /></td>
-                      <td class="num"><strong>{{ t.score }}</strong></td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section class="tp-panel" aria-labelledby="fundamental-heading">
-            <div class="tp-panel-header">
-              <h2 id="fundamental-heading">Fundamental analysis</h2>
-              <p>Approximate snapshot; DCF is two-stage with a CAPM discount rate</p>
-            </div>
-            <div class="tp-table-wrap" tabindex="0" role="region" aria-label="Fundamental analysis">
-              <table class="tp-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Symbol</th>
-                    <th scope="col" class="num">P/E</th>
-                    <th scope="col" class="num">PEG</th>
-                    <th scope="col" class="num">ROE</th>
-                    <th scope="col" class="num">Debt/equity</th>
-                    <th scope="col" class="num">Piotroski</th>
-                    <th scope="col" class="num">Altman Z</th>
-                    <th scope="col" class="num">Discount rate</th>
-                    <th scope="col" class="num">DCF value</th>
-                    <th scope="col" class="num">Margin of safety</th>
-                    <th scope="col" class="num">Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (h of r.holdings; track h.symbol) {
-                    @if (h.analysis.fundamental; as f) {
-                      <tr data-testid="fundamental-row">
-                        <td><strong>{{ h.symbol }}</strong></td>
-                        <td class="num">{{ f.fundamentals.pe }}</td>
-                        <td class="num">{{ (f.peg | number: '1.2-2') ?? '—' }}</td>
-                        <td class="num">{{ f.fundamentals.roePct }}%</td>
-                        <td class="num">{{ f.fundamentals.debtToEquity }}</td>
-                        <td class="num">{{ f.fundamentals.piotroski }}/9</td>
-                        <td class="num">{{ f.fundamentals.altmanZ }} ({{ f.altmanZone }})</td>
-                        <td class="num">{{ f.discountRate | percent: '1.1-1' }}</td>
-                        <td class="num">{{ f.intrinsicValue | currency }}</td>
-                        <td class="num"><app-pnl-value kind="percent" [value]="f.marginOfSafety * 100" /></td>
-                        <td class="num"><strong>{{ f.score }}</strong></td>
-                      </tr>
-                    } @else {
-                      <tr>
-                        <td><strong>{{ h.symbol }}</strong></td>
-                        <td colspan="10" class="tp-muted">No fundamentals available</td>
-                      </tr>
-                    }
-                  }
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section class="tp-panel" aria-labelledby="risk-heading">
-            <div class="tp-panel-header">
-              <h2 id="risk-heading">Risk and outlook</h2>
-              <p>One year of daily returns, annualised; composite = 40% fundamental + 35% technical + 25% risk</p>
-            </div>
-            <div class="tp-table-wrap" tabindex="0" role="region" aria-label="Risk and outlook">
-              <table class="tp-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Symbol</th>
-                    <th scope="col" class="num">Weight</th>
-                    <th scope="col" class="num">Volatility</th>
-                    <th scope="col" class="num">Beta</th>
-                    <th scope="col" class="num">Sharpe</th>
-                    <th scope="col" class="num">Sortino</th>
-                    <th scope="col" class="num">Max drawdown</th>
-                    <th scope="col" class="num">1-day VaR</th>
-                    <th scope="col" class="num">Expected return</th>
-                    <th scope="col" class="num">P(up, 3 mo)</th>
-                    <th scope="col" class="num">Risk score</th>
-                    <th scope="col" class="num">Composite</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (h of r.holdings; track h.symbol) {
-                    @let k = h.analysis.risk;
-                    <tr data-testid="risk-row">
-                      <td><strong>{{ h.symbol }}</strong></td>
-                      <td class="num">{{ h.weight | percent: '1.0-1' }}</td>
-                      <td class="num">{{ k.volatility | percent: '1.0-1' }}</td>
-                      <td class="num">{{ k.beta | number: '1.2-2' }}</td>
-                      <td class="num">{{ k.sharpe | number: '1.2-2' }}</td>
-                      <td class="num">{{ k.sortino | number: '1.2-2' }}</td>
-                      <td class="num">{{ k.maxDrawdown | percent: '1.0-1' }}</td>
-                      <td class="num">{{ k.var95 | percent: '1.0-2' }}</td>
-                      <td class="num">{{ h.analysis.expectedReturn | percent: '1.0-1' }}</td>
-                      <td class="num">{{ chance(h.analysis.probabilityUp3m) }}</td>
-                      <td class="num">{{ k.score }}</td>
-                      <td class="num"><strong>{{ h.analysis.compositeScore }}</strong></td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          </section>
         }
 
         @if (r.rebalance.length > 0) {
@@ -352,74 +210,6 @@ interface AdvisorData {
                         </span>
                       </td>
                       <td class="num"><app-pnl-value [value]="t.value" /></td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          </section>
-        }
-
-        @if (r.correlation.symbols.length > 1) {
-          <section class="tp-panel" aria-labelledby="correlation-heading">
-            <div class="tp-panel-header">
-              <h2 id="correlation-heading">Correlation of daily returns</h2>
-              <p>Close to 1 means two holdings rise and fall together and add little diversification</p>
-            </div>
-            <div class="tp-table-wrap" tabindex="0" role="region" aria-label="Correlation matrix">
-              <table class="tp-table corr">
-                <thead>
-                  <tr>
-                    <th scope="col"></th>
-                    @for (s of r.correlation.symbols; track s) {
-                      <th scope="col" class="num">{{ s }}</th>
-                    }
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (row of r.correlation.matrix; track $index; let i = $index) {
-                    <tr>
-                      <th scope="row">{{ r.correlation.symbols[i] }}</th>
-                      @for (value of row; track $index) {
-                        <td class="num" [style.background-color]="corrColour(value)">{{ value | number: '1.2-2' }}</td>
-                      }
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          </section>
-        }
-
-        @if (r.ideas.length > 0) {
-          <section class="tp-panel" aria-labelledby="ideas-heading">
-            <div class="tp-panel-header">
-              <h2 id="ideas-heading">Instruments you do not hold that score well</h2>
-              <p>Candidates for new money or for proceeds from a sale</p>
-            </div>
-            <div class="tp-table-wrap" tabindex="0" role="region" aria-label="Ideas">
-              <table class="tp-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Symbol</th>
-                    <th scope="col" class="num">Price</th>
-                    <th scope="col" class="num">Fundamental</th>
-                    <th scope="col" class="num">Technical</th>
-                    <th scope="col" class="num">Risk</th>
-                    <th scope="col" class="num">Composite</th>
-                    <th scope="col" class="num">P(up, 3 mo)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (idea of r.ideas; track idea.symbol) {
-                    <tr data-testid="idea-row" [attr.data-symbol]="idea.symbol">
-                      <td><strong>{{ idea.symbol }}</strong></td>
-                      <td class="num">{{ idea.price | currency }}</td>
-                      <td class="num">{{ idea.fundamental?.score ?? '—' }}</td>
-                      <td class="num">{{ idea.technical.score }}</td>
-                      <td class="num">{{ idea.risk.score }}</td>
-                      <td class="num"><strong>{{ idea.compositeScore }}</strong></td>
-                      <td class="num">{{ chance(idea.probabilityUp3m) }}</td>
                     </tr>
                   }
                 </tbody>
@@ -466,7 +256,6 @@ interface AdvisorData {
     .kv dt { font-size: 0.75rem; color: var(--tp-text-muted); }
     .kv dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
     .reasons { margin: 0; padding-left: 1.125rem; display: grid; gap: 0.25rem; font-size: 0.875rem; line-height: 1.45; }
-    .corr th[scope='row'] { text-align: left; }
     .method summary { cursor: pointer; padding: 1rem 1.25rem; font-weight: 600; }
     .method p { margin: 0 0 0.75rem; line-height: 1.55; font-size: 0.875rem; }
     @media (max-width: 600px) { .kv { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -570,10 +359,4 @@ export class AdvisorComponent implements OnInit {
     }
   }
 
-  /** Positive correlation tinted toward the negative colour (less diversification), negative toward positive. */
-  protected corrColour(value: number): string {
-    const strength = Math.round(Math.min(Math.abs(value), 1) * 28);
-    const colour = value >= 0 ? 'var(--tp-negative)' : 'var(--tp-positive)';
-    return `color-mix(in srgb, ${colour} ${strength}%, transparent)`;
-  }
 }

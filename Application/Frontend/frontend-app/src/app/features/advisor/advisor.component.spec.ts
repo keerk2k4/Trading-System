@@ -81,9 +81,6 @@ describe('AdvisorComponent', () => {
     expect(cards.length).toBe(1);
     expect(cards[0].getAttribute('data-symbol')).toBe('AAPL');
     expect(cards[0].querySelector('[data-testid="advice-action"]')?.textContent?.trim()).toBeTruthy();
-    expect(all('technical-row').length).toBe(1);
-    expect(all('fundamental-row').length).toBe(1);
-    expect(all('risk-row').length).toBe(1);
     expect(text('advisor-probability')).toMatch(/%/);
   });
 
