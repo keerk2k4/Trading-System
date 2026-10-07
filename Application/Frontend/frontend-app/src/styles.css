@@ -1027,6 +1027,146 @@ select.tp-input {
   margin-top: 0.5rem;
 }
 
+/* Notification kind: a tinted circle holding the kind's icon (notification-kinds.ts). */
+
+.tp-kind {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  color: var(--tone);
+  background-color: color-mix(in srgb, var(--tone) 12%, transparent);
+}
+
+.tp-kind svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tp-kind.is-positive { --tone: var(--tp-positive); }
+.tp-kind.is-negative { --tone: var(--tp-negative); }
+.tp-kind.is-warning { --tone: var(--tp-warning); }
+.tp-kind.is-accent { --tone: var(--tp-accent); }
+
+/* Toasts (ToastContainerComponent): new notifications, top right; full width
+   at the top on a phone. */
+
+.tp-toasts {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  right: 0.75rem;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.tp-toast {
+  display: flex;
+  align-items: flex-start;
+  pointer-events: auto;
+  color: var(--tp-text);
+  background-color: var(--tp-surface);
+  border: 1px solid var(--tp-border);
+  border-radius: var(--tp-radius-lg);
+  box-shadow: var(--tp-shadow);
+  animation: tp-toast-in 0.2s ease-out;
+}
+
+.tp-toast-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.875rem 0 0.875rem 1rem;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--tp-radius-lg) 0 0 var(--tp-radius-lg);
+}
+
+.tp-toast-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.tp-toast-title {
+  font-size: 0.9375rem;
+}
+
+.tp-toast-message {
+  font-size: 0.875rem;
+  color: var(--tp-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.tp-toast-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: 0.25rem;
+  padding: 0;
+  color: var(--tp-text-muted);
+  background: none;
+  border: 0;
+  border-radius: var(--tp-radius);
+  cursor: pointer;
+}
+
+.tp-toast-close:hover {
+  color: var(--tp-text);
+  background-color: var(--tp-surface-raised);
+}
+
+.tp-toast-close svg {
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.tp-toast-body:focus-visible,
+.tp-toast-close:focus-visible {
+  outline: 2px solid var(--tp-focus);
+  outline-offset: -2px;
+}
+
+@keyframes tp-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tp-toast {
+    animation: none;
+  }
+}
+
+@media (min-width: 36rem) {
+  .tp-toasts {
+    top: 1rem;
+    right: 1rem;
+    left: auto;
+    width: 23rem;
+  }
+}
+
 /* App shell (AppShellComponent): sidebar + top bar around signed-in pages */
 
 .sh {

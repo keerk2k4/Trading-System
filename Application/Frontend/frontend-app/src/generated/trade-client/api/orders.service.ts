@@ -43,7 +43,7 @@ export class OrdersService extends BaseService {
 
     /**
      * Cancel a working order
-     * Cancels an order that is still &#x60;NEW&#x60; and returns the updated order. An order that is already &#x60;FILLED&#x60;, &#x60;REJECTED&#x60; or &#x60;CANCELLED&#x60; cannot be cancelled and returns &#x60;ORD-409&#x60;.  The cancellation is a state transition guarded inside the database transaction. Checking the status, then updating it, without a guarded transition, races the Trade Executor. 
+     * Cancels an order that is still &#x60;NEW&#x60; and returns the updated order. An order that is already &#x60;FILLED&#x60;, &#x60;REJECTED&#x60; or &#x60;CANCELLED&#x60; cannot be cancelled and returns &#x60;ORD-409&#x60;.  Timing: &#x60;MARKET&#x60; orders are executed immediately by the Trade Executor, so they are cancellable only for a brief instant after acceptance. &#x60;LIMIT&#x60; orders wait &#x60;app.execution.limit-delay-ms&#x60; (15s by default) in &#x60;NEW&#x60; before the executor prices them, which is the window where cancel and update succeed.  The cancellation is a state transition guarded inside the database transaction. Checking the status, then updating it, without a guarded transition, races the Trade Executor. 
      * @endpoint delete /api/v1/orders/{id}
      * @param id The order UUID, without the &#x60;ORD-&#x60; display prefix.
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
@@ -173,10 +173,13 @@ export class OrdersService extends BaseService {
 
     /**
      * Update a working order
-     * Updates quantity and/or limit price of an order that is still `NEW` and returns the updated order. Only `LIMIT` orders can be updated, and only while `NEW`.
+     * Updates quantity and/or limit price of an order that is still &#x60;NEW&#x60; and returns the updated order. Only &#x60;LIMIT&#x60; orders can be updated, and only while &#x60;NEW&#x60;. A &#x60;MARKET&#x60; order carries no limit price so only its quantity could change, and since market orders execute immediately the window is effectively zero; implementations reject price updates on &#x60;MARKET&#x60; orders with &#x60;VAL-422&#x60;.  The update re-validates business rules 4-7 against the new values, then applies a guarded transition (&#x60;WHERE id &#x3D; ? AND status &#x3D; \&#39;NEW\&#39;&#x60;) so it races safely with the Trade Executor. The executor always re-reads the order row after the &#x60;LIMIT&#x60; delay, so an accepted update is what gets priced. 
      * @endpoint patch /api/v1/orders/{id}
-     * @param id The order identifier, without the `ORD-` display prefix.
-     * @param updateOrderRequest
+     * @param id The order identifier, without the &#x60;ORD-&#x60; display prefix.
+     * @param updateOrderRequest 
+     * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
+     * @param reportProgress flag to report request and response progress.
+     * @param options additional options
      */
     public updateOrder(id: string, updateOrderRequest: UpdateOrderRequest, observe?: 'body', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<OrderResponse>;
     public updateOrder(id: string, updateOrderRequest: UpdateOrderRequest, observe?: 'response', reportProgress?: boolean, options?: {httpHeaderAccept?: 'application/json', context?: HttpContext, transferCache?: boolean}): Observable<HttpResponse<OrderResponse>>;
@@ -226,7 +229,7 @@ export class OrdersService extends BaseService {
             }
         }
 
-        let localVarPath = `/api/v1/orders/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: ""})}`;
+        let localVarPath = `/api/v1/orders/${this.configuration.encodeParam({name: "id", value: id, in: "path", style: "simple", explode: false, dataType: "string", dataFormat: undefined})}`;
         const { basePath, withCredentials } = this.configuration;
         return this.httpClient.request<OrderResponse>('patch', `${basePath}${localVarPath}`,
             {

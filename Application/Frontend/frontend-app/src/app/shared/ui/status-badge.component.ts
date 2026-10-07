@@ -5,6 +5,8 @@ type Tone = 'positive' | 'negative' | 'warning' | 'neutral';
 const TONES: Record<string, Tone> = {
   FILLED: 'positive',
   ORDER_FILLED: 'positive',
+  TRIGGERED: 'positive',
+  TRIGGERING: 'warning',
   APPROVED: 'positive',
   ACTIVE: 'positive',
   SENT: 'positive',

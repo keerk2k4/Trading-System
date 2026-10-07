@@ -2,7 +2,7 @@ package com.tradingsystem.spring_boot_app.service;
 
 import com.tradingsystem.spring_boot_app.dto.NotificationResponse;
 import com.tradingsystem.spring_boot_app.mapper.NotificationMapper;
-import com.tradingsystem.spring_boot_app.notification.LoggingNotificationSender;
+import com.tradingsystem.spring_boot_app.notification.NotificationSender;
 import com.tradingsystem.spring_boot_app.notification.NotificationDeliveryService;
 import com.tradingsystem.spring_boot_app.notification.NotificationStatus;
 import com.tradingsystem.spring_boot_app.notification.NotificationType;
@@ -41,11 +41,11 @@ public class NotificationService implements NotificationDeliveryService {
 
     private final NotificationMapper notifications;
     private final CustomerPreferenceResolver preferences;
-    private final LoggingNotificationSender sender;
+    private final NotificationSender sender;
 
     public NotificationService(NotificationMapper notifications,
                                CustomerPreferenceResolver preferences,
-                               LoggingNotificationSender sender) {
+                               NotificationSender sender) {
         this.notifications = notifications;
         this.preferences = preferences;
         this.sender = sender;

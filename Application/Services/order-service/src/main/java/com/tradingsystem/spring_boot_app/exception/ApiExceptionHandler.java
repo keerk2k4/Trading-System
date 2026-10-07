@@ -86,6 +86,11 @@ public class ApiExceptionHandler {
         return response(HttpStatus.NOT_FOUND, "WL-404", "Watchlist not found");
     }
 
+    @ExceptionHandler(StrategyNotFoundException.class)
+    ResponseEntity<ErrorResponse> strategyNotFound() {
+        return response(HttpStatus.NOT_FOUND, "STR-404", "Strategy not found");
+    }
+
     @ExceptionHandler(org.springframework.dao.DuplicateKeyException.class)
     ResponseEntity<ErrorResponse> duplicateWatchlist() {
         return response(HttpStatus.CONFLICT, "WL-409", "Watchlist already exists");

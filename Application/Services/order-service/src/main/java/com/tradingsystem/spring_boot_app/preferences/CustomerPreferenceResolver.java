@@ -10,7 +10,9 @@ package com.tradingsystem.spring_boot_app.preferences;
  * returned channel on the notification row, so historical routing never has
  * to be reconstructed from current preferences.
  *
- * <p>Agreed default when nothing has been stored: {@link AlertChannel#EMAIL}.
+ * <p>Agreed default when nothing has been stored: {@link AlertChannel#PUSH}
+ * (in app only). Every notification is stored and shown in the app whatever
+ * the channel, so nothing is lost; email is something a customer opts into.
  * Holding the message was considered and rejected: a lost message nobody
  * finds out about is worse than a documented default channel.
  */
@@ -18,7 +20,7 @@ public interface CustomerPreferenceResolver {
 
     /**
      * Resolve the alert channel for an account, falling back to the
-     * documented default ({@link AlertChannel#EMAIL}) when no preference row
+     * documented default ({@link AlertChannel#PUSH}, in app only) when no preference row
      * exists. Never returns null and never throws for a missing row.
      *
      * @param accountId the numeric trading-account key

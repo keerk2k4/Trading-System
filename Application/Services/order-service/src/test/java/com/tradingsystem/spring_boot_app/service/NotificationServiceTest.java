@@ -1,7 +1,7 @@
 package com.tradingsystem.spring_boot_app.service;
 
 import com.tradingsystem.spring_boot_app.mapper.NotificationMapper;
-import com.tradingsystem.spring_boot_app.notification.LoggingNotificationSender;
+import com.tradingsystem.spring_boot_app.notification.NotificationSender;
 import com.tradingsystem.spring_boot_app.notification.NotificationStatus;
 import com.tradingsystem.spring_boot_app.notification.NotificationType;
 import com.tradingsystem.spring_boot_app.preferences.AlertChannel;
@@ -38,7 +38,7 @@ class NotificationServiceTest {
     @Mock
     private CustomerPreferenceResolver preferences;
     @Mock
-    private LoggingNotificationSender sender;
+    private NotificationSender sender;
 
     private NotificationService service;
 

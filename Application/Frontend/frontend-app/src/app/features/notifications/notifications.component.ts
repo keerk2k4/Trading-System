@@ -5,25 +5,12 @@ import { RouterLink } from '@angular/router';
 import { TradeApiService } from '../../shared/services/trade-api.service';
 import { ErrorMappingService } from '../../shared/services/error-mapping.service';
 import { AlertChannel, Notification, TradeApiError } from '../../shared/models/order.models';
-
-type Tone = 'positive' | 'negative' | 'warning' | 'accent';
-
-/** How each kind of notification is drawn: a label for screen readers, a tone and an icon. */
-const KINDS: Record<string, { label: string; tone: Tone; icon: string }> = {
-  ORDER_FILLED: { label: 'Order filled', tone: 'positive', icon: 'M4 10.5l3.5 3.5L16 6' },
-  ORDER_REJECTED: { label: 'Order rejected', tone: 'negative', icon: 'M5.5 5.5l9 9m0-9l-9 9' },
-  ORDER_CANCELLED: { label: 'Order cancelled', tone: 'warning', icon: 'M5 10h10' },
-  PRICE_ALERT: {
-    label: 'Price alert',
-    tone: 'accent',
-    icon: 'M10 3a4.5 4.5 0 0 0-4.5 4.5c0 4-1.5 5.5-1.5 5.5h12s-1.5-1.5-1.5-5.5A4.5 4.5 0 0 0 10 3ZM8.5 15.5a1.5 1.5 0 0 0 3 0'
-  }
-};
+import { NotificationKind, notificationKind } from '../../shared/ui/notification-kinds';
 
 const CHANNEL_WORDS: Record<AlertChannel, string> = {
-  EMAIL: 'email',
-  SMS: 'SMS',
-  PUSH: 'push notification'
+  EMAIL: 'by email',
+  SMS: 'by SMS',
+  PUSH: 'as an in-app alert'
 };
 
 interface DayGroup {
@@ -91,7 +78,7 @@ interface DayGroup {
                 <ul class="inbox">
                   @for (notification of group.items; track notification.notificationId) {
                     <li class="item" data-testid="notification-row" [attr.data-event-id]="notification.eventId">
-                      <span class="kind" [class]="'kind is-' + kind(notification).tone" aria-hidden="true">
+                      <span class="tp-kind" [class]="'tp-kind is-' + kind(notification).tone" aria-hidden="true">
                         <svg viewBox="0 0 20 20"><path [attr.d]="kind(notification).icon" /></svg>
                       </span>
                       <div class="body">
@@ -140,22 +127,6 @@ interface DayGroup {
     .inbox { list-style: none; margin: 0; padding: 0; }
     .item { display: flex; gap: 0.875rem; padding: 1rem 1.25rem; }
     .item + .item { border-top: 1px solid var(--tp-border); }
-
-    .kind {
-      flex: none;
-      display: grid;
-      place-items: center;
-      width: 2rem;
-      height: 2rem;
-      border-radius: 50%;
-      color: var(--tone);
-      background-color: color-mix(in srgb, var(--tone) 12%, transparent);
-    }
-    .kind svg { width: 1.125rem; height: 1.125rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .kind.is-positive { --tone: var(--tp-positive); }
-    .kind.is-negative { --tone: var(--tp-negative); }
-    .kind.is-warning { --tone: var(--tp-warning); }
-    .kind.is-accent { --tone: var(--tp-accent); }
 
     .body { flex: 1; min-width: 0; }
     .head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.25rem 1rem; flex-wrap: wrap; }
@@ -210,22 +181,22 @@ export class NotificationsComponent implements OnInit {
     }
   }
 
-  protected kind(notification: Notification): { label: string; tone: Tone; icon: string } {
-    return KINDS[notification.type] ?? { label: 'Notification', tone: 'accent', icon: 'M10 6v5m0 3h.01' };
+  protected kind(notification: Notification): NotificationKind {
+    return notificationKind(notification);
   }
 
   /** Where the message went, in words: the status and the resolved channel together. */
   protected deliveryText(notification: Notification): string {
-    const channel = CHANNEL_WORDS[notification.channel] ?? String(notification.channel).toLowerCase();
+    const channel = CHANNEL_WORDS[notification.channel] ?? `by ${String(notification.channel).toLowerCase()}`;
     switch (notification.status) {
       case 'SENT':
-        return `Sent by ${channel}`;
+        return `Sent ${channel}`;
       case 'QUEUED':
-        return `Waiting to send by ${channel}`;
+        return `Waiting to send ${channel}`;
       case 'FAILED':
-        return `Couldn't send by ${channel}. It's still here in your inbox.`;
+        return `Couldn't send ${channel}. It's still here in your inbox.`;
       default:
-        return `By ${channel}`;
+        return channel.charAt(0).toUpperCase() + channel.slice(1);
     }
   }
 

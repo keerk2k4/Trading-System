@@ -71,6 +71,13 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
           <p>Submit a limit or market order to buy or sell an instrument.</p>
         </div>
         <div class="tp-actions">
+          <a
+            class="tp-btn tp-btn-secondary"
+            routerLink="/strategies"
+            [queryParams]="{ symbol: (values().symbol ?? '').trim().toUpperCase() || null }"
+            data-testid="order-add-strategy"
+            >Add strategy</a
+          >
           <a class="tp-btn tp-btn-secondary" routerLink="/orders/history">Order history</a>
         </div>
       </header>

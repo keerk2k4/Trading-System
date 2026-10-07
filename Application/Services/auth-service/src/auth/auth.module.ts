@@ -10,6 +10,8 @@ import { KycRepository } from "../repositories/KycRepository";
 import { ThrottleService } from "../services/ThrottleService";
 import { BearerGuard } from "../guards/BearerGuard";
 import { KycController } from "./kyc.controller";
+import { InternalNotificationController } from "./internal-notification.controller";
+import { InternalServiceGuard } from "../guards/InternalServiceGuard";
 import { AccountProvisioningEventService } from "../services/AccountProvisioningEventService";
 import { NotificationService } from "../services/NotificationService";
 import { EmailOtpService } from "../services/EmailOtpService";
@@ -17,7 +19,7 @@ import { FieldEncryptionService } from "../services/FieldEncryptionService";
 
 @Module({
   imports: [DatabaseModule],
-  controllers: [AuthController, KycController],
+  controllers: [AuthController, KycController, InternalNotificationController],
   providers: [
     TokenService,
     PasswordService,
@@ -31,6 +33,7 @@ import { FieldEncryptionService } from "../services/FieldEncryptionService";
     EmailOtpService,
     FieldEncryptionService,
     BearerGuard,
+    InternalServiceGuard,
   ],
   exports: [
     TokenService,

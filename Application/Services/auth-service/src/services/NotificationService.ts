@@ -154,6 +154,31 @@ export class NotificationService {
     });
   }
 
+  /**
+   * Emails a trade notification (order filled/rejected/cancelled, price alert)
+   * written by order-service, for a customer whose alert channel includes
+   * email. Returns whether the SMTP server accepted it, so order-service can
+   * record SENT or FAILED.
+   */
+  async sendTradeNotification(
+    userId: string,
+    email: string,
+    username: string,
+    subject: string,
+    message: string,
+  ): Promise<boolean> {
+    return this.send(userId, {
+      to: email,
+      subject,
+      text:
+        `Hello ${username},\n\n` +
+        `${message}\n\n` +
+        'You receive these emails because your alerts are set to "In app and email". ' +
+        "You can change this in Settings.\n\n" +
+        "Enterprise Trading Platform",
+    });
+  }
+
   // Local development without a mail server: print the code instead of sending it.
   private printOtpInDev(email: string, label: string, otp: string): boolean {
     if (this.transporter || process.env.NODE_ENV === "production" || !this.hasDeliverableAddress(email)) {

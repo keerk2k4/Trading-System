@@ -17,7 +17,7 @@ import {
 import { Observable, of, throwError } from 'rxjs';
 import { catchError, finalize, map, shareReplay, switchMap, tap } from 'rxjs/operators';
 import { AUTH_API_BASE_URL } from '../api/api-clients';
-import { AuthService as AuthApi, ProfileService } from '../../../generated/auth-client';
+import { AuthService as AuthApi, ContactResponse, ProfileService } from '../../../generated/auth-client';
 import { accessTokenStore } from './access-token.store';
 
 // Base URL of the real Sprint 8/9 auth-service, set per build in
@@ -166,6 +166,12 @@ export class MockAuthService {
   // Real backend: GET /auth/me -> { id, username, accountId, roles }.
   // The contract marks it secured, so the generated client and
   // authTokenInterceptor both attach the same bearer token.
+  // GET /auth/me/contact: the signed-in user's email and phone, read on
+  // demand for the settings screen. Never cached or stored in the browser.
+  getContact(): Observable<ContactResponse> {
+    return this.profileApi.getMyContact();
+  }
+
   loadCurrentUser(): Observable<User> {
     return this.profileApi.getCurrentUser().pipe(
       map((me) => ({

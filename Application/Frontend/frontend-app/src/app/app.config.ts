@@ -3,13 +3,14 @@ import { provideRouter } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { routes } from './app.routes';
 import { authTokenInterceptor } from './shared/interceptors/auth-token.interceptor';
+import { orderActivityInterceptor } from './shared/interceptors/order-activity.interceptor';
 import { provideApiClients } from './shared/api/api-clients';
 import { MockAuthService } from './shared/services/auth.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideRouter(routes),
-    provideHttpClient(withInterceptors([authTokenInterceptor])),
+    provideHttpClient(withInterceptors([authTokenInterceptor, orderActivityInterceptor])),
     ...provideApiClients(),
     // The access token is held in memory only, so a reload starts without
     // one. Before the first route is guarded, swap the HttpOnly refresh
