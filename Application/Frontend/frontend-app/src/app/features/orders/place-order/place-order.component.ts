@@ -27,8 +27,7 @@ import { WatchlistService } from '../../../shared/services/watchlist.service';
 import { StatusBadgeComponent } from '../../../shared/ui/status-badge.component';
 import { AccountStatusNoticeComponent } from '../../../shared/ui/account-status-notice.component';
 import { CandlestickChartComponent } from '../../../shared/ui/candlestick-chart.component';
-import { OrderSide, OrderType, PlaceOrderResponse, TradeApiError } from '../../../shared/models/order.models';
-import { OrderSide, OrderType, PlaceOrderResponse, Quote, TradeApiError } from '../../../shared/models/order.models';
+import { OrderSide, OrderType, PlaceOrderRequest, PlaceOrderResponse, Quote, TradeApiError } from '../../../shared/models/order.models';
 import { WatchlistStock } from '../../../shared/models/watchlist.models';
 
 /** Results shown under the symbol field; the full list belongs on the watchlist page. */
@@ -70,7 +69,6 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
         <div>
           <h1>Place order</h1>
           <p>Submit a limit or market order to buy or sell an instrument.</p>
-          <p>Submit a limit or market order to buy or sell an instrument.</p>
         </div>
         <div class="tp-actions">
           <a class="tp-btn tp-btn-secondary" routerLink="/orders/history">Order history</a>
@@ -107,16 +105,6 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                 @if (errorMessage(); as message) {
                   <div class="tp-alert tp-alert-error" role="alert" data-testid="order-error"><span>{{ message }}</span></div>
                 }
-
-                <fieldset class="tp-segmented">
-                  <legend class="tp-label">Order type</legend>
-                  <div class="tp-segmented-options is-full">
-                    <input type="radio" id="type-limit" name="orderType" value="LIMIT" formControlName="orderType" />
-                    <label for="type-limit" data-testid="order-type-limit">Limit</label>
-                    <input type="radio" id="type-market" name="orderType" value="MARKET" formControlName="orderType" />
-                    <label for="type-market" data-testid="order-type-market">Market</label>
-                  </div>
-                </fieldset>
 
                 <fieldset class="tp-segmented">
                   <legend class="tp-label">Side</legend>
@@ -368,7 +356,6 @@ export class PlaceOrderComponent implements OnInit {
   private readonly resultHeading = viewChild.required<ElementRef<HTMLElement>>('resultHeading');
 
   protected readonly form = inject(NonNullableFormBuilder).group({
-    orderType: ['LIMIT' as OrderType, Validators.required],
     side: ['' as OrderSide | '', Validators.required],
     orderType: ['LIMIT' as OrderType, Validators.required],
     symbol: ['', [Validators.required, Validators.maxLength(10)]],
@@ -399,10 +386,7 @@ export class PlaceOrderComponent implements OnInit {
   protected readonly accountId = computed(() => this.authService.currentUser$()?.accountId ?? 0);
   protected readonly summarySymbol = computed(() => (this.values().symbol ?? '').trim().toUpperCase());
   protected readonly estimate = computed(() => {
-    const { orderType, quantity } = this.values();
-    if (orderType === 'MARKET') {
-      return null;
-    }
+    const { quantity } = this.values();
     const unit = this.isMarket() ? this.marketPrice() : this.values().price;
     return quantity && unit && quantity > 0 && unit > 0 ? quantity * unit : null;
   });
@@ -610,9 +594,6 @@ export class PlaceOrderComponent implements OnInit {
   }
 
   protected priceError(): string | null {
-    if (this.values().orderType === 'MARKET') {
-      return null;
-    }
     if (this.isMarket()) {
       return null;
     }
@@ -642,47 +623,26 @@ export class PlaceOrderComponent implements OnInit {
       return;
     }
 
-    // accountId is 0 until the trading account has been provisioned and the
-    // user has signed in again to pick it up in a fresh token.
     // Generate idempotencyKey (unique identifier for order idempotency)
     if (!this.idempotencyKey) {
       this.idempotencyKey = crypto.randomUUID();
     }
 
     const { orderType, side, symbol, quantity, price } = this.form.getRawValue();
-    const { side, orderType, symbol, quantity, price } = this.form.getRawValue();
     this.isLoading.set(true);
 
-    const request = {
+    // The backend resolves the account from the JWT; the request carries no accountId.
+    const request: PlaceOrderRequest = {
       orderType,
       symbol: symbol.trim().toUpperCase(),
       side: side as OrderSide,
       quantity: quantity ?? 0,
-      idempotencyKey: this.idempotencyKey
-    } as {
-      orderType: OrderType;
-      symbol: string;
-      side: OrderSide;
-      quantity: number;
-      idempotencyKey: string;
-      price?: number;
+      idempotencyKey: this.idempotencyKey,
+      ...(orderType === 'MARKET' ? {} : { price: price ?? 0 })
     };
-    if (orderType === 'LIMIT') {
-      request.price = price ?? 0;
-    }
 
     this.orderService
       .placeOrder(request)
-    this.orderService
-      .placeOrder({
-        accountId,
-        orderType: orderType as OrderType,
-        symbol: symbol.trim().toUpperCase(),
-        side: side as OrderSide,
-        quantity: quantity ?? 0,
-        ...(orderType === 'MARKET' ? {} : { price: price ?? 0 }),
-        idempotencyKey: this.idempotencyKey
-      })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (response) => {
