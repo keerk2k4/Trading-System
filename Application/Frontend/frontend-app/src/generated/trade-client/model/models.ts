@@ -20,6 +20,7 @@ export * from './quote-response';
 export * from './update-order-request';
 export * from './update-preference-request';
 export * from './place-order-request';
+export * from './place-order-type';
 export * from './position-response';
 export * from './preference-response';
 export * from './watchlist-detail-response';

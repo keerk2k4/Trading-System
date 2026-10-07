@@ -106,6 +106,18 @@ public class JwtTokenProvider {
     }
 
     /**
+     * Extracts the {@code sub} claim, the Auth service's user id, after the
+     * same validation as {@link #extractAccountId(String)}. Used to record
+     * which admin made a change.
+     *
+     * @return the subject, or null if validation fails or there is none
+     */
+    public String extractSubject(String token) {
+        Claims claims = verifiedClaims(token);
+        return claims == null ? null : claims.getSubject();
+    }
+
+    /**
      * Verifies signature, expiry and algorithm, in that order.
      *
      * @return the token's claims, or null if any check fails

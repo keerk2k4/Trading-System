@@ -1,3 +1,4 @@
+export * from './admin-user-response';
 export * from './database-health';
 export * from './error-response';
 export * from './health-details-response';

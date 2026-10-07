@@ -17,6 +17,7 @@ const TONES: Record<string, Tone> = {
   ORDER_REJECTED: 'negative',
   FAILED: 'negative',
   SUSPENDED: 'negative',
+  BLOCKED: 'negative',
   CLOSED: 'negative',
   // Service health
   UP: 'positive',

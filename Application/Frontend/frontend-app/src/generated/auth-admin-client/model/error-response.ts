@@ -1,5 +1,5 @@
 /**
- * Auth Service, health routes
+ * Auth Service, health and admin routes
  *
  * 
  *
@@ -17,6 +17,7 @@ export namespace ErrorResponse {
     export const ErrorCodeEnum = {
         AUTH_401: 'AUTH-401',
         AUTH_403: 'AUTH-403',
+        VAL_422: 'VAL-422',
     } as const;
     export type ErrorCodeEnum = typeof ErrorCodeEnum[keyof typeof ErrorCodeEnum];
 }

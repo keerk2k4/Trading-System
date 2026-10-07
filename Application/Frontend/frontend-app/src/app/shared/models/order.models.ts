@@ -17,7 +17,7 @@ import type {
   OrderResponse,
   OrderSide as ContractOrderSide,
   OrderStatus as ContractOrderStatus,
-  OrderType as ContractOrderType,
+  PlaceOrderType as ContractPlaceOrderType,
   PlaceOrderRequest as ContractPlaceOrderRequest,
   PositionResponse,
   PreferenceResponse as ContractPreferenceResponse,
@@ -28,7 +28,7 @@ import type {
 
 export type OrderStatus = ContractOrderStatus;
 export type OrderSide = ContractOrderSide;
-export type OrderType = ContractOrderType;
+export type OrderType = ContractPlaceOrderType;
 export type AccountStatus = ContractAccountStatus;
 export type AlertChannel = ContractAlertChannel;
 export type NotificationType = ContractNotificationType;

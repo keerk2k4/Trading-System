@@ -1,6 +1,8 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 import { PlaceOrderComponent } from './place-order.component';
 import { MockAuthService } from '../../../shared/services/auth.service';
@@ -55,6 +57,8 @@ describe('PlaceOrderComponent', () => {
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: TradeApiService, useValue: tradeApi },
         {
           provide: MockAuthService,
@@ -97,7 +101,7 @@ describe('PlaceOrderComponent', () => {
 
     const order = sentOrder();
     expect(order).toEqual(
-      jasmine.objectContaining({ accountId: 6, symbol: 'AAPL', side: 'BUY', quantity: 10, price: 150.25 })
+      jasmine.objectContaining({ orderType: 'LIMIT', symbol: 'AAPL', side: 'BUY', quantity: 10, price: 150.25 })
     );
     expect(order.idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
     expect(el('h2').textContent).toContain('Order submitted');
@@ -176,6 +180,38 @@ describe('PlaceOrderComponent', () => {
     expect(document.activeElement).toBe(el('#quantity'));
   });
 
+  it('shows the candlestick chart of the selected stock, until another symbol is typed', () => {
+    expect(page.querySelector('[data-testid="candle-chart"]')).toBeNull();
+
+    type('symbol', 'apple');
+    fixture.detectChanges();
+    expect(page.querySelector('[data-testid="candle-chart"]')).toBeNull();
+
+    el<HTMLButtonElement>('[data-testid="order-search-select"][data-symbol="AAPL"]').click();
+    fixture.detectChanges();
+    const candle = { date: '2026-10-06', open: 100, high: 105, low: 95, close: 102, volume: 1, synthetic: false };
+    TestBed.inject(HttpTestingController)
+      .expectOne('candles/AAPL.json')
+      .flush({ data: { symbol: 'AAPL', interval: '1d', currency: 'USD', candles: [candle] } });
+    fixture.detectChanges();
+
+    expect(el('[data-testid="candle-chart"]').textContent).toContain('AAPL');
+    expect(page.querySelectorAll('[data-testid="candle"]').length).toBe(1);
+
+    type('symbol', 'MSF');
+    fixture.detectChanges();
+    expect(page.querySelector('[data-testid="candle-chart"]')).toBeNull();
+  });
+
+  it('says there is no such instrument when the selected stock has no chart data', () => {
+    // As a deep link (/orders/new?symbol=IBM) selects it.
+    fixture.componentInstance['pickedSymbol'].set('IBM');
+    type('symbol', 'IBM');
+    fixture.detectChanges();
+
+    expect(el('[data-testid="candle-error"]').textContent).toContain('There is no such instrument: IBM');
+  });
+
   it('keeps a price the trader already typed when a result is selected', () => {
     type('price', '150.25');
     type('symbol', 'AAPL');
@@ -223,6 +259,22 @@ describe('PlaceOrderComponent', () => {
     submit();
 
     expect(tradeApi.placeOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('submits a market order without price', async () => {
+    el<HTMLInputElement>('#side-buy').click();
+    el<HTMLInputElement>('[data-testid="order-type-market"]').click();
+    type('symbol', 'AAPL');
+    type('quantity', '1');
+    fixture.detectChanges();
+    submit();
+    await fixture.whenStable();
+
+    expect(page.querySelector('#price')).toBeNull();
+    expect(sentOrder()).toEqual(
+      jasmine.objectContaining({ orderType: 'MARKET', symbol: 'AAPL', side: 'BUY', quantity: 1 })
+    );
+    expect((sentOrder() as { price?: number }).price).toBeUndefined();
   });
 
   it('announces how many stocks match for screen readers', () => {

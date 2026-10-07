@@ -158,18 +158,37 @@ export async function getOrderStatus(request: APIRequestContext, accessToken: st
 export async function placeOrderViaApi(
   request: APIRequestContext,
   accessToken: string,
-  order: { side: 'BUY' | 'SELL'; quantity: number; price: number; symbol?: string; idempotencyKey?: string }
+  order: {
+    side: 'BUY' | 'SELL';
+    quantity: number;
+    price?: number;
+    orderType?: 'LIMIT' | 'MARKET';
+    symbol?: string;
+    idempotencyKey?: string;
+  }
 ) {
+  const orderType = order.orderType ?? 'LIMIT';
+  const data: {
+    orderType: 'LIMIT' | 'MARKET';
+    symbol: string;
+    side: 'BUY' | 'SELL';
+    quantity: number;
+    idempotencyKey: string;
+    price?: number;
+  } = {
+    orderType,
+    symbol: order.symbol ?? env.symbol,
+    side: order.side,
+    quantity: order.quantity,
+    idempotencyKey: order.idempotencyKey ?? randomUUID()
+  };
+  if (orderType === 'LIMIT') {
+    data.price = order.price ?? 100;
+  }
+
   return request.post(`${env.tradeApi}/api/v1/orders`, {
     headers: bearer(accessToken),
-    data: {
-      accountId: Number(env.accountId),
-      symbol: order.symbol ?? env.symbol,
-      side: order.side,
-      quantity: order.quantity,
-      price: order.price,
-      idempotencyKey: order.idempotencyKey ?? randomUUID()
-    }
+    data
   });
 }
 

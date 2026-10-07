@@ -3,7 +3,7 @@ openapi: 3.1.0
 info:
   title: Trade REST API, admin routes
   version: 1.0.0
-  summary: Admin-only views of the platform, served by the Trade REST API.
+  summary: Admin-only views and account controls, served by the Trade REST API.
   description: |
     Written by the team for the admin dashboard. The programme's `trade-api.yaml` is left
     untouched; these routes live on the same service, port and token verification, and the
@@ -21,6 +21,20 @@ info:
 
     The Angular route guard on the admin pages is a usability control. This check is the
     security control.
+
+    ## Account status
+
+    | Status | Sign in | Orders |
+    |---|---|---|
+    | `PENDING` | yes | no |
+    | `ACTIVE` | yes | yes |
+    | `SUSPENDED` | yes | no |
+    | `BLOCKED` | no | no |
+    | `CLOSED` | no | no |
+
+    An admin changes it through `PATCH /api/v1/admin/accounts/{accountId}/status`. Nothing else
+    has to be told: the Trade REST API checks the status on every request, the Auth service on
+    every sign-in and refresh, and orders need `ACTIVE`.
   license:
     name: Instructional use only
 
@@ -78,7 +92,136 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/v1/admin/accounts:
+    get:
+      tags: [Admin]
+      operationId: searchAccounts
+      summary: List or search trading accounts
+      description: |
+        Every filter is optional and they combine. With none, the newest accounts are listed. At
+        most 50 accounts are returned, newest first; narrow the filter to see others. A name search
+        starts in the Auth service (`auth-admin-api.yaml`, `GET /admin/users?query=`), whose
+        `userId`s are passed here. An unknown `status` matches nothing.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/AccountStatus'
+        - name: accountNumber
+          in: query
+          required: false
+          description: Exact account number.
+          schema:
+            type: string
+          example: ACC-6
+        - name: userId
+          in: query
+          required: false
+          description: Auth user ids; repeat the parameter for several.
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: The matching accounts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminAccountSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/admin/accounts/{accountId}:
+    get:
+      tags: [Admin]
+      operationId: getAdminAccount
+      summary: One trading account with its activity and status history
+      parameters:
+        - $ref: '#/components/parameters/AccountIdPath'
+      responses:
+        '200':
+          description: The account, its activity, the statuses it may move to next, and its history.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminAccountDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+
+  /api/v1/admin/accounts/{accountId}/status:
+    patch:
+      tags: [Admin]
+      operationId: changeAccountStatus
+      summary: Change a trading account's status, with a reason
+      description: |
+        Allowed changes:
+
+        | From | To |
+        |---|---|
+        | `PENDING` | `BLOCKED`, `CLOSED` (only KYC approval makes it `ACTIVE`) |
+        | `ACTIVE` | `SUSPENDED`, `BLOCKED`, `CLOSED` |
+        | `SUSPENDED` | `ACTIVE`, `BLOCKED`, `CLOSED` |
+        | `BLOCKED` | `ACTIVE`, `SUSPENDED`, `CLOSED` |
+        | `CLOSED` | nothing: closing is permanent |
+
+        Any other change is `ACC-409`, as is a change made while another admin changed the same
+        account (the update applies only if the status is still the one read). The change and an
+        audit record of who made it (the token's `sub`), from what, to what and why are written in
+        one transaction.
+      parameters:
+        - $ref: '#/components/parameters/AccountIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeAccountStatusRequest'
+            example:
+              status: SUSPENDED
+              reason: Chargeback dispute opened by the card issuer
+      responses:
+        '200':
+          description: The account after the change, as `GET /api/v1/admin/accounts/{accountId}` shows it.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminAccountDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+        '409':
+          $ref: '#/components/responses/StatusChangeNotAllowed'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
 components:
+
+  parameters:
+    AccountIdPath:
+      name: accountId
+      in: path
+      required: true
+      description: The numeric account key, `ACCOUNTS.id`.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      example: 6
 
   securitySchemes:
     bearerAuth:
@@ -112,6 +255,39 @@ components:
               value:
                 errorCode: AUTH-403
                 message: Forbidden
+    AccountNotFound:
+      description: No account exists with that key.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            notFound:
+              value:
+                errorCode: ACC-404
+                message: Account not found
+    StatusChangeNotAllowed:
+      description: The change is not one of the allowed ones, or the status changed meanwhile.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            notAllowed:
+              value:
+                errorCode: ACC-409
+                message: This status change is not allowed
+    InvalidInput:
+      description: A missing or blank reason, a reason over 500 characters, or an unknown status.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalid:
+              value:
+                errorCode: VAL-422
+                message: Invalid input
 
   schemas:
 
@@ -166,6 +342,115 @@ components:
             A fixed sentence for a person to read. Never an exception text, host name or port.
           example: Not reachable
 
+    AccountStatus:
+      type: string
+      enum: [PENDING, ACTIVE, SUSPENDED, BLOCKED, CLOSED]
+
+    LocalDateTime:
+      type: string
+      description: |
+        An ISO-8601 date and time in the server's local time, without an offset, e.g.
+        `2026-10-07T09:15:00`. The service stores these as `TIMESTAMP` (no time zone).
+      example: '2026-10-07T09:15:00'
+
+    AdminAccountSummary:
+      type: object
+      additionalProperties: false
+      required: [id, accountNumber, userId, status, cashBalance, createdAt, updatedAt]
+      description: |
+        The customer's name and username are not here: they live in the Auth service, asked by
+        `userId` (`auth-admin-api.yaml`, `GET /admin/users?ids=`).
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 6
+        accountNumber:
+          type: string
+          example: ACC-6
+        userId:
+          type: string
+          description: The Auth service's user id of the account holder.
+          example: 11111111-2222-4333-8444-555555555555
+        status:
+          $ref: '#/components/schemas/AccountStatus'
+        cashBalance:
+          type: number
+          example: 1000.00
+        createdAt:
+          $ref: '#/components/schemas/LocalDateTime'
+        updatedAt:
+          $ref: '#/components/schemas/LocalDateTime'
+
+    AccountStatusChange:
+      type: object
+      additionalProperties: false
+      required: [fromStatus, toStatus, reason, changedBy, changedAt]
+      properties:
+        fromStatus:
+          $ref: '#/components/schemas/AccountStatus'
+        toStatus:
+          $ref: '#/components/schemas/AccountStatus'
+        reason:
+          type: string
+          example: Chargeback dispute opened by the card issuer
+        changedBy:
+          type: string
+          description: The admin's Auth user id (their token's `sub`).
+        changedAt:
+          $ref: '#/components/schemas/LocalDateTime'
+
+    AdminAccountDetail:
+      type: object
+      additionalProperties: false
+      required: [account, openPositions, ordersByStatus, lastOrderAt, allowedNextStatuses, statusHistory]
+      properties:
+        account:
+          $ref: '#/components/schemas/AdminAccountSummary'
+        openPositions:
+          type: integer
+          format: int64
+          description: Instruments currently held (open positions with a quantity above zero).
+          example: 2
+        ordersByStatus:
+          type: object
+          description: Order count per order status; only statuses that occur are present.
+          additionalProperties:
+            type: integer
+            format: int64
+          example:
+            FILLED: 5
+            REJECTED: 1
+        lastOrderAt:
+          type: [string, 'null']
+          description: |
+            When the account last placed an order, in the same local format as `LocalDateTime`;
+            null if it never has.
+          example: '2026-10-06T14:30:00'
+        allowedNextStatuses:
+          type: array
+          description: What `PATCH .../status` accepts from the current status; empty once `CLOSED`.
+          items:
+            $ref: '#/components/schemas/AccountStatus'
+        statusHistory:
+          type: array
+          description: Every status change made by an admin, newest first.
+          items:
+            $ref: '#/components/schemas/AccountStatusChange'
+
+    ChangeAccountStatusRequest:
+      type: object
+      additionalProperties: false
+      required: [status, reason]
+      properties:
+        status:
+          $ref: '#/components/schemas/AccountStatus'
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Why the admin is making the change. Kept in the audit trail; must not be blank.
+
     ErrorResponse:
       type: object
       additionalProperties: false
@@ -174,12 +459,15 @@ components:
       properties:
         errorCode:
           type: string
-          enum: [AUTH-401, AUTH-403]
+          enum: [AUTH-401, AUTH-403, ACC-404, ACC-409, VAL-422]
           description: |
             | Code | HTTP | Meaning |
             |---|---|---|
             | `AUTH-401` | 401 | Unauthorised or invalid token |
             | `AUTH-403` | 403 | Valid token, but not an admin |
+            | `ACC-404` | 404 | No account with that key |
+            | `ACC-409` | 409 | That status change is not allowed, or the status changed meanwhile |
+            | `VAL-422` | 422 | A missing or blank reason, or an unknown status |
           example: AUTH-403
         message:
           type: string

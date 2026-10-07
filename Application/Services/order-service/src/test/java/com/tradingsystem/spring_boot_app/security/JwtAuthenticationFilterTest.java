@@ -76,12 +76,14 @@ class JwtAuthenticationFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         when(tokenProvider.extractAccountId("admin.jwt.token")).thenReturn(0L);
         when(tokenProvider.extractRoles("admin.jwt.token")).thenReturn(List.of("ADMIN"));
+        when(tokenProvider.extractSubject("admin.jwt.token")).thenReturn("admin-user-id");
 
         filter.doFilter(request, response, filterChain);
 
         verify(filterChain).doFilter(request, response);
         assertEquals(0L, request.getAttribute(ACCOUNT_ID_ATTRIBUTE));
         assertEquals(List.of("ADMIN"), request.getAttribute("roles"));
+        assertEquals("admin-user-id", request.getAttribute("subject"));
     }
 
     @Test

@@ -28,6 +28,14 @@ class ApiExceptionHandlerTest {
     }
 
     @Test
+    void refusedStatusChangeUsesAcc409Envelope() {
+        ResponseEntity<ErrorResponse> response = handler.statusChangeNotAllowed();
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertEquals(new ErrorResponse("ACC-409", "This status change is not allowed"), response.getBody());
+    }
+
+    @Test
     void unexpectedFailureUsesSafeServerErrorEnvelope() {
         ResponseEntity<ErrorResponse> response = handler.unexpected(
                 new IllegalArgumentException("database password and internal detail"));

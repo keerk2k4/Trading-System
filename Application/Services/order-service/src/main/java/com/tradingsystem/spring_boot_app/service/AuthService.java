@@ -26,6 +26,7 @@ public class AuthService {
     private static final String ACCOUNT_ID_ATTRIBUTE = "accountId";
     private static final String ROLES_ATTRIBUTE = "roles";
     private static final String ADMIN_ROLE = "ADMIN";
+    private static final String SUBJECT_ATTRIBUTE = "subject";
 
     public void requireBearerToken(HttpServletRequest request) {
         String authorization = request.getHeader("Authorization");
@@ -79,6 +80,19 @@ public class AuthService {
      *
      * @throws ForbiddenException if the token does not carry the ADMIN role
      */
+    /**
+     * The Auth user id ({@code sub}) of the verified caller, for audit records.
+     *
+     * @throws UnauthorisedException if the token carried no subject
+     */
+    public String authenticatedSubject(HttpServletRequest request) {
+        requireBearerToken(request);
+        if (!(request.getAttribute(SUBJECT_ATTRIBUTE) instanceof String subject) || subject.isBlank()) {
+            throw new UnauthorisedException();
+        }
+        return subject;
+    }
+
     public void requireAdmin(HttpServletRequest request) {
         requireBearerToken(request);
         if (!(request.getAttribute(ROLES_ATTRIBUTE) instanceof Collection<?> roles)

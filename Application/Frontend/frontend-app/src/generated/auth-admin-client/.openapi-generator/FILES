@@ -3,12 +3,14 @@
 README.md
 api.base.service.ts
 api.module.ts
+api/admin.service.ts
 api/api.ts
 api/health.service.ts
 configuration.ts
 encoder.ts
 git_push.sh
 index.ts
+model/admin-user-response.ts
 model/database-health.ts
 model/error-response.ts
 model/health-details-response-components.ts

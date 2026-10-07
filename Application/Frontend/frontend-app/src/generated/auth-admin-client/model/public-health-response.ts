@@ -1,5 +1,5 @@
 /**
- * Auth Service, health routes
+ * Auth Service, health and admin routes
  *
  * 
  *

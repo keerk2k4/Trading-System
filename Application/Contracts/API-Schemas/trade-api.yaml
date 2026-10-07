@@ -10,8 +10,8 @@ info:
 
     ## Identifiers
 
-    `accountId` means the numeric surrogate key `ACCOUNTS.id` everywhere in this contract: in the
-    path parameter, in the order request body, and in the JWT `accountId` claim. The string business
+    `accountId` means the numeric surrogate key `ACCOUNTS.id` everywhere in this contract: in
+    path parameters and in the JWT `accountId` claim. The string business
     identifier lives on `ACCOUNTS.account_id` and is returned as `AccountResponse.accountId`, which
     is the one place the name carries the other meaning. Where any other material uses the name
     loosely, this contract is the one that binds.
@@ -40,8 +40,8 @@ info:
     | 2 | The account must be `ACTIVE` | `ACC-403`, 403 |
     | 3 | The instrument must exist and be tradable | `INS-404`, 404 |
     | 4 | Quantity must be greater than zero | `VAL-422`, 422 |
-    | 5 | Price must be greater than zero | `VAL-422`, 422 |
-    | 6 | BUY: cash balance must be at least quantity multiplied by price | `ORD-400`, 400 |
+    | 5 | LIMIT: price must be greater than zero; MARKET: omit price | `VAL-422`, 422 |
+    | 6 | BUY: cash balance must be at least quantity multiplied by validation price | `ORD-400`, 400 |
     | 7 | SELL: held quantity must be at least the order quantity | `ORD-409`, 409 |
     | 8 | The idempotency key must be unique | `ORD-409`, 409 |
 
@@ -108,12 +108,20 @@ paths:
               buy:
                 summary: Buy 100 shares
                 value:
-                  accountId: 1
+                  orderType: LIMIT
                   symbol: ACME
                   side: BUY
                   quantity: 100
                   price: 25.50
                   idempotencyKey: 6f2b1c2a-6a1e-4a4f-9c0d-2f7a1b3c4d5e
+              marketBuy:
+                summary: Buy at market
+                value:
+                  orderType: MARKET
+                  symbol: ACME
+                  side: BUY
+                  quantity: 100
+                  idempotencyKey: 6f2b1c2a-6a1e-4a4f-9c0d-2f7a1b3c4d5f
       responses:
         '200':
           description: Order accepted and recorded.
@@ -1037,14 +1045,12 @@ components:
       enum: [BUY, SELL]
       description: Direction of the order.
 
-    OrderType:
+    PlaceOrderType:
       type: string
-      enum: [MARKET, LIMIT]
+      enum: [LIMIT, MARKET]
       description: |
-        `LIMIT` carries a limit price and waits `app.execution.limit-delay-ms` (15s) in `NEW`
-        before the executor prices it, so it can be cancelled or updated first. `MARKET`
-        carries no price; the executor fills it immediately at the live Fauxnance quote
-        (BUY at ask, SELL at bid) or rejects it when no quote exists.
+        Supported order-entry types on `POST /api/v1/orders`.
+        LIMIT requires `price`; MARKET must omit `price`.
 
     OrderStatus:
       type: string
@@ -1066,19 +1072,12 @@ components:
     PlaceOrderRequest:
       type: object
       additionalProperties: false
-      required: [accountId, symbol, side, quantity, idempotencyKey]
+      required: [symbol, side, quantity, idempotencyKey]
       properties:
-        accountId:
-          type: integer
-          format: int64
-          minimum: 1
-          description: |
-            The numeric account key, `ACCOUNTS.id`. Accepted for contract compatibility but
-            ignored: the backend always resolves the effective account from the JWT `accountId`
-            claim and never trusts a caller-supplied identifier.
-          example: 1
         orderType:
-          $ref: '#/components/schemas/OrderType'
+          allOf:
+            - $ref: '#/components/schemas/PlaceOrderType'
+          default: LIMIT
         symbol:
           type: string
           minLength: 1
@@ -1097,14 +1096,13 @@ components:
           description: Whole units. Must be greater than zero, business rule 4.
           example: 100
         price:
-          type: number
+          type: [number, 'null']
           format: double
           exclusiveMinimum: 0
           multipleOf: 0.01
           description: |
-            Limit price per unit, to two decimal places. Required for `LIMIT` orders
-            (business rule 5); must be absent for `MARKET` orders, which are priced from the
-            live `market-data` quote at execution time (BUY at ask, SELL at bid).
+            LIMIT only: limit price per unit, to two decimal places.
+            Omit or set null for MARKET orders.
             Serialise as a JSON number and hold it as `BigDecimal` in Java. Never use `double` for
             money in the domain.
           example: 25.50
@@ -1167,7 +1165,7 @@ components:
         price:
           type: [number, 'null']
           format: double
-          description: Limit price for LIMIT orders; null for MARKET orders.
+          description: LIMIT price when provided; null for MARKET orders.
           example: 25.50
 
     OrderHistoryEntry:
@@ -1196,7 +1194,7 @@ components:
         price:
           type: [number, 'null']
           format: double
-          description: The limit price submitted with the order; null for MARKET orders.
+          description: The limit price submitted with the order.
           example: 25.50
         executedPrice:
           type: [number, 'null']

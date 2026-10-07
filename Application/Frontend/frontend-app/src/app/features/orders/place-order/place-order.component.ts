@@ -26,6 +26,8 @@ import { ErrorMappingService } from '../../../shared/services/error-mapping.serv
 import { WatchlistService } from '../../../shared/services/watchlist.service';
 import { StatusBadgeComponent } from '../../../shared/ui/status-badge.component';
 import { AccountStatusNoticeComponent } from '../../../shared/ui/account-status-notice.component';
+import { CandlestickChartComponent } from '../../../shared/ui/candlestick-chart.component';
+import { OrderSide, OrderType, PlaceOrderResponse, TradeApiError } from '../../../shared/models/order.models';
 import { OrderSide, OrderType, PlaceOrderResponse, Quote, TradeApiError } from '../../../shared/models/order.models';
 import { WatchlistStock } from '../../../shared/models/watchlist.models';
 
@@ -53,12 +55,21 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
 
 @Component({
   selector: 'app-place-order',
-  imports: [ReactiveFormsModule, RouterLink, CurrencyPipe, DecimalPipe, StatusBadgeComponent, AccountStatusNoticeComponent],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    CurrencyPipe,
+    DecimalPipe,
+    StatusBadgeComponent,
+    AccountStatusNoticeComponent,
+    CandlestickChartComponent
+  ],
   template: `
     <div class="tp-page">
       <header class="tp-page-header">
         <div>
           <h1>Place order</h1>
+          <p>Submit a limit or market order to buy or sell an instrument.</p>
           <p>Submit a limit or market order to buy or sell an instrument.</p>
         </div>
         <div class="tp-actions">
@@ -96,6 +107,16 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                 @if (errorMessage(); as message) {
                   <div class="tp-alert tp-alert-error" role="alert" data-testid="order-error"><span>{{ message }}</span></div>
                 }
+
+                <fieldset class="tp-segmented">
+                  <legend class="tp-label">Order type</legend>
+                  <div class="tp-segmented-options is-full">
+                    <input type="radio" id="type-limit" name="orderType" value="LIMIT" formControlName="orderType" />
+                    <label for="type-limit" data-testid="order-type-limit">Limit</label>
+                    <input type="radio" id="type-market" name="orderType" value="MARKET" formControlName="orderType" />
+                    <label for="type-market" data-testid="order-type-market">Market</label>
+                  </div>
+                </fieldset>
 
                 <fieldset class="tp-segmented">
                   <legend class="tp-label">Side</legend>
@@ -174,6 +195,10 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                         </ul>
                       }
                     </div>
+                  }
+
+                  @if (chartSymbol(); as chart) {
+                    <app-candlestick-chart [symbol]="chart" />
                   }
                 </div>
 
@@ -300,6 +325,7 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                   {{ values().side === 'BUY' ? 'Buy' : values().side === 'SELL' ? 'Sell' : '—' }}
                 </dd>
               </div>
+              <div><dt>Order type</dt><dd data-testid="order-summary-type">{{ values().orderType === 'MARKET' ? 'Market' : 'Limit' }}</dd></div>
               <div><dt>Quantity</dt><dd class="tp-num" data-testid="order-summary-quantity">{{ (values().quantity | number) ?? '—' }}</dd></div>
               @if (isMarket()) {
                 <div><dt>Market price</dt><dd class="tp-num" data-testid="order-summary-market-price">{{ (marketPrice() | currency) ?? '—' }}</dd></div>
@@ -342,6 +368,7 @@ export class PlaceOrderComponent implements OnInit {
   private readonly resultHeading = viewChild.required<ElementRef<HTMLElement>>('resultHeading');
 
   protected readonly form = inject(NonNullableFormBuilder).group({
+    orderType: ['LIMIT' as OrderType, Validators.required],
     side: ['' as OrderSide | '', Validators.required],
     orderType: ['LIMIT' as OrderType, Validators.required],
     symbol: ['', [Validators.required, Validators.maxLength(10)]],
@@ -372,7 +399,10 @@ export class PlaceOrderComponent implements OnInit {
   protected readonly accountId = computed(() => this.authService.currentUser$()?.accountId ?? 0);
   protected readonly summarySymbol = computed(() => (this.values().symbol ?? '').trim().toUpperCase());
   protected readonly estimate = computed(() => {
-    const { quantity } = this.values();
+    const { orderType, quantity } = this.values();
+    if (orderType === 'MARKET') {
+      return null;
+    }
     const unit = this.isMarket() ? this.marketPrice() : this.values().price;
     return quantity && unit && quantity > 0 && unit > 0 ? quantity * unit : null;
   });
@@ -394,6 +424,12 @@ export class PlaceOrderComponent implements OnInit {
   protected readonly showSearch = computed(() => {
     const query = (this.values().symbol ?? '').trim();
     return query !== '' && query.toUpperCase() !== this.pickedSymbol();
+  });
+  // The chart follows the selected instrument and disappears once the trader
+  // types something else into the field.
+  protected readonly chartSymbol = computed(() => {
+    const picked = this.pickedSymbol();
+    return picked && this.summarySymbol() === picked ? picked : '';
   });
   // Same name-or-symbol filter as the watchlist page, over the same catalog.
   protected readonly searchResults = computed(() =>
@@ -479,13 +515,13 @@ export class PlaceOrderComponent implements OnInit {
    * Focus moves on to quantity because the pressed button disappears.
    */
   protected selectStock(stock: WatchlistStock): void {
-    const { symbol, price } = this.form.controls;
+    const { symbol, price, orderType } = this.form.controls;
     symbol.setValue(stock.symbol);
     symbol.markAsDirty();
     this.pickedSymbol.set(stock.symbol);
     if (this.isMarket()) {
       this.loadQuote(stock.symbol);
-    } else if (price.value === null && stock.price > 0) {
+    } else if (orderType.value === 'LIMIT' && price.value === null && stock.price > 0) {
       price.setValue(Math.round(stock.price * 100) / 100);
       price.markAsDirty();
     }
@@ -574,6 +610,9 @@ export class PlaceOrderComponent implements OnInit {
   }
 
   protected priceError(): string | null {
+    if (this.values().orderType === 'MARKET') {
+      return null;
+    }
     if (this.isMarket()) {
       return null;
     }
@@ -605,20 +644,35 @@ export class PlaceOrderComponent implements OnInit {
 
     // accountId is 0 until the trading account has been provisioned and the
     // user has signed in again to pick it up in a fresh token.
-    const accountId = this.accountId();
-    if (!accountId) {
-      this.errorMessage.set(this.errorMapping.getErrorMessage('ACC-404'));
-      return;
-    }
-
     // Generate idempotencyKey (unique identifier for order idempotency)
     if (!this.idempotencyKey) {
       this.idempotencyKey = crypto.randomUUID();
     }
 
+    const { orderType, side, symbol, quantity, price } = this.form.getRawValue();
     const { side, orderType, symbol, quantity, price } = this.form.getRawValue();
     this.isLoading.set(true);
 
+    const request = {
+      orderType,
+      symbol: symbol.trim().toUpperCase(),
+      side: side as OrderSide,
+      quantity: quantity ?? 0,
+      idempotencyKey: this.idempotencyKey
+    } as {
+      orderType: OrderType;
+      symbol: string;
+      side: OrderSide;
+      quantity: number;
+      idempotencyKey: string;
+      price?: number;
+    };
+    if (orderType === 'LIMIT') {
+      request.price = price ?? 0;
+    }
+
+    this.orderService
+      .placeOrder(request)
     this.orderService
       .placeOrder({
         accountId,

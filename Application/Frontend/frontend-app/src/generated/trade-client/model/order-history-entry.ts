@@ -19,7 +19,7 @@ export interface OrderHistoryEntry {
     orderType?: OrderType;
     quantity: number;
     /**
-     * The limit price submitted with the order; null for MARKET orders.
+     * The submitted limit price. Null for MARKET orders.
      */
     price?: number | null;
     /**

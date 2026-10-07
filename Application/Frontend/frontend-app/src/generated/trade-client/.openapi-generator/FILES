@@ -24,6 +24,7 @@ model/order-response.ts
 model/order-side.ts
 model/order-status.ts
 model/place-order-request.ts
+model/place-order-type.ts
 model/position-response.ts
 model/watchlist-detail-response.ts
 model/watchlist-response.ts

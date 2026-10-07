@@ -33,6 +33,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String ACCOUNT_ID_ATTRIBUTE = "accountId";
     private static final String ROLES_ATTRIBUTE = "roles";
+    private static final String SUBJECT_ATTRIBUTE = "subject";
     private final JwtTokenProvider tokenProvider;
     private final AccountSessionService accountSessions;
     
@@ -91,6 +92,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // widen what a customer route returns, which stays scoped to accountId.
             request.setAttribute(ACCOUNT_ID_ATTRIBUTE, accountId);
             request.setAttribute(ROLES_ATTRIBUTE, tokenProvider.extractRoles(token));
+            request.setAttribute(SUBJECT_ATTRIBUTE, tokenProvider.extractSubject(token));
             
             // Continue the filter chain
             filterChain.doFilter(request, response);

@@ -137,6 +137,18 @@ export const routes: Routes = [
         title: 'Service health · Trading Platform',
         loadComponent: () =>
           import('./features/admin/service-health/service-health.component').then((m) => m.ServiceHealthComponent)
+      },
+      {
+        path: 'customers',
+        title: 'Customers · Trading Platform',
+        loadComponent: () =>
+          import('./features/admin/customers/customer-list.component').then((m) => m.CustomerListComponent)
+      },
+      {
+        path: 'customers/:accountId',
+        title: 'Customer account · Trading Platform',
+        loadComponent: () =>
+          import('./features/admin/customers/customer-detail.component').then((m) => m.CustomerDetailComponent)
       }
     ]
   },
