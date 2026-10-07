@@ -610,6 +610,27 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorised'
 
+  /auth/me/contact:
+    get:
+      tags: [Profile]
+      operationId: getMyContact
+      summary: Get the authenticated user's contact details
+      description: |
+        Returns the signed-in user's own email and phone, so the settings screen can show where
+        alerts go. Protected; the user comes from the verified token. Kept separate from
+        `/auth/me`, which the UI caches, so contact details are read on demand and never stored in
+        the browser. The Trade API's preferences hold the alert channel only and refer here rather
+        than keeping a copy.
+      responses:
+        '200':
+          description: Where alerts reach this user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+
   /kyc:
     get:
       tags: [KYC]
@@ -1153,6 +1174,20 @@ components:
           format: date-time
           description: Not currently populated by any endpoint; reserved for future use.
           example: '2026-09-30T08:00:00Z'
+
+    ContactResponse:
+      type: object
+      additionalProperties: false
+      required: [email, phone]
+      properties:
+        email:
+          type: string
+          format: email
+          example: priya.menon@example.com
+        phone:
+          type: ['string', 'null']
+          description: Null when the user registered without a phone number.
+          example: '+919876543210'
 
     Role:
       type: string

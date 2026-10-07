@@ -895,6 +895,45 @@ describe("AuthController", () => {
     });
   });
 
+  describe("getMyContact", () => {
+    const claims = { sub: USER_ID, accountId: ACCOUNT_ID, roles: [Role.CUSTOMER] };
+
+    it("returns the caller's own email and phone from the user row", async () => {
+      userRepository.findByUserId.mockResolvedValue({ ...user, phone: "+919876543210" });
+      const { res, state } = makeResponse();
+
+      await controller.getMyContact(claims, res);
+
+      expect(state).toEqual({ status: 200, body: { email: user.email, phone: "+919876543210" } });
+      expect(userRepository.findByUserId).toHaveBeenCalledWith(USER_ID);
+    });
+
+    it("answers null for a phone that was never given", async () => {
+      userRepository.findByUserId.mockResolvedValue(user);
+      const { res, state } = makeResponse();
+
+      await controller.getMyContact(claims, res);
+
+      expect(state).toEqual({ status: 200, body: { email: user.email, phone: null } });
+    });
+
+    it("returns 401 without claims, for a missing user, and when the lookup fails", async () => {
+      const first = makeResponse();
+      await controller.getMyContact(undefined, first.res);
+      expect(first.state).toEqual({ status: 401, body: errorResponse });
+
+      userRepository.findByUserId.mockResolvedValue(null);
+      const second = makeResponse();
+      await controller.getMyContact(claims, second.res);
+      expect(second.state).toEqual({ status: 401, body: errorResponse });
+
+      userRepository.findByUserId.mockRejectedValue(new Error("database unavailable"));
+      const third = makeResponse();
+      await controller.getMyContact(claims, third.res);
+      expect(third.state).toEqual({ status: 401, body: errorResponse });
+    });
+  });
+
   describe("logout", () => {
     it("revokes the supplied refresh token and returns 204", async () => {
       refreshTokenService.revokeRefreshToken.mockResolvedValue(1);

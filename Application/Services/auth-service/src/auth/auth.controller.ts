@@ -16,6 +16,7 @@ import { RegisterRequest } from "../dtos/RegisterRequest";
 import { LoginRequest } from "../dtos/LoginRequest";
 import { RefreshRequest } from "../dtos/RefreshRequest";
 import { UserResponse } from "../dtos/UserResponse";
+import { ContactResponse } from "../dtos/ContactResponse";
 import { TokenResponse } from "../dtos/TokenResponse";
 import { ErrorResponse } from "../dtos/ErrorResponse";
 import { BearerGuard } from "../guards/BearerGuard";
@@ -795,6 +796,32 @@ export class AuthController {
         message: "Unauthorised",
       };
       res.status(401).json(response);
+    }
+  }
+
+  // The caller's own email and phone, decrypted from the user row. Kept off
+  // /auth/me because the browser caches that response; never logged.
+  @Get("me/contact")
+  @UseGuards(BearerGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiTags("Profile")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Get the authenticated user's contact details" })
+  @ApiResponse({ status: 200, description: "Where alerts reach this user.", type: ContactResponse })
+  @ApiResponse({ status: 401, description: "Unauthorised", type: ErrorResponse })
+  async getMyContact(@CurrentUser() claims: any, @Res() res: Response): Promise<void> {
+    const unauthorised: ErrorResponse = { errorCode: "AUTH-401", message: "Unauthorised" };
+    try {
+      const user = claims ? await this.userRepository.findByUserId(claims.sub) : null;
+      if (!user) {
+        res.status(401).json(unauthorised);
+        return;
+      }
+      const contact: ContactResponse = { email: user.email, phone: user.phone ?? null };
+      res.status(200).json(contact);
+    } catch (error) {
+      console.error("Get contact error:", error instanceof Error ? error.message : "unknown");
+      res.status(401).json(unauthorised);
     }
   }
 }
