@@ -31,7 +31,10 @@ public class JwtTokenProvider {
     private static final String ALGORITHM = "HS256";
     private static final String ACCOUNT_ID_CLAIM = "accountId";
     private static final String ROLES_CLAIM = "roles";
-    
+    private static final String INTERNAL_SERVICE = "order-service";
+    private static final String INTERNAL_SCOPE = "auth-internal";
+    private static final long INTERNAL_TOKEN_TTL_MILLIS = 60_000;
+
     private final SecretKey secretKey;
     
     public JwtTokenProvider(@Value("${jwt.secret}") String secret) {
@@ -168,6 +171,26 @@ public class JwtTokenProvider {
         }
     }
     
+    /**
+     * Mints the short-lived token order-service sends to auth-service's
+     * /internal routes (notification email). Same shared secret as every other
+     * token; auth-service accepts it only with this service, scope and issuer,
+     * so it can never pass as a customer token or the reverse.
+     *
+     * @return a signed HS256 token valid for one minute
+     */
+    public String createInternalServiceToken() {
+        Date now = new Date();
+        return Jwts.builder()
+                .issuer(INTERNAL_SERVICE)
+                .claim("service", INTERNAL_SERVICE)
+                .claim("scope", INTERNAL_SCOPE)
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + INTERNAL_TOKEN_TTL_MILLIS))
+                .signWith(secretKey, Jwts.SIG.HS256)
+                .compact();
+    }
+
     /**
      * Validates an internal service token.
      * Internal tokens are used for service-to-service communication (Auth Service → Trade API).

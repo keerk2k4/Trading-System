@@ -67,6 +67,24 @@ export class TokenService {
     return jwt.sign(payload, this.SECRET, { algorithm: "HS256" });
   }
 
+  /**
+   * Verifies a service-to-service token sent TO auth-service (e.g. order-service
+   * asking for a notification email). It must be signed with the shared secret,
+   * issued by `service` and carry `scope`. Customer access tokens and the
+   * tokens auth-service itself issues for the Trade API never match.
+   */
+  verifyInternalServiceToken(token: string, service: string, scope: string): boolean {
+    try {
+      const payload = jwt.verify(token, this.SECRET, {
+        algorithms: ["HS256"],
+        issuer: service,
+      }) as Partial<InternalServiceTokenPayload>;
+      return payload.service === service && payload.scope === scope;
+    } catch {
+      return false;
+    }
+  }
+
   verifyAccessToken(token: string): VerifyResult {
     try {
       const payload = jwt.verify(token, this.SECRET, {
