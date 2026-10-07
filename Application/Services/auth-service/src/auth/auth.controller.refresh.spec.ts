@@ -67,6 +67,17 @@ function makeFakeDatabaseService() {
         // bcrypt.compare, so the fake returns every candidate row.
         return { rows: [...rows], rowCount: rows.length };
       }
+      if (text.includes("UPDATE auth.refresh_tokens SET is_revoked = TRUE WHERE user_id")) {
+        const [userId] = params;
+        let n = 0;
+        for (const r of rows) {
+          if (r.user_id === userId && !r.is_revoked) {
+            r.is_revoked = true;
+            n++;
+          }
+        }
+        return { rowCount: n, rows: [] };
+      }
       if (text.includes("UPDATE auth.refresh_tokens SET is_revoked = TRUE WHERE id")) {
         const [id] = params;
         let n = 0;
@@ -109,6 +120,8 @@ describe("Auth refresh rotation", () => {
   let controller: AuthController;
   let refreshService: RefreshTokenService;
   let fakeDb: ReturnType<typeof makeFakeDatabaseService>;
+  // The trading account's status as the Trade API reports it on refresh.
+  let accountStatus: string;
 
   const fakeUser: any = {
     userId: USER_ID,
@@ -130,6 +143,7 @@ describe("Auth refresh rotation", () => {
 
   beforeEach(async () => {
     fakeDb = makeFakeDatabaseService();
+    accountStatus = "ACTIVE";
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
@@ -154,7 +168,7 @@ describe("Auth refresh rotation", () => {
               accountId: 7,
               accountNumber: "ACC-7",
               availableBalance: "0",
-              accountStatus: "ACTIVE",
+              accountStatus,
             }),
           },
         },
@@ -279,4 +293,37 @@ describe("Auth refresh rotation", () => {
     expect(state.body.errorCode).toBe("AUTH-401");
     expect(state.cleared).toBe(true);
   });
+
+  it("# keeps a suspended account signed in, since only its orders are refused", async () => {
+    accountStatus = "SUSPENDED";
+    const first = await issueInitialRefreshToken();
+    const { res, state } = mockRes();
+
+    await controller.refresh({ refreshToken: first } as any, {} as any, res);
+
+    expect(state.status).toBe(200);
+    expect(state.body.accessToken).toBeDefined();
+  });
+
+  it.each(["BLOCKED", "CLOSED"])(
+    "# ends every session of an account %s while signed in",
+    async (status) => {
+      const first = await issueInitialRefreshToken();
+      const otherDevice = await issueInitialRefreshToken();
+      accountStatus = status;
+      const { res, state } = mockRes();
+
+      await controller.refresh({ refreshToken: first } as any, {} as any, res);
+
+      expect(state.status).toBe(403);
+      expect(state.body).toEqual({ errorCode: "ACC-403", message: "You are blocked from using this service." });
+      expect(state.cleared).toBe(true);
+      expect(fakeDb.rows.every((row) => row.is_revoked)).toBe(true);
+
+      // The token from the other device no longer works either.
+      const again = mockRes();
+      await controller.refresh({ refreshToken: otherDevice } as any, {} as any, again.res);
+      expect(again.state.status).toBe(401);
+    },
+  );
 });

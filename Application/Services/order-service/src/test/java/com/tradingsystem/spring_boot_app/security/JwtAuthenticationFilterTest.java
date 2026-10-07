@@ -2,6 +2,7 @@ package com.tradingsystem.spring_boot_app.security;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tradingsystem.spring_boot_app.service.AccountSessionService;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,12 +33,14 @@ class JwtAuthenticationFilterTest {
     private JwtTokenProvider tokenProvider;
     @Mock
     private FilterChain filterChain;
+    @Mock
+    private AccountSessionService accountSessions;
 
     private JwtAuthenticationFilter filter;
 
     @BeforeEach
     void setUp() {
-        filter = new JwtAuthenticationFilter(tokenProvider);
+        filter = new JwtAuthenticationFilter(tokenProvider, accountSessions);
     }
 
     @Test
@@ -79,6 +82,38 @@ class JwtAuthenticationFilterTest {
         verify(filterChain).doFilter(request, response);
         assertEquals(0L, request.getAttribute(ACCOUNT_ID_ATTRIBUTE));
         assertEquals(List.of("ADMIN"), request.getAttribute("roles"));
+    }
+
+    @Test
+    void validTokenForABlockedOrClosedAccountIsRefusedWithAcc403() throws Exception {
+        MockHttpServletRequest request = request("/api/v1/accounts/me/balance");
+        request.addHeader("Authorization", "Bearer still.valid.token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        when(tokenProvider.extractAccountId("still.valid.token")).thenReturn(17L);
+        when(accountSessions.isLockedOut(17L)).thenReturn(true);
+
+        filter.doFilter(request, response, filterChain);
+
+        JsonNode body = new ObjectMapper().readTree(response.getContentAsString());
+        assertAll(
+                () -> assertEquals(403, response.getStatus()),
+                () -> assertEquals("ACC-403", body.path("errorCode").asText()),
+                () -> assertEquals("Account not active", body.path("message").asText())
+        );
+        verifyNoInteractions(filterChain);
+    }
+
+    @Test
+    void adminTokenIsNotCheckedAgainstATradingAccount() throws Exception {
+        MockHttpServletRequest request = request("/api/v1/admin/health");
+        request.addHeader("Authorization", "Bearer admin.jwt.token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        when(tokenProvider.extractAccountId("admin.jwt.token")).thenReturn(0L);
+
+        filter.doFilter(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        verifyNoInteractions(accountSessions);
     }
 
     @ParameterizedTest

@@ -2,6 +2,7 @@ package com.tradingsystem.spring_boot_app.config;
 
 import com.tradingsystem.spring_boot_app.security.JwtAuthenticationFilter;
 import com.tradingsystem.spring_boot_app.security.JwtTokenProvider;
+import com.tradingsystem.spring_boot_app.service.AccountSessionService;
 import jakarta.servlet.http.HttpServlet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 
 class SecurityConfigCorsTest {
 
@@ -29,7 +31,8 @@ class SecurityConfigCorsTest {
         JwtTokenProvider tokenProvider =
                 new JwtTokenProvider("your-256-bit-secret-key-for-hmac-sha256-token-signing");
         cors = config.corsFilterRegistrationBean(UI_ORIGIN);
-        jwt = config.filterRegistrationBean(config.jwtAuthenticationFilter(tokenProvider));
+        jwt = config.filterRegistrationBean(
+                config.jwtAuthenticationFilter(tokenProvider, mock(AccountSessionService.class)));
     }
 
     @Test

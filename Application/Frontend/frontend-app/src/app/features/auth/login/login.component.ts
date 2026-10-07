@@ -227,6 +227,9 @@ export class LoginComponent {
         return 'Incorrect username or password. Check your details and try again.';
       case 'VAL-422':
         return 'Those details were not accepted. Check your username and password and try again.';
+      // Correct credentials for a BLOCKED or CLOSED account.
+      case 'ACC-403':
+        return "This account can't be used to sign in. Please contact support.";
       default:
         return this.errorMapping.getErrorMessage(err.errorCode);
     }

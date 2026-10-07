@@ -682,7 +682,7 @@ describe("AuthController", () => {
       expect(refreshTokenService.storeRefreshToken).not.toHaveBeenCalled();
     });
 
-    it("rejects a suspended account without issuing or rotating tokens", async () => {
+    it("lets a suspended account sign in, since only its orders are refused", async () => {
       tradeApiClient.getAccountByUserId.mockResolvedValue({
         ...account,
         accountStatus: "SUSPENDED",
@@ -691,20 +691,34 @@ describe("AuthController", () => {
 
       await controller.login(loginRequest(), {} as any, res);
 
-      expect(state).toEqual({
-        status: 403,
-        body: {
-          errorCode: "ACC-403",
-          message: "You are blocked from using this service.",
-        },
-      });
-      expect(tokenService.createAccessToken).not.toHaveBeenCalled();
-      expect(refreshTokenService.revokeAllRefreshTokensForUser).not.toHaveBeenCalled();
-      expect(refreshTokenService.generateRefreshToken).not.toHaveBeenCalled();
-      expect(refreshTokenService.hashRefreshToken).not.toHaveBeenCalled();
-      expect(refreshTokenService.storeRefreshToken).not.toHaveBeenCalled();
-      expect(throttleService.resetThrottle).not.toHaveBeenCalled();
+      expect(state.status).toBe(200);
+      expect(tokenService.createAccessToken).toHaveBeenCalledWith(user.userId, ACCOUNT_ID, ["CUSTOMER"]);
+      expect(refreshTokenService.storeRefreshToken).toHaveBeenCalled();
     });
+
+    it.each(["BLOCKED", "CLOSED", "FROZEN"])(
+      "refuses a %s account with ACC-403 without issuing or rotating tokens",
+      async (accountStatus) => {
+        tradeApiClient.getAccountByUserId.mockResolvedValue({ ...account, accountStatus });
+        const { res, state } = makeResponse();
+
+        await controller.login(loginRequest(), {} as any, res);
+
+        expect(state).toEqual({
+          status: 403,
+          body: {
+            errorCode: "ACC-403",
+            message: "You are blocked from using this service.",
+          },
+        });
+        expect(tokenService.createAccessToken).not.toHaveBeenCalled();
+        expect(refreshTokenService.revokeAllRefreshTokensForUser).not.toHaveBeenCalled();
+        expect(refreshTokenService.generateRefreshToken).not.toHaveBeenCalled();
+        expect(refreshTokenService.hashRefreshToken).not.toHaveBeenCalled();
+        expect(refreshTokenService.storeRefreshToken).not.toHaveBeenCalled();
+        expect(throttleService.resetThrottle).not.toHaveBeenCalled();
+      },
+    );
 
     it("maps unexpected dependency errors to the uniform 401 response", async () => {
       const lookupError = new Error("database unavailable");

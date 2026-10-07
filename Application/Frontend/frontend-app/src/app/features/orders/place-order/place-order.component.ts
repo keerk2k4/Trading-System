@@ -25,6 +25,7 @@ import { TradeApiService } from '../../../shared/services/trade-api.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
 import { WatchlistService } from '../../../shared/services/watchlist.service';
 import { StatusBadgeComponent } from '../../../shared/ui/status-badge.component';
+import { AccountStatusNoticeComponent } from '../../../shared/ui/account-status-notice.component';
 import { OrderSide, PlaceOrderResponse, TradeApiError } from '../../../shared/models/order.models';
 import { WatchlistStock } from '../../../shared/models/watchlist.models';
 
@@ -52,7 +53,7 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
 
 @Component({
   selector: 'app-place-order',
-  imports: [ReactiveFormsModule, RouterLink, CurrencyPipe, DecimalPipe, StatusBadgeComponent],
+  imports: [ReactiveFormsModule, RouterLink, CurrencyPipe, DecimalPipe, StatusBadgeComponent, AccountStatusNoticeComponent],
   template: `
     <div class="tp-page">
       <header class="tp-page-header">
@@ -64,6 +65,8 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
           <a class="tp-btn tp-btn-secondary" routerLink="/orders/history">Order history</a>
         </div>
       </header>
+
+      <app-account-status-notice [status]="accountStatus()" />
 
       <div class="tp-grid tp-grid-main-side">
         <section class="tp-panel" aria-labelledby="ticket-heading">
@@ -336,6 +339,10 @@ export class PlaceOrderComponent implements OnInit {
     return count === 0 ? 'No stocks match.' : `${count} ${count === 1 ? 'stock matches' : 'stocks match'}.`;
   });
 
+  // Only for the suspended notice; the ticket itself works the same for every
+  // status and the Trade API decides whether the order is accepted.
+  protected readonly accountStatus = signal<string | null>(null);
+
   protected readonly submitted = signal(false);
   protected readonly isLoading = signal(false);
   protected readonly errorMessage = signal('');
@@ -346,6 +353,10 @@ export class PlaceOrderComponent implements OnInit {
 
   ngOnInit(): void {
     this.watchlist.loadCatalog();
+    this.orderService
+      .getAccount()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({ next: (account) => this.accountStatus.set(account.status), error: () => undefined });
 
     // Deep link from the watchlist (/orders/new?symbol=AAPL): fill the ticket
     // with that stock. The user's own typing always wins, so only a pristine

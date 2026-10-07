@@ -24,6 +24,7 @@ import { TokenService } from "../services/TokenService";
 import { PasswordService } from "../services/PasswordService";
 import { RefreshTokenService } from "../services/RefreshTokenService";
 import { TradeApiClient } from "../services/TradeApiClient";
+import { canSignIn } from "./account-access";
 import { PHONE_UNIQUE_INDEX, UserRepository } from "../repositories/UserRepository";
 import { isUniqueViolation } from "../database/unique-violation";
 import { ThrottleService } from "../services/ThrottleService";
@@ -515,13 +516,14 @@ export class AuthController {
         return;
       }
 
-      // Do not issue or rotate any credentials for a non-active trading account.
-      if (account.accountStatus?.trim().toUpperCase() == "SUSPENDED") {
+      // BLOCKED and CLOSED accounts get no credentials at all. SUSPENDED may
+      // sign in; the Trade REST API refuses its orders (see account-access.ts).
+      if (!canSignIn(account.accountStatus)) {
         const response: ErrorResponse = {
           errorCode: "ACC-403",
           message: "You are blocked from using this service.",
         };
-        console.log("Login attempt blocked due to suspended trading account for username:", loginRequest.username);
+        console.log("Login refused for username:", loginRequest.username, "trading account status:", account.accountStatus);
         res.status(403).json(response);
         return;
       }
@@ -641,6 +643,7 @@ export class AuthController {
   @ApiOperation({ summary: "Exchange a refresh token for a new token pair" })
   @ApiResponse({ status: 200, description: "A new token pair.", type: TokenResponse })
   @ApiResponse({ status: 401, description: "Unauthorised", type: ErrorResponse })
+  @ApiResponse({ status: 403, description: "The trading account is blocked or closed.", type: ErrorResponse })
   @ApiResponse({ status: 422, description: "Invalid input", type: ErrorResponse })
   async refresh(@Body() refreshRequest: RefreshRequest, @Req() req: ExpressRequest, @Res() res: Response): Promise<void> {
     const unauthorised = (): void => {
@@ -689,6 +692,19 @@ export class AuthController {
             message: "Unauthorised",
           };
           res.status(401).json(response);
+          return;
+        }
+        // An account blocked or closed while signed in must not be kept signed
+        // in by refreshing: end every session it holds.
+        if (!canSignIn(account.accountStatus)) {
+          await this.refreshTokenService.revokeAllRefreshTokensForUser(user.userId);
+          this.clearRefreshCookie(res);
+          const response: ErrorResponse = {
+            errorCode: "ACC-403",
+            message: "You are blocked from using this service.",
+          };
+          console.log("Refresh refused for user:", user.userId, "trading account status:", account.accountStatus);
+          res.status(403).json(response);
           return;
         }
         accountId = account.accountId;

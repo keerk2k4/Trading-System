@@ -43,6 +43,23 @@ describe('DashboardComponent', () => {
     );
   });
 
+  it('tells a suspended customer that orders will be refused', () => {
+    tradeApi.getAccount.and.returnValue(
+      of({ id: 6, accountId: 'ACC-6', holderName: 'Gaurang', cashBalance: 1000, status: 'SUSPENDED', version: 1, lastUpdated: '' })
+    );
+    create({ id: 'u-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] });
+
+    expect(page.querySelector('[data-testid="account-suspended-notice"]')?.textContent).toContain(
+      'Your account is suspended.'
+    );
+  });
+
+  it('shows no suspended notice for an active account', () => {
+    create({ id: 'u-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] });
+
+    expect(page.querySelector('[data-testid="account-suspended-notice"]')).toBeNull();
+  });
+
   it('summarises cash, holdings at cost and the total', () => {
     create({ id: 'u-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] });
 

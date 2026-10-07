@@ -2,6 +2,7 @@ package com.tradingsystem.spring_boot_app.config;
 
 import com.tradingsystem.spring_boot_app.security.JwtAuthenticationFilter;
 import com.tradingsystem.spring_boot_app.security.JwtTokenProvider;
+import com.tradingsystem.spring_boot_app.service.AccountSessionService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -21,8 +22,9 @@ import java.util.List;
 public class SecurityConfig {
     
     @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter(JwtTokenProvider tokenProvider) {
-        return new JwtAuthenticationFilter(tokenProvider);
+    public JwtAuthenticationFilter jwtAuthenticationFilter(JwtTokenProvider tokenProvider,
+                                                           AccountSessionService accountSessions) {
+        return new JwtAuthenticationFilter(tokenProvider, accountSessions);
     }
     
     @Bean

@@ -130,7 +130,7 @@ export class AuthService extends BaseService {
 
     /**
      * Log in and receive tokens
-     * Verifies the credentials and issues an access token and a refresh token. Every credential failure, whatever its cause (unknown username, wrong password, or no trading account provisioned yet), returns the same &#x60;AUTH-401&#x60; body.  If the credentials are valid but the linked trading account is &#x60;SUSPENDED&#x60;, login is refused with &#x60;ACC-403&#x60; instead, and no tokens are issued or rotated. 
+     * Verifies the credentials and issues an access token and a refresh token. Every credential failure, whatever its cause (unknown username, wrong password, or no trading account provisioned yet), returns the same &#x60;AUTH-401&#x60; body.  If the credentials are valid but the linked trading account is &#x60;BLOCKED&#x60; or &#x60;CLOSED&#x60; (or any status other than &#x60;PENDING&#x60;, &#x60;ACTIVE&#x60; or &#x60;SUSPENDED&#x60;), login is refused with &#x60;ACC-403&#x60; instead, and no tokens are issued or rotated.  A &#x60;SUSPENDED&#x60; account signs in normally and can read its account, but the Trade REST API refuses its orders with &#x60;ACC-403&#x60; (business rule 2 accepts orders from &#x60;ACTIVE&#x60; accounts only). 
      * @endpoint post /auth/login
      * @param loginRequest 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.
@@ -331,7 +331,7 @@ export class AuthService extends BaseService {
 
     /**
      * Exchange a refresh token for a new token pair
-     * Consumes the presented refresh token and issues a new pair. The presented token stops working immediately. For a customer token, the trading account is looked up again and a missing account fails the refresh with &#x60;AUTH-401&#x60;, the same as login. An admin token skips the account lookup (&#x60;accountId&#x60; stays &#x60;0&#x60;). 
+     * Consumes the presented refresh token and issues a new pair. The presented token stops working immediately. For a customer token, the trading account is looked up again and a missing account fails the refresh with &#x60;AUTH-401&#x60;, the same as login, and an account that is no longer allowed to sign in (&#x60;BLOCKED&#x60;, &#x60;CLOSED&#x60;) fails it with &#x60;ACC-403&#x60; and has every one of its refresh tokens revoked, so a customer blocked while signed in cannot stay signed in by refreshing. An admin token skips the account lookup (&#x60;accountId&#x60; stays &#x60;0&#x60;). 
      * @endpoint post /auth/refresh
      * @param refreshRequest 
      * @param observe set whether or not to return the data Observable as the body, response or events. defaults to returning the body.

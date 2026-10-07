@@ -131,6 +131,19 @@ describe('LoginComponent', () => {
     expect(TestBed.inject(Router).url).toBe('/login');
   });
 
+  it('tells a blocked or closed account it cannot sign in', async () => {
+    auth.login.and.returnValue(
+      throwError(() => ({ errorCode: 'ACC-403', message: 'You are blocked from using this service.', status: 403 }))
+    );
+    await open('/login');
+    type('login-username', 'gaurang123');
+    type('login-password', 'correct password');
+    submit();
+
+    expect(alertText()).toBe("This account can't be used to sign in. Please contact support.");
+    expect(TestBed.inject(Router).url).toBe('/login');
+  });
+
   it('shows a connection message when the auth service is unreachable', async () => {
     auth.login.and.returnValue(throwError(() => ({ errorCode: '', message: 'Unexpected error', status: 0 })));
     await open('/login');

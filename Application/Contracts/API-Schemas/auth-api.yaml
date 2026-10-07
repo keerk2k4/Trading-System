@@ -457,8 +457,12 @@ paths:
         failure, whatever its cause (unknown username, wrong password, or no trading account
         provisioned yet), returns the same `AUTH-401` body.
 
-        If the credentials are valid but the linked trading account is `SUSPENDED`, login is refused
-        with `ACC-403` instead, and no tokens are issued or rotated.
+        If the credentials are valid but the linked trading account is `BLOCKED` or `CLOSED` (or any
+        status other than `PENDING`, `ACTIVE` or `SUSPENDED`), login is refused with `ACC-403`
+        instead, and no tokens are issued or rotated.
+
+        A `SUSPENDED` account signs in normally and can read its account, but the Trade REST API
+        refuses its orders with `ACC-403` (business rule 2 accepts orders from `ACTIVE` accounts only).
       requestBody:
         required: true
         content:
@@ -480,13 +484,13 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorised'
         '403':
-          description: The linked trading account is suspended.
+          description: The linked trading account is blocked or closed.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               examples:
-                suspended:
+                blocked:
                   value:
                     errorCode: ACC-403
                     message: You are blocked from using this service.
@@ -530,8 +534,10 @@ paths:
       description: |
         Consumes the presented refresh token and issues a new pair. The presented token stops working
         immediately. For a customer token, the trading account is looked up again and a missing
-        account fails the refresh with `AUTH-401`, the same as login. An admin token skips the
-        account lookup (`accountId` stays `0`).
+        account fails the refresh with `AUTH-401`, the same as login, and an account that is no longer
+        allowed to sign in (`BLOCKED`, `CLOSED`) fails it with `ACC-403` and has every one of its
+        refresh tokens revoked, so a customer blocked while signed in cannot stay signed in by
+        refreshing. An admin token skips the account lookup (`accountId` stays `0`).
       requestBody:
         required: true
         content:
@@ -547,6 +553,17 @@ paths:
                 $ref: '#/components/schemas/TokenResponse'
         '401':
           $ref: '#/components/responses/Unauthorised'
+        '403':
+          description: The trading account is blocked or closed. Every refresh token it held is revoked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                blocked:
+                  value:
+                    errorCode: ACC-403
+                    message: You are blocked from using this service.
         '422':
           $ref: '#/components/responses/InvalidInput'
 

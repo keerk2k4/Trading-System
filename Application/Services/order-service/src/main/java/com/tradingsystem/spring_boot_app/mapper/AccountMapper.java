@@ -215,4 +215,15 @@ Optional<Account> findAccountByUserId(@Param("userId") String userId);
     WHERE trading_account_id = #{accountId}
     """)
     Optional<String> findUserIdByAccountId(@Param("accountId") Long accountId);
+
+    /**
+     * Only the status, by primary key: the per-request check in
+     * JwtAuthenticationFilter runs this on every customer call.
+     */
+    @Select("""
+    SELECT account_status
+    FROM trading.trading_accounts
+    WHERE trading_account_id = #{accountId}
+    """)
+    Optional<String> findAccountStatusById(@Param("accountId") Long accountId);
 }

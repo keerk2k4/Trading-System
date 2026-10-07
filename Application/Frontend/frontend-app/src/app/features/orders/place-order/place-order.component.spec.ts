@@ -36,7 +36,10 @@ describe('PlaceOrderComponent', () => {
   }
 
   beforeEach(() => {
-    tradeApi = jasmine.createSpyObj<TradeApiService>('TradeApiService', ['placeOrder', 'searchInstruments']);
+    tradeApi = jasmine.createSpyObj<TradeApiService>('TradeApiService', ['placeOrder', 'searchInstruments', 'getAccount']);
+    tradeApi.getAccount.and.returnValue(
+      of({ id: 6, accountId: 'ACC-6', holderName: 'Gaurang', cashBalance: 1000, status: 'ACTIVE', version: 1, lastUpdated: '' })
+    );
     const catalog: InstrumentResponse[] = [
       { symbol: 'AAPL', name: 'Apple Inc.', price: 189.234, change: 1.2, changePercent: 0.6 },
       { symbol: 'MSFT', name: 'Microsoft Corporation', price: 410.5, change: -2, changePercent: -0.5 }
@@ -244,6 +247,31 @@ describe('PlaceOrderComponent', () => {
     const rows = second.nativeElement.querySelectorAll('[data-testid="order-search-row"]');
     expect(rows.length).toBe(1);
     expect(rows[0].textContent).toContain('MSFT');
+  });
+
+  it('warns a suspended customer and still sends the order, leaving the decision to the server', () => {
+    tradeApi.getAccount.and.returnValue(
+      of({ id: 6, accountId: 'ACC-6', holderName: 'Gaurang', cashBalance: 1000, status: 'SUSPENDED', version: 1, lastUpdated: '' })
+    );
+    tradeApi.placeOrder.and.returnValue(
+      throwError(() => ({ errorCode: 'ACC-403', message: 'Account not active', status: 403 }))
+    );
+    const suspended = TestBed.createComponent(PlaceOrderComponent);
+    suspended.detectChanges();
+    page = suspended.nativeElement;
+    fixture = suspended;
+
+    expect(el('[data-testid="account-suspended-notice"]').textContent).toContain('Your account is suspended.');
+
+    fillValidOrder();
+    submit();
+
+    expect(tradeApi.placeOrder).toHaveBeenCalledTimes(1);
+    expect(el('[role="alert"]').textContent).toContain('not active');
+  });
+
+  it('shows no suspended notice for an active account', () => {
+    expect(page.querySelector('[data-testid="account-suspended-notice"]')).toBeNull();
   });
 
   it('shows a business rejection from the server and keeps the ticket for correction', () => {

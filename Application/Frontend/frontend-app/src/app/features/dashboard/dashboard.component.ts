@@ -9,6 +9,7 @@ import { TradeApiService } from '../../shared/services/trade-api.service';
 import { ErrorMappingService } from '../../shared/services/error-mapping.service';
 import { StatusBadgeComponent } from '../../shared/ui/status-badge.component';
 import { PnlValueComponent } from '../../shared/ui/pnl-value.component';
+import { AccountStatusNoticeComponent } from '../../shared/ui/account-status-notice.component';
 import { Account, Position, TradeApiError } from '../../shared/models/order.models';
 
 interface PortfolioSummary {
@@ -23,7 +24,7 @@ interface PortfolioSummary {
 
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, CurrencyPipe, DatePipe, DecimalPipe, StatusBadgeComponent, PnlValueComponent],
+  imports: [RouterLink, CurrencyPipe, DatePipe, DecimalPipe, StatusBadgeComponent, PnlValueComponent, AccountStatusNoticeComponent],
   template: `
     <div class="tp-page">
       <header class="tp-page-header">
@@ -36,6 +37,8 @@ interface PortfolioSummary {
           <a class="tp-btn tp-btn-primary tp-btn-icon-plus" data-icon routerLink="/orders/new">Place order</a>
         </div>
       </header>
+
+      <app-account-status-notice [status]="account()?.status" />
 
       @if (errorMessage(); as message) {
         <div class="tp-alert tp-alert-error" role="alert" data-testid="dashboard-error"><span>{{ message }}</span></div>

@@ -4,5 +4,6 @@ public enum AccountStatus {
     PENDING,
     ACTIVE,
     SUSPENDED,
+    BLOCKED,
     CLOSED
 }
