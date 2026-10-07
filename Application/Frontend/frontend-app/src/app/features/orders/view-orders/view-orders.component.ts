@@ -98,12 +98,14 @@ export const POLL_MAX_DURATION_MS = 5 * 60_000;
                   <th scope="col">Created</th>
                   <th scope="col">Symbol</th>
                   <th scope="col">Side</th>
+                  <th scope="col">Type</th>
                   <th scope="col" class="num">Quantity</th>
                   <th scope="col" class="num">Limit price</th>
                   <th scope="col" class="num">Fill price</th>
                   <th scope="col">Status</th>
                   <th scope="col" class="num">Realized P&amp;L</th>
                   <th scope="col" class="num">P&amp;L %</th>
+                  <th scope="col">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -117,13 +119,94 @@ export const POLL_MAX_DURATION_MS = 5 * 60_000;
                         <strong>{{ order.side === 'BUY' ? 'Buy' : 'Sell' }}</strong>
                       </span>
                     </td>
+                    <td data-testid="order-type">{{ order.orderType ?? 'LIMIT' }}</td>
                     <td class="num">{{ order.quantity | number }}</td>
-                    <td class="num">{{ order.price | currency }}</td>
+                    <td class="num">{{ (order.price | currency) ?? '—' }}</td>
                     <td class="num">{{ (order.executedPrice | currency) ?? '—' }}</td>
                     <td><app-status-badge data-testid="order-status" [status]="order.status" /></td>
                     <!-- Only FILLED SELL orders realise P&L; everything else shows a muted dash. -->
                     <td class="num" data-testid="order-realized-pnl"><app-pnl-value [value]="order.realizedPnl" /></td>
                     <td class="num" data-testid="order-realized-pnl-percent"><app-pnl-value kind="percent" [value]="order.realizedPnlPercent" /></td>
+                    <td>
+                      @if (order.status === 'NEW') {
+                        @if (editingOrderId() === order.orderId) {
+                          <div class="tp-edit" data-testid="order-edit-form">
+                            <input
+                              class="tp-input tp-num"
+                              type="number"
+                              min="1"
+                              step="1"
+                              data-testid="order-edit-quantity"
+                              [value]="editQuantity()"
+                              (input)="editQuantity.set($any($event.target).valueAsNumber)"
+                              aria-label="Updated quantity"
+                            />
+                            @if ((order.orderType ?? 'LIMIT') === 'LIMIT') {
+                              <input
+                                class="tp-input tp-num"
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                data-testid="order-edit-price"
+                                [value]="editPrice()"
+                                (input)="editPrice.set($any($event.target).valueAsNumber)"
+                                aria-label="Updated limit price"
+                              />
+                            }
+                            <button
+                              class="tp-btn tp-btn-primary"
+                              type="button"
+                              data-testid="order-edit-save"
+                              [attr.aria-disabled]="isActing() ? 'true' : null"
+                              (click)="saveEdit(order)"
+                            >
+                              {{ isActing() ? 'Saving…' : 'Save' }}
+                            </button>
+                            <button
+                              class="tp-btn tp-btn-secondary"
+                              type="button"
+                              data-testid="order-edit-cancel"
+                              (click)="cancelEdit()"
+                            >
+                              Back
+                            </button>
+                          </div>
+                          @if (actionError(); as message) {
+                            <p class="tp-field-error" data-testid="order-action-error">{{ message }}</p>
+                          }
+                        } @else {
+                          <div class="tp-actions">
+                            @if ((order.orderType ?? 'LIMIT') === 'LIMIT') {
+                              <button
+                                class="tp-btn tp-btn-secondary"
+                                type="button"
+                                data-testid="order-edit"
+                                [attr.data-order-id]="order.orderId"
+                                [attr.aria-disabled]="isActing() ? 'true' : null"
+                                (click)="startEdit(order)"
+                              >
+                                Update
+                              </button>
+                            }
+                            <button
+                              class="tp-btn tp-btn-secondary"
+                              type="button"
+                              data-testid="order-cancel"
+                              [attr.data-order-id]="order.orderId"
+                              [attr.aria-disabled]="isActing() ? 'true' : null"
+                              (click)="cancelOrder(order)"
+                            >
+                              {{ isActing() ? 'Working…' : 'Cancel' }}
+                            </button>
+                          </div>
+                          @if (actionError() && actionOrderId() === order.orderId) {
+                            <p class="tp-field-error" data-testid="order-action-error">{{ actionError() }}</p>
+                          }
+                        }
+                      } @else {
+                        <span class="tp-muted">—</span>
+                      }
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -134,8 +217,8 @@ export const POLL_MAX_DURATION_MS = 5 * 60_000;
         <details class="guide" data-testid="status-guide">
           <summary>What do the statuses mean?</summary>
           <dl>
-            <div><dt><app-status-badge status="NEW" /></dt><dd>Submitted and waiting for execution. This is the normal state.</dd></div>
-            <div><dt><app-status-badge status="FILLED" /></dt><dd>Executed successfully.</dd></div>
+            <div><dt><app-status-badge status="NEW" /></dt><dd>Submitted and waiting for execution. Limit orders stay here about 15 seconds and can be updated or cancelled; market orders fill immediately.</dd></div>
+            <div><dt><app-status-badge status="FILLED" /></dt><dd>Executed successfully. Positions update at once; holdings follow after about 15 seconds of settlement.</dd></div>
             <div><dt><app-status-badge status="REJECTED" /></dt><dd>Rejected by the system.</dd></div>
             <div><dt><app-status-badge status="CANCELLED" /></dt><dd>Cancelled by you or the system.</dd></div>
           </dl>
@@ -167,6 +250,15 @@ export class ViewOrdersComponent implements OnInit {
   protected readonly isRefreshing = signal(false);
   protected readonly errorMessage = signal('');
 
+  // Cancel/update state. Only NEW orders show actions; MARKET orders execute
+  // immediately so their window is effectively zero, LIMIT orders have ~15s.
+  protected readonly isActing = signal(false);
+  protected readonly actionError = signal('');
+  protected readonly actionOrderId = signal<string | null>(null);
+  protected readonly editingOrderId = signal<string | null>(null);
+  protected readonly editQuantity = signal<number | null>(null);
+  protected readonly editPrice = signal<number | null>(null);
+
   /** True while the blotter is re-reading the list every POLL_INTERVAL_MS. */
   readonly isPolling = signal(false);
   private pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -185,6 +277,84 @@ export class ViewOrdersComponent implements OnInit {
     if (!this.isRefreshing()) {
       this.loadOrders();
     }
+  }
+
+  /** Cancel a NEW order. The blotter re-reads afterwards so the terminal state shows. */
+  protected cancelOrder(order: Order): void {
+    if (this.isActing()) {
+      return;
+    }
+    this.isActing.set(true);
+    this.actionError.set('');
+    this.actionOrderId.set(order.orderId);
+    this.orderService.cancelOrder(order.orderId).subscribe({
+      next: () => {
+        this.isActing.set(false);
+        this.actionOrderId.set(null);
+        this.loadOrders(true);
+      },
+      error: (err: TradeApiError) => {
+        this.isActing.set(false);
+        this.actionError.set(
+          this.errorMapping.isNetworkError(err.status)
+            ? this.errorMapping.getNetworkErrorMessage()
+            : this.errorMapping.getErrorMessage(err.errorCode)
+        );
+      }
+    });
+  }
+
+  /** Open the inline editor seeded with the order's current values. */
+  protected startEdit(order: Order): void {
+    this.actionError.set('');
+    this.actionOrderId.set(null);
+    this.editingOrderId.set(order.orderId);
+    this.editQuantity.set(order.quantity);
+    this.editPrice.set(order.price ?? null);
+  }
+
+  protected cancelEdit(): void {
+    this.editingOrderId.set(null);
+    this.editQuantity.set(null);
+    this.editPrice.set(null);
+    this.actionError.set('');
+  }
+
+  /** Save quantity and/or limit price for a NEW LIMIT order. */
+  protected saveEdit(order: Order): void {
+    if (this.isActing()) {
+      return;
+    }
+    const quantity = this.editQuantity();
+    const price = (order.orderType ?? 'LIMIT') === 'LIMIT' ? this.editPrice() : null;
+    if ((quantity === null || Number.isNaN(quantity)) && (price === null || Number.isNaN(price as number))) {
+      this.actionError.set('Enter a new quantity or price.');
+      return;
+    }
+    this.isActing.set(true);
+    this.actionError.set('');
+    this.actionOrderId.set(order.orderId);
+    this.orderService
+      .updateOrder(order.orderId, {
+        ...(quantity !== null && !Number.isNaN(quantity) && quantity !== order.quantity ? { quantity } : {}),
+        ...(price !== null && !(Number.isNaN(price as number)) && price !== order.price ? { price: price as number } : {})
+      })
+      .subscribe({
+        next: () => {
+          this.isActing.set(false);
+          this.actionOrderId.set(null);
+          this.cancelEdit();
+          this.loadOrders(true);
+        },
+        error: (err: TradeApiError) => {
+          this.isActing.set(false);
+          this.actionError.set(
+            this.errorMapping.isNetworkError(err.status)
+              ? this.errorMapping.getNetworkErrorMessage()
+              : this.errorMapping.getErrorMessage(err.errorCode)
+          );
+        }
+      });
   }
 
   // A background poll leaves the loading state alone, so the table and its

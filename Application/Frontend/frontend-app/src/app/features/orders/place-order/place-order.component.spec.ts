@@ -36,7 +36,10 @@ describe('PlaceOrderComponent', () => {
   }
 
   beforeEach(() => {
-    tradeApi = jasmine.createSpyObj<TradeApiService>('TradeApiService', ['placeOrder', 'searchInstruments', 'getAccount']);
+    tradeApi = jasmine.createSpyObj<TradeApiService>('TradeApiService', ['placeOrder', 'searchInstruments', 'getAccount', 'getQuote']);
+    tradeApi.getQuote.and.returnValue(
+      of({ symbol: 'AAPL', price: 189.23, bid: 189.2, ask: 189.26, currency: 'USD', change: 1.2, changePercent: 0.6 })
+    );
     tradeApi.getAccount.and.returnValue(
       of({ id: 6, accountId: 'ACC-6', holderName: 'Gaurang', cashBalance: 1000, status: 'ACTIVE', version: 1, lastUpdated: '' })
     );

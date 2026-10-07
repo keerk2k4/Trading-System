@@ -2,11 +2,13 @@ package com.tradingsystem.spring_boot_app.controller;
 
 import com.tradingsystem.domain.enums.OrderSide;
 import com.tradingsystem.domain.enums.OrderStatus;
+import com.tradingsystem.domain.enums.OrderType;
 import com.tradingsystem.exception.AccountNotActiveException;
 import com.tradingsystem.exception.AccountNotFoundException;
 import com.tradingsystem.spring_boot_app.dto.AccountResponse;
 import com.tradingsystem.spring_boot_app.dto.AccountStatus;
 import com.tradingsystem.spring_boot_app.dto.BalanceResponse;
+import com.tradingsystem.spring_boot_app.dto.HoldingResponse;
 import com.tradingsystem.spring_boot_app.dto.OrderHistoryEntry;
 import com.tradingsystem.spring_boot_app.dto.PositionResponse;
 import com.tradingsystem.spring_boot_app.exception.UnauthorisedException;
@@ -161,9 +163,30 @@ class AccountControllerTest {
     }
 
     @Test
+    void getHoldingsAnswers200WithContractBody() throws Exception {
+        when(accounts.getHoldings(eq(1L))).thenReturn(List.of(
+                new HoldingResponse(1L, "ACME", 100, new BigDecimal("25.50"),
+                        new BigDecimal("27.00"), new BigDecimal("2700.00"),
+                        new BigDecimal("150.00"), new BigDecimal("5.88"))));
+
+        mvc.perform(get("/api/v1/accounts/{id}/holdings", 1).header("Authorization", TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].accountId").value(1))
+                .andExpect(jsonPath("$[0].symbol").value("ACME"))
+                .andExpect(jsonPath("$[0].quantity").value(100))
+                .andExpect(jsonPath("$[0].averageCost").value(25.50))
+                .andExpect(jsonPath("$[0].currentPrice").value(27.00))
+                .andExpect(jsonPath("$[0].marketValue").value(2700.00));
+
+        mvc.perform(get("/api/v1/accounts/me/holdings").header("Authorization", TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].accountId").value(1));
+    }
+
+    @Test
     void getOrdersAnswers200WithContractBody() throws Exception {
         when(accounts.getOrders(eq(1L), any(), any(), any())).thenReturn(List.of(
-                new OrderHistoryEntry("ORD-" + UUID, 1L, "ACME", OrderSide.SELL, 100,
+                new OrderHistoryEntry("ORD-" + UUID, 1L, "ACME", OrderSide.SELL, OrderType.LIMIT, 100,
                         new BigDecimal("25.50"), new BigDecimal("25.48"), OrderStatus.FILLED,
                         UUID, NOW, new BigDecimal("200.00"), new BigDecimal("8.00"))));
 

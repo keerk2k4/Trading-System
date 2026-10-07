@@ -68,6 +68,48 @@ class SecurityConfigCorsTest {
                     .toUpperCase().contains("PATCH")));
             }
 
+            @Test
+            void putPreflightFromUiOriginIsAnsweredWithoutReachingJwtFilter() throws Exception {
+            MockHttpServletRequest request = preflight(UI_ORIGIN, "PUT");
+            MockHttpServletResponse response = new MockHttpServletResponse();
+
+            run(request, response);
+
+            assertAll(
+                () -> assertEquals(200, response.getStatus()),
+                () -> assertEquals(UI_ORIGIN, response.getHeader("Access-Control-Allow-Origin")),
+                () -> assertTrue(response.getHeader("Access-Control-Allow-Methods")
+                    .toUpperCase().contains("PUT")));
+            }
+
+    @Test
+    void preflightsForEveryUiRouteShareOnePolicy() throws Exception {
+        String[] paths = {
+            "/api/v1/orders",
+            "/api/v1/orders/1",
+            "/api/v1/accounts/me",
+            "/api/v1/accounts/me/positions",
+            "/api/v1/accounts/me/holdings",
+            "/api/v1/instruments/AAPL/quote",
+            "/api/v1/preferences/me",
+            "/api/v1/notifications/me"
+        };
+        String[] methods = {"GET", "POST", "PUT", "PATCH", "DELETE"};
+        for (String path : paths) {
+            for (String method : methods) {
+                MockHttpServletRequest request = preflight(UI_ORIGIN, method, path);
+                MockHttpServletResponse response = new MockHttpServletResponse();
+
+                run(request, response);
+
+                assertAll(
+                    () -> assertEquals(200, response.getStatus(), method + " " + path),
+                    () -> assertEquals(UI_ORIGIN,
+                        response.getHeader("Access-Control-Allow-Origin"), method + " " + path));
+            }
+        }
+    }
+
     @Test
     void preflightFromOtherOriginIsRejected() throws Exception {
         MockHttpServletRequest request = preflight("http://evil.example");
@@ -99,8 +141,12 @@ class SecurityConfigCorsTest {
     }
 
     private MockHttpServletRequest preflight(String origin, String method) {
-        MockHttpServletRequest request = new MockHttpServletRequest("OPTIONS", "/api/v1/orders");
-        request.setRequestURI("/api/v1/orders");
+        return preflight(origin, method, "/api/v1/orders");
+    }
+
+    private MockHttpServletRequest preflight(String origin, String method, String path) {
+        MockHttpServletRequest request = new MockHttpServletRequest("OPTIONS", path);
+        request.setRequestURI(path);
         request.addHeader("Origin", origin);
         request.addHeader("Access-Control-Request-Method", method);
         request.addHeader("Access-Control-Request-Headers", "authorization,content-type");

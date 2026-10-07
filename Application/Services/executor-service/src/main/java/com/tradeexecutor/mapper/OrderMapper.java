@@ -146,5 +146,11 @@ public interface OrderMapper {
     int recordRealizedPnl(@Param("orderId") Long orderId,
                           @Param("averageCost") BigDecimal averageCost,
                           @Param("realizedPnl") BigDecimal realizedPnl);
+
+    @Select("SELECT filled_price FROM orders WHERE order_id = #{orderId}")
+    Optional<BigDecimal> findFilledPrice(@Param("orderId") Long orderId);
+
+    @Select("SELECT status FROM orders WHERE order_id = #{orderId}")
+    Optional<String> findOrderStatus(@Param("orderId") Long orderId);
 }
 

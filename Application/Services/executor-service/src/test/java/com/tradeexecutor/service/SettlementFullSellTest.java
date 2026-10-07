@@ -71,8 +71,8 @@ class SettlementFullSellTest {
     }
 
     @Test
-    @DisplayName("SELL of the full quantity deletes the position and holding rows")
-    void fullSellDeletesPositionAndHolding() {
+    @DisplayName("SELL of the full quantity deletes the holding row and leaves positions alone")
+    void fullSellDeletesHoldingOnly() {
         Instrument instrument = new Instrument(7L, "AAPL", "Apple Inc.", AssetClass.EQUITY, "USD");
         Order sell = order(11L, 1L, instrument);
 
@@ -83,10 +83,6 @@ class SettlementFullSellTest {
         when(accountMapper.getAccountVersion(1L)).thenReturn(Optional.of(0L));
         when(accountMapper.updateAvailableBalanceOptimistic(anyLong(), any(), anyLong())).thenReturn(1);
         when(orderMapper.findOrderById(11L)).thenReturn(Optional.of(sell));
-
-        Position current = position(99L, account, instrument, 10);
-        when(positionMapper.findPositionByAccountAndInstrument(1L, 7L)).thenReturn(Optional.of(current));
-        when(positionMapper.deletePosition(99L)).thenReturn(1);
         when(orderMapper.recordRealizedPnl(anyLong(), any(), any())).thenReturn(1);
 
         Holding holding = org.mockito.Mockito.mock(Holding.class);
@@ -99,16 +95,17 @@ class SettlementFullSellTest {
         service.settleOrder(11L, 1L, new BigDecimal("100.00"), 10, OrderSide.SELL,
                 ExecutionResult.filled(new BigDecimal("100.00")));
 
-        verify(positionMapper).deletePosition(99L);
+        verify(positionMapper, never()).findPositionByAccountAndInstrument(anyLong(), anyLong());
         verify(positionMapper, never()).updatePosition(anyLong(), anyInt(), any());
+        verify(positionMapper, never()).deletePosition(anyLong());
         verify(holdingMapper).deleteHolding(55L);
         // (100.00 - 90.00 average cost) x 10
         verify(orderMapper).recordRealizedPnl(11L, new BigDecimal("90.00"), new BigDecimal("100.0000"));
     }
 
     @Test
-    @DisplayName("Partial SELL keeps the position with reduced quantity")
-    void partialSellKeepsPosition() {
+    @DisplayName("Partial SELL reduces the holding and leaves positions alone")
+    void partialSellReducesHoldingOnly() {
         Instrument instrument = new Instrument(7L, "AAPL", "Apple Inc.", AssetClass.EQUITY, "USD");
         Order sell = order(12L, 1L, instrument);
 
@@ -119,10 +116,6 @@ class SettlementFullSellTest {
         when(accountMapper.getAccountVersion(1L)).thenReturn(Optional.of(0L));
         when(accountMapper.updateAvailableBalanceOptimistic(anyLong(), any(), anyLong())).thenReturn(1);
         when(orderMapper.findOrderById(12L)).thenReturn(Optional.of(sell));
-
-        Position current = position(99L, account, instrument, 10);
-        when(positionMapper.findPositionByAccountAndInstrument(1L, 7L)).thenReturn(Optional.of(current));
-        when(positionMapper.updatePosition(anyLong(), anyInt(), any())).thenReturn(1);
         when(orderMapper.recordRealizedPnl(anyLong(), any(), any())).thenReturn(1);
 
         Holding holding = org.mockito.Mockito.mock(Holding.class);
@@ -135,7 +128,9 @@ class SettlementFullSellTest {
         service.settleOrder(12L, 1L, new BigDecimal("100.00"), 4, OrderSide.SELL,
                 ExecutionResult.filled(new BigDecimal("100.00")));
 
-        verify(positionMapper).updatePosition(99L, 6, new BigDecimal("90.00"));
+        verify(holdingMapper).updateHolding(55L, 6, new BigDecimal("90.00"));
+        verify(positionMapper, never()).findPositionByAccountAndInstrument(anyLong(), anyLong());
+        verify(positionMapper, never()).updatePosition(anyLong(), anyInt(), any());
         verify(positionMapper, never()).deletePosition(anyLong());
         // (100.00 - 90.00 average cost) x 4
         verify(orderMapper).recordRealizedPnl(12L, new BigDecimal("90.00"), new BigDecimal("40.0000"));

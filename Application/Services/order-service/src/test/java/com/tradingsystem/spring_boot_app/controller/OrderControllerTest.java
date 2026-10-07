@@ -108,8 +108,21 @@ class OrderControllerTest {
                         .header("Authorization", TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validBody().replace("}", ",\"accountId\":999}")))
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.errorCode").value("VAL-422"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderId").value("ORD-" + UUID))
+                .andExpect(jsonPath("$.status").value("FILLED"));
+    }
+
+    @Test
+    void placeOrderToleratesBodyAccountIdBecauseJwtIsAuthoritative() throws Exception {
+        when(orders.placeOrder(any())).thenReturn(filled());
+
+        mvc.perform(post("/api/v1/orders")
+                        .header("Authorization", TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validBody().replace("}", ",\"accountId\":999}")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FILLED"));
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.tradingsystem.spring_boot_app.controller;
 import com.tradingsystem.domain.enums.OrderStatus;
 import com.tradingsystem.spring_boot_app.dto.AccountResponse;
 import com.tradingsystem.spring_boot_app.dto.BalanceResponse;
+import com.tradingsystem.spring_boot_app.dto.HoldingResponse;
 import com.tradingsystem.spring_boot_app.dto.OrderHistoryEntry;
 import com.tradingsystem.spring_boot_app.dto.PositionResponse;
 import com.tradingsystem.spring_boot_app.dto.UpdateBalanceRequest;
@@ -117,6 +118,24 @@ public class AccountController {
         long accountId = authService.authenticatedAccountId(request);
         List<PositionResponse> positions = accounts.getPositions(accountId);
         return ResponseEntity.ok(positions);
+    }
+
+    @Operation(summary = "List the signed-in trader's settled holdings (path id is resolved from the token)")
+    @GetMapping(value = "/{id}/holdings", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<List<HoldingResponse>> getHoldings(
+            @PathVariable("id") @Min(1) long id,
+            HttpServletRequest request) {
+        long accountId = authService.authenticatedAccountId(request);
+        List<HoldingResponse> holdings = accounts.getHoldings(accountId);
+        return ResponseEntity.ok(holdings);
+    }
+
+    @Operation(summary = "List the signed-in trader's settled holdings")
+    @GetMapping(value = "/me/holdings", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<List<HoldingResponse>> getMyHoldings(HttpServletRequest request) {
+        long accountId = authService.authenticatedAccountId(request);
+        List<HoldingResponse> holdings = accounts.getHoldings(accountId);
+        return ResponseEntity.ok(holdings);
     }
 
     @Operation(summary = "List the signed-in trader's orders, optionally filtered by status and time range (path id is resolved from the token)")

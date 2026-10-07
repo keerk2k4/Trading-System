@@ -30,7 +30,7 @@ describe('DashboardComponent', () => {
   const statValues = () => Array.from(page.querySelectorAll('.tp-stat-value')).map((v) => v.textContent?.trim());
 
   beforeEach(() => {
-    tradeApi = jasmine.createSpyObj<TradeApiService>('TradeApiService', ['getAccount', 'getBalance', 'getPositions']);
+    tradeApi = jasmine.createSpyObj<TradeApiService>('TradeApiService', ['getAccount', 'getBalance', 'getPositions', 'getHoldings']);
     tradeApi.getAccount.and.returnValue(
       of({ id: 6, accountId: 'ACC-6', holderName: 'Gaurang', cashBalance: 1000, status: 'ACTIVE', version: 1, lastUpdated: '' })
     );
@@ -41,6 +41,7 @@ describe('DashboardComponent', () => {
         { accountId: 6, symbol: 'MSFT', quantity: 2, averageCost: 400 }
       ])
     );
+    tradeApi.getHoldings.and.returnValue(of([]));
   });
 
   it('tells a suspended customer that orders will be refused', () => {
@@ -114,8 +115,26 @@ describe('DashboardComponent', () => {
     expect(total.querySelector('[data-testid="positions-total-pnl-percent"] app-pnl-value')?.textContent?.trim()).toBe('+2.70%');
   });
 
-  it('explains a missing trading account when the backend returns ACC-404', () => {
-    tradeApi.getAccount.and.returnValue(throwError(() => ({ errorCode: 'ACC-404', message: '', status: 404 })));
+  it('shows settled holdings beside positions and counts them towards the total', () => {
+    tradeApi.getPositions.and.returnValue(of([]));
+    tradeApi.getHoldings.and.returnValue(
+      of([
+        { accountId: 6, symbol: 'ACME', quantity: 100, averageCost: 25, currentPrice: 27, marketValue: 2700, unrealizedPnl: 200, unrealizedPnlPercent: 8 }
+      ])
+    );
+    create({ id: 'u-1', username: 'gaurang123', accountId: 6, roles: ['CUSTOMER'] });
+
+    const rows = page.querySelectorAll('[data-testid="holding-row"]');
+    expect(rows.length).toBe(1);
+    expect(rows[0].textContent).toContain('ACME');
+    // Cash 1,000 + holdings 2,700 at live price.
+    expect(statValues()).toEqual(['$3,700.00', '$1,000.00', '$2,700.00', '+$200.00', '+8.00%']);
+    expect(page.querySelector('[data-testid="dashboard-holding-count"]')?.textContent).toContain('1 settled holding');
+    const total = page.querySelector('[data-testid="holdings-total-row"]')!;
+    expect(total.textContent).toContain('$2,700.00');
+  });
+
+  it('explains a missing trading account when the backend returns ACC-404', () => {    tradeApi.getAccount.and.returnValue(throwError(() => ({ errorCode: 'ACC-404', message: '', status: 404 })));
     create({ id: 'u-1', username: 'gaurang123', accountId: 0, roles: ['CUSTOMER'] });
 
     expect(tradeApi.getAccount).toHaveBeenCalled();

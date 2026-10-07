@@ -131,6 +131,7 @@ public interface OrderMapper {
             o.trading_account_id AS account_id,
             i.symbol AS symbol,
             o.side AS side,
+            o.order_type AS order_type,
             o.quantity AS quantity,
             CAST(o.limit_price AS numeric(18,2)) AS price,
             CAST(o.filled_price AS numeric(18,2)) AS executed_price,
@@ -151,6 +152,7 @@ public interface OrderMapper {
         @Arg(column = "account_id", javaType = Long.class),
         @Arg(column = "symbol", javaType = String.class),
         @Arg(column = "side", javaType = com.tradingsystem.domain.enums.OrderSide.class),
+        @Arg(column = "order_type", javaType = com.tradingsystem.domain.enums.OrderType.class),
         @Arg(column = "quantity", javaType = int.class),
         @Arg(column = "price", javaType = java.math.BigDecimal.class),
         @Arg(column = "executed_price", javaType = java.math.BigDecimal.class),
@@ -212,6 +214,24 @@ public interface OrderMapper {
     int updateOrderStatusIfCurrent(@Param("orderId") Long orderId,
                                    @Param("expectedStatus") OrderStatus expectedStatus,
                                    @Param("nextStatus") OrderStatus nextStatus);
+
+    /**
+     * Guarded in-place update of a working order. Only rows still NEW are
+     * touched, so this races safely with the Trade Executor's NEW -&gt; FILLED
+     * transition after the LIMIT delay. Null fields keep their current value.
+     *
+     * @return 1 when the order was still NEW and updated, 0 otherwise
+     */
+    @Update("""
+        UPDATE trading.orders
+        SET quantity = COALESCE(#{quantity}, quantity),
+            limit_price = COALESCE(#{price}, limit_price),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE order_id = #{orderId} AND status = 'NEW'
+        """)
+    int updateWorkingOrder(@Param("orderId") Long orderId,
+                           @Param("quantity") Integer quantity,
+                           @Param("price") java.math.BigDecimal price);
     
     /**
      * Counts total orders.

@@ -1,7 +1,11 @@
 export * from './accounts.service';
 import { AccountsService } from './accounts.service';
+export * from './notifications.service';
+import { NotificationsService } from './notifications.service';
 export * from './orders.service';
 import { OrdersService } from './orders.service';
+export * from './preferences.service';
+import { PreferencesService } from './preferences.service';
 export * from './watchlists.service';
 import { WatchlistsService } from './watchlists.service';
-export const APIS = [AccountsService, OrdersService, WatchlistsService];
+export const APIS = [AccountsService, NotificationsService, OrdersService, PreferencesService, WatchlistsService];

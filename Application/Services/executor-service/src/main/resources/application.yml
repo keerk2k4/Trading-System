@@ -62,6 +62,19 @@ app:
     poll-interval-ms: ${POLL_INTERVAL_SECONDS:30000}
     min-interval-ms: 30000
 
+  # Order execution timing (contracts/kafka-topics.md "Execution timing").
+  # MARKET orders execute immediately; LIMIT orders wait limit-delay-ms in NEW
+  # so they can be cancelled (DELETE) or updated (PATCH) first.
+  execution:
+    limit-delay-ms: ${APP_EXECUTION_LIMIT_DELAY_MS:15000}
+
+  # Holdings settlement timing (contracts/trade-api.yaml positions description).
+  # A FILLED order settles cash + positions immediately; holdings (demat)
+  # follow after holdings-delay-ms via trading.settlement_jobs.
+  settlement:
+    holdings-delay-ms: ${APP_SETTLEMENT_HOLDINGS_DELAY_MS:15000}
+    optimistic-lock-retries: ${APP_SETTLEMENT_RETRIES:3}
+
 # Health: only the health endpoint is exposed. /actuator/health answers UP or
 # DOWN only, for load balancers and container restarts. It covers the database
 # and Kafka (kafka/KafkaHealthIndicator). The Trade API reads the dependencies

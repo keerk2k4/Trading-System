@@ -662,7 +662,7 @@ Application/Infrastructure/Kafka/scripts/create-topics.sh
    - `mybatis:` is nested under `spring:` in `application.yml` (it should be top-level), so
      `map-underscore-to-camel-case` is probably not applied (mappers use explicit mappings, so it's mostly
      harmless).
-   - The Dockerfile `EXPOSE 8080` but the app listens on 8081.
+    - The Dockerfile exposes 8081 to match the app's `server.port` (fixed; it previously said 8080).
    - The Fauxnance retry default is 3 in code but 1 in the YAML.
    - The `FauxnanceClient` URL default `http://localhost:8080` is the Trade API's port.
    - The group id `trade-executor-group` differs from the contract's `trade-executor`.

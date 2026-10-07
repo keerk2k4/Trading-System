@@ -5,7 +5,9 @@ import { catchError, map } from 'rxjs/operators';
 import {
   AccountsService,
   InstrumentResponse,
+  NotificationsService,
   OrdersService,
+  PreferencesService,
   WatchlistDetailResponse,
   WatchlistResponse,
   WatchlistStockResponse,
@@ -15,12 +17,18 @@ import {
   Account,
   Balance,
   BalanceUpdateRequest,
+  Holding,
+  Notification,
   Order,
   OrderHistoryFilter,
   PlaceOrderRequest,
   PlaceOrderResponse,
   Position,
-  TradeApiError
+  Preferences,
+  Quote,
+  TradeApiError,
+  UpdateOrderRequest,
+  UpdatePreferences
 } from '../models/order.models';
 import { TRADE_API_BASE_URL } from '../api/api-clients';
 
@@ -41,6 +49,8 @@ export class TradeApiService {
   private orders = inject(OrdersService);
   private accounts = inject(AccountsService);
   private watchlists = inject(WatchlistsService);
+  private preferences = inject(PreferencesService);
+  private notifications = inject(NotificationsService);
 
   // GET /api/v1/accounts/me
   getAccount(): Observable<Account> {
@@ -60,6 +70,35 @@ export class TradeApiService {
   getPositions(): Observable<Position[]> {
     return this.accounts
       .getMyPositions()
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // GET /api/v1/accounts/me/holdings — settled holdings only. A filled
+  // DELIVERY buy shows in positions first and moves here after settlement.
+  getHoldings(): Observable<Holding[]> {
+    return this.accounts
+      .getMyHoldings()
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // GET /api/v1/preferences/me
+  getPreferences(): Observable<Preferences> {
+    return this.preferences
+      .getMyPreferences()
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // PUT /api/v1/preferences/me
+  updatePreferences(update: UpdatePreferences): Observable<Preferences> {
+    return this.preferences
+      .updateMyPreferences(update)
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // GET /api/v1/notifications/me — backend inbox, newest first.
+  getNotifications(): Observable<Notification[]> {
+    return this.notifications
+      .getMyNotifications()
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
@@ -88,6 +127,27 @@ export class TradeApiService {
   placeOrder(order: PlaceOrderRequest): Observable<PlaceOrderResponse> {
     return this.orders
       .placeOrder(order)
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // DELETE /api/v1/orders/{id} — cancels a NEW order.
+  cancelOrder(orderId: string): Observable<PlaceOrderResponse> {
+    return this.orders
+      .cancelOrder(orderId.replace(/^ORD-/i, ''))
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // PATCH /api/v1/orders/{id} — updates quantity and/or limit price of a NEW order.
+  updateOrder(orderId: string, update: UpdateOrderRequest): Observable<PlaceOrderResponse> {
+    return this.orders
+      .updateOrder(orderId.replace(/^ORD-/i, ''), update)
+      .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  // GET /api/v1/instruments/{symbol}/quote — latest cached quote for MARKET tickets.
+  getQuote(symbol: string): Observable<Quote> {
+    return this.watchlists
+      .getQuote(symbol.trim().toUpperCase())
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 

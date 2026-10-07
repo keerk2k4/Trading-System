@@ -4,6 +4,7 @@ import com.tradingsystem.domain.dto.PlaceOrderRequest;
 import com.tradingsystem.exception.InvalidOrderArgumentException;
 import com.tradingsystem.spring_boot_app.dto.CreateOrderRequest;
 import com.tradingsystem.spring_boot_app.dto.OrderResponse;
+import com.tradingsystem.spring_boot_app.dto.UpdateOrderRequest;
 import com.tradingsystem.spring_boot_app.service.OrderService;
 import com.tradingsystem.spring_boot_app.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,6 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -63,6 +65,18 @@ public class OrderController {
             HttpServletRequest request) {
         authService.requireBearerToken(request);
         return ResponseEntity.ok(orders.cancelOrder(normaliseOrderId(id)));
+    }
+
+    @Operation(summary = "Update quantity and/or limit price of a working order")
+    @PatchMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<OrderResponse> updateOrder(
+            @PathVariable("id") String id,
+            @Valid @RequestBody UpdateOrderRequest body,
+            HttpServletRequest request) {
+        authService.requireBearerToken(request);
+        body.validateForUpdate(null);
+        return ResponseEntity.ok(orders.updateOrder(normaliseOrderId(id), body.getQuantity(), body.getPrice()));
     }
 
     private String normaliseOrderId(String id) {
