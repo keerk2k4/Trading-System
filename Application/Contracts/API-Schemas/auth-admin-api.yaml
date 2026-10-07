@@ -1,9 +1,9 @@
 openapi: 3.1.0
 
 info:
-  title: Auth Service, health routes
+  title: Auth Service, health and admin routes
   version: 1.0.0
-  summary: The Auth service's own health, for monitors and for the admin dashboard.
+  summary: The Auth service's own health, and the admin customer lookup.
   description: |
     Written by the team. The programme's `auth-api.yaml` is left untouched; these routes live on
     the same service and port, and the Angular UI generates its typed client from this file.
@@ -18,6 +18,14 @@ info:
 
     Both check the service's own database with `SELECT 1`, limited to 2 seconds, and reuse the
     answer for 5 seconds so a flood of calls never reaches the database.
+
+    ## Customer lookup
+
+    `GET /admin/users` finds customers for the admin account screens, by name or by user id.
+    Admins are never returned. Email and phone are stored encrypted with random ciphertext, so
+    they cannot be searched; they are decrypted only to be masked before they leave the service.
+    The trading account (number, status, balance) comes from the Trade REST API
+    (`trade-admin-api.yaml`), matched on `userId`.
   license:
     name: Instructional use only
 
@@ -30,6 +38,8 @@ servers:
 tags:
   - name: Health
     description: The service's own status.
+  - name: Admin
+    description: Admin-only customer lookup.
 
 paths:
   /health:
@@ -85,6 +95,57 @@ paths:
           $ref: '#/components/responses/Unauthorised'
         '403':
           $ref: '#/components/responses/Forbidden'
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      operationId: findUsers
+      summary: Search customers by name or username, or fetch them by id (admin only)
+      description: |
+        Give exactly one of `query` or `ids`. `query` matches anywhere in the username, first
+        name, last name or full name, ignoring case; `%` and `_` are matched literally. `ids` is
+        for naming the accounts in the Trade REST API's account list; anything that is not a user
+        id is ignored. At most 50 customers are returned.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 100
+          example: alice
+        - name: ids
+          in: query
+          required: false
+          description: Comma-separated user ids, at most 50.
+          schema:
+            type: string
+          example: 11111111-2222-4333-8444-555555555555,66666666-7777-4888-9999-aaaaaaaaaaaa
+      responses:
+        '200':
+          description: The matching customers, at most 50.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminUserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Neither or both of `query` and `ids`, or a `query` of the wrong length.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                errorCode: VAL-422
+                message: Invalid input
 
 components:
 
@@ -167,6 +228,35 @@ components:
             Present when the database is down. A fixed sentence, never the driver's error text.
           example: No response within 2 s
 
+    AdminUserResponse:
+      type: object
+      additionalProperties: false
+      required: [userId, username, firstName, lastName, email, phone, kycStatus]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        username:
+          type: string
+          example: alice.trader
+        firstName:
+          type: string
+          example: Alice
+        lastName:
+          type: string
+          example: Trader
+        email:
+          type: [string, 'null']
+          description: Masked, e.g. `a***@example.com`.
+          example: a***@example.com
+        phone:
+          type: [string, 'null']
+          description: Masked to the last four digits, e.g. `******3210`.
+          example: '******3210'
+        kycStatus:
+          type: string
+          enum: [NOT_SUBMITTED, PENDING, APPROVED, REJECTED]
+
     ErrorResponse:
       type: object
       additionalProperties: false
@@ -174,6 +264,6 @@ components:
       properties:
         errorCode:
           type: string
-          enum: [AUTH-401, AUTH-403]
+          enum: [AUTH-401, AUTH-403, VAL-422]
         message:
           type: string

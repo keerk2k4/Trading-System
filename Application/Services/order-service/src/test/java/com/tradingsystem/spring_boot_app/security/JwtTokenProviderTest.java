@@ -160,6 +160,16 @@ class JwtTokenProviderTest {
         assertEquals(0L, provider.extractAccountId(token));
     }
 
+    @Test
+    void extractsTheSubjectOfAValidToken() {
+        assertEquals("admin-under-test", provider.extractSubject(tokenWithRoles(List.of("ADMIN"), SIGNING_KEY)));
+    }
+
+    @Test
+    void returnsNoSubjectForATokenSignedWithAnotherSecret() {
+        assertNull(provider.extractSubject(tokenWithRoles(List.of("ADMIN"), OTHER_SIGNING_KEY)));
+    }
+
     private static String tokenWithRoles(List<String> roles, SecretKey key) {
         return Jwts.builder()
                 .subject("admin-under-test")

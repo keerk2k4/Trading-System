@@ -35,6 +35,11 @@ public class ApiExceptionHandler {
         return response(HttpStatus.FORBIDDEN, "AUTH-403", "Forbidden");
     }
 
+    @ExceptionHandler(AccountStatusChangeNotAllowedException.class)
+    ResponseEntity<ErrorResponse> statusChangeNotAllowed() {
+        return response(HttpStatus.CONFLICT, "ACC-409", "This status change is not allowed");
+    }
+
     @ExceptionHandler(AccountNotFoundException.class)
     ResponseEntity<ErrorResponse> accountNotFound() {
         return response(HttpStatus.NOT_FOUND, "ACC-404", "Account not found");

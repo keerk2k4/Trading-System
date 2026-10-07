@@ -694,6 +694,126 @@ select.tp-input {
   outline-offset: 1px;
 }
 
+/* Choice cards: a radio group drawn as one card per option, each with a title,
+   a short description and facts. The native radio stays inside the card, so
+   keyboard and screen-reader use are those of an ordinary radio group. */
+
+.tp-choice-cards {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+@media (min-width: 48rem) {
+  .tp-choice-cards {
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  }
+}
+
+.tp-choice-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 1rem 1.125rem;
+  border: 1px solid var(--tp-border);
+  border-radius: var(--tp-radius);
+  background-color: var(--tp-surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tp-choice-card:hover {
+  border-color: var(--tp-border-strong);
+}
+
+.tp-choice-card:has(input:checked) {
+  border-color: var(--tp-accent);
+  box-shadow: 0 0 0 1px var(--tp-accent);
+  background-color: color-mix(in srgb, var(--tp-accent) 7%, var(--tp-surface));
+}
+
+.tp-choice-card:has(input:focus-visible) {
+  outline: 2px solid var(--tp-focus);
+  outline-offset: 2px;
+}
+
+/* An option that cannot be undone. */
+.tp-choice-card.is-danger:has(input:checked) {
+  border-color: var(--tp-danger);
+  box-shadow: 0 0 0 1px var(--tp-danger);
+  background-color: var(--tp-danger-surface);
+}
+
+.tp-choice-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.tp-choice-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--tp-text);
+}
+
+.tp-choice-card input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--tp-accent);
+}
+
+.tp-choice-card.is-danger input {
+  accent-color: var(--tp-danger);
+}
+
+.tp-choice-card-text {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--tp-text-muted);
+}
+
+/* Yes/no facts (AccessFactsComponent): the words carry the meaning, the drawn
+   tick or cross and its colour only reinforce it. */
+.tp-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+  color: var(--tp-text);
+}
+
+.tp-facts li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.tp-facts svg {
+  flex: none;
+  width: 0.9375rem;
+  height: 0.9375rem;
+  fill: none;
+  stroke: var(--tp-negative);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tp-facts li.is-yes svg {
+  stroke: var(--tp-positive);
+}
+
 /* Buttons and links */
 
 .tp-btn {

@@ -10,6 +10,7 @@ const TONES: Record<string, Tone> = {
   PENDING: 'warning',
   REJECTED: 'negative',
   SUSPENDED: 'negative',
+  BLOCKED: 'negative',
   CLOSED: 'negative',
   // Service health
   UP: 'positive',

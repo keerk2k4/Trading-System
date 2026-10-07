@@ -21,6 +21,7 @@ const CUSTOMER_NAV: NavItem[] = [
 const ADMIN_NAV: NavItem[] = [
   { label: 'Overview', link: '/admin/dashboard', icon: 'var(--tp-icon-grid)' },
   { label: 'KYC review', link: '/admin/kyc-review', icon: 'var(--tp-icon-shield)' },
+  { label: 'Customers', link: '/admin/customers', icon: 'var(--tp-icon-list)' },
   { label: 'Service health', link: '/admin/health', icon: 'var(--tp-icon-check)' }
 ];
 

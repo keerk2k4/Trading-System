@@ -146,6 +146,21 @@ class AuthServiceTest {
         assertThrows(UnauthorisedException.class, () -> authService.requireAdmin(request));
     }
 
+    @Test
+    void authenticatedSubjectReturnsTheTokensSubject() {
+        MockHttpServletRequest request = requestWithAuthorization("Bearer opaque-token");
+        request.setAttribute("subject", "admin-user-id");
+
+        assertEquals("admin-user-id", authService.authenticatedSubject(request));
+    }
+
+    @Test
+    void authenticatedSubjectRejectsATokenWithoutOne() {
+        MockHttpServletRequest request = requestWithAuthorization("Bearer opaque-token");
+
+        assertThrows(UnauthorisedException.class, () -> authService.authenticatedSubject(request));
+    }
+
     private static MockHttpServletRequest requestWithAuthorization(String authorization) {
         MockHttpServletRequest request = new MockHttpServletRequest();
         if (authorization != null) {

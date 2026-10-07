@@ -14,7 +14,7 @@
  */
 export interface ErrorResponse { 
     /**
-     * | Code | HTTP | Meaning | |---|---|---| | `AUTH-401` | 401 | Unauthorised or invalid token | | `AUTH-403` | 403 | Valid token, but not an admin | 
+     * | Code | HTTP | Meaning | |---|---|---| | `AUTH-401` | 401 | Unauthorised or invalid token | | `AUTH-403` | 403 | Valid token, but not an admin | | `ACC-404` | 404 | No account with that key | | `ACC-409` | 409 | That status change is not allowed, or the status changed meanwhile | | `VAL-422` | 422 | A missing or blank reason, or an unknown status | 
      */
     errorCode: ErrorResponse.ErrorCodeEnum;
     message: string;
@@ -23,6 +23,9 @@ export namespace ErrorResponse {
     export const ErrorCodeEnum = {
         AUTH_401: 'AUTH-401',
         AUTH_403: 'AUTH-403',
+        ACC_404: 'ACC-404',
+        ACC_409: 'ACC-409',
+        VAL_422: 'VAL-422',
     } as const;
     export type ErrorCodeEnum = typeof ErrorCodeEnum[keyof typeof ErrorCodeEnum];
 }
