@@ -9,6 +9,7 @@ import com.tradingsystem.domain.entities.User;
 import com.tradingsystem.domain.enums.AssetClass;
 import com.tradingsystem.domain.enums.OrderSide;
 import com.tradingsystem.domain.enums.OrderStatus;
+import com.tradingsystem.domain.enums.OrderType;
 import com.tradingsystem.domain.enums.TradingStatus;
 import com.tradingsystem.domain.enums.UserStatus;
 import com.tradingsystem.exception.AccountNotActiveException;
@@ -23,6 +24,7 @@ import com.tradingsystem.spring_boot_app.mapper.HoldingMapper;
 import com.tradingsystem.spring_boot_app.mapper.InstrumentMapper;
 import com.tradingsystem.spring_boot_app.mapper.OrderMapper;
 import com.tradingsystem.spring_boot_app.mapper.PositionMapper;
+import com.tradingsystem.spring_boot_app.service.LatestPriceCache;
 import com.tradingsystem.spring_boot_app.service.OrderService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
@@ -76,14 +78,14 @@ class OrderSettlementCharacterisationTest {
     }
 
     private PlaceOrderRequest buyTenAt2550() {
-        return new PlaceOrderRequest(1L, "ACME", OrderSide.BUY, 10, new BigDecimal("25.50"), KEY);
+        return new PlaceOrderRequest(1L, OrderType.LIMIT, "ACME", OrderSide.BUY, 10, new BigDecimal("25.50"), KEY);
     }
 
     @BeforeEach
     void setUp() {
         TransactionSynchronizationManager.initSynchronization();
         KafkaTemplate<String, KafkaMessageEnvelope<OrderPlacedPayload>> kafkaTemplate = Mockito.mock(KafkaTemplate.class);
-        service = new OrderService(accounts, instruments, orders, positions, holdingMapper, kafkaTemplate);
+        service = new OrderService(accounts, instruments, orders, positions, holdingMapper, new LatestPriceCache(), kafkaTemplate);
     }
 
     @AfterEach
@@ -161,7 +163,7 @@ class OrderSettlementCharacterisationTest {
         when(instruments.findInstrumentBySymbol("NOPE")).thenReturn(Optional.empty());
 
         PlaceOrderRequest request =
-                new PlaceOrderRequest(1L, "NOPE", OrderSide.BUY, 10, new BigDecimal("25.50"), KEY);
+            new PlaceOrderRequest(1L, OrderType.LIMIT, "NOPE", OrderSide.BUY, 10, new BigDecimal("25.50"), KEY);
 
         assertThrows(InstrumentNotFoundException.class, () -> service.placeOrder(request));
         verify(orders, never()).insertOrder(any(Order.class));

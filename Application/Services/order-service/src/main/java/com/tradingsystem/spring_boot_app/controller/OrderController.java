@@ -42,9 +42,11 @@ public class OrderController {
     public ResponseEntity<OrderResponse> placeOrder(
             @Valid @RequestBody CreateOrderRequest body,
             HttpServletRequest request) {
+        body.validateForCreate();
         long accountId = authService.authenticatedAccountId(request);
         PlaceOrderRequest orderRequest = new PlaceOrderRequest(
             accountId,
+            body.getOrderType(),
             body.getSymbol(),
             body.getSide(),
             body.getQuantity(),

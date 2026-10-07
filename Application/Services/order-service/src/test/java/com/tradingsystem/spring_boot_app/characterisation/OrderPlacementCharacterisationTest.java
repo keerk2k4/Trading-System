@@ -72,13 +72,13 @@ class OrderPlacementCharacterisationTest {
                     || authorization.substring("Bearer ".length()).isBlank()) {
                 throw new UnauthorisedException();
             }
-            return null;
-        }).when(authService).verifyAccountAccess(any(HttpServletRequest.class), any(Long.class));
+            return 1L;
+        }).when(authService).authenticatedAccountId(any(HttpServletRequest.class));
     }
 
     private static String validBody() {
         return """
-                {"accountId":1,"symbol":"ACME","side":"BUY","quantity":10,\
+                {"symbol":"ACME","side":"BUY","quantity":10,\
                 "price":25.50,"idempotencyKey":"%s"}""".formatted(KEY);
     }
 

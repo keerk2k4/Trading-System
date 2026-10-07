@@ -78,7 +78,7 @@ class OrderControllerTest {
 
     private static String validBody() {
         return """
-                {"accountId":1,"symbol":"ACME","side":"BUY","quantity":100,\
+                                {"symbol":"ACME","side":"BUY","quantity":100,\
                 "price":25.50,"idempotencyKey":"%s"}""".formatted(UUID);
     }
 
@@ -107,9 +107,9 @@ class OrderControllerTest {
         mvc.perform(post("/api/v1/orders")
                         .header("Authorization", TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody().replace("\"accountId\":1", "\"accountId\":999")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.orderId").value("ORD-" + UUID));
+                        .content(validBody().replace("}", ",\"accountId\":999}")))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("VAL-422"));
     }
 
     @Test
@@ -137,7 +137,7 @@ class OrderControllerTest {
     @Test
     void placeOrderWithInvalidBodyIsVal422Envelope() throws Exception {
         String body = """
-                {"accountId":1,"symbol":"ACME","side":"BUY","quantity":0,\
+                                {"symbol":"ACME","side":"BUY","quantity":0,\
                 "price":0,"idempotencyKey":"short"}""";
 
         mvc.perform(post("/api/v1/orders")
@@ -147,6 +147,40 @@ class OrderControllerTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.errorCode").value("VAL-422"))
                 .andExpect(jsonPath("$.message").value("Invalid input"));
+        verifyNoInteractions(orders);
+    }
+
+    @Test
+    void placeMarketOrderWithoutPriceAnswers200() throws Exception {
+        OrderResponse accepted = new OrderResponse("ORD-" + UUID, OrderStatus.NEW, "Order accepted, pending execution",
+                "ACME", OrderSide.BUY, 100, null);
+        when(orders.placeOrder(any())).thenReturn(accepted);
+
+        String body = """
+                {"orderType":"MARKET","symbol":"ACME","side":"BUY","quantity":100,\
+                "idempotencyKey":"%s"}""".formatted(UUID);
+
+        mvc.perform(post("/api/v1/orders")
+                        .header("Authorization", TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.orderId").value("ORD-" + UUID))
+                .andExpect(jsonPath("$.status").value("NEW"));
+    }
+
+    @Test
+    void placeMarketOrderWithPriceIsVal422Envelope() throws Exception {
+        String body = """
+                {"orderType":"MARKET","symbol":"ACME","side":"BUY","quantity":100,\
+                "price":25.50,"idempotencyKey":"%s"}""".formatted(UUID);
+
+        mvc.perform(post("/api/v1/orders")
+                        .header("Authorization", TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("VAL-422"));
         verifyNoInteractions(orders);
     }
 

@@ -9,6 +9,7 @@ public class OrderPlacedEvent {
     private String orderId;
     private Long accountId;
     private String symbol;
+    private String orderType;
     private String side;
     private Integer quantity;
     private BigDecimal price;
@@ -26,6 +27,9 @@ public class OrderPlacedEvent {
 
     public String getSymbol() { return symbol; }
     public void setSymbol(String symbol) { this.symbol = symbol; }
+
+    public String getOrderType() { return orderType; }
+    public void setOrderType(String orderType) { this.orderType = orderType; }
 
     public String getSide() { return side; }
     public void setSide(String side) { this.side = side; }

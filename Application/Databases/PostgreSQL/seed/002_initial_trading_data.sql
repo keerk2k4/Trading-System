@@ -192,7 +192,7 @@ INSERT INTO trading.orders (
     'BUY',
     'MARKET',
     'FILLED',
-    509.7700,
+    NULL,
     5.0000,
     '2026-08-10 11:20:00'
 ),
@@ -228,7 +228,7 @@ INSERT INTO trading.orders (
     'BUY',
     'MARKET',
     'FILLED',
-    180.3000,
+    NULL,
     15.0000,
     '2026-08-12 10:30:00'
 ),
@@ -264,7 +264,7 @@ INSERT INTO trading.orders (
     'BUY',
     'MARKET',
     'FILLED',
-    1210.4500,
+    NULL,
     2.0000,
     '2026-08-13 12:15:00'
 ),

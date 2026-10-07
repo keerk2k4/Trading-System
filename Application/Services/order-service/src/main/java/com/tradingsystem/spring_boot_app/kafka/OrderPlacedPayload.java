@@ -34,6 +34,10 @@ public record OrderPlacedPayload(
     @JsonProperty("symbol")
     @NotBlank(message = "symbol cannot be blank")
     String symbol,
+
+    @JsonProperty("orderType")
+    @NotBlank(message = "orderType cannot be blank")
+    String orderType,
     
     @JsonProperty("side")
     @NotBlank(message = "side cannot be blank")
@@ -45,7 +49,6 @@ public record OrderPlacedPayload(
     Integer quantity,
     
     @JsonProperty("price")
-    @NotNull(message = "price cannot be null")
     @Positive(message = "price must be positive")
     BigDecimal price,
     

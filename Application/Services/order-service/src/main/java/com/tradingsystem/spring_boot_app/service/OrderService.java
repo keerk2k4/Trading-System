@@ -10,6 +10,7 @@ import com.tradingsystem.domain.enums.OrderStatus;
 import com.tradingsystem.domain.enums.OrderType;
 import com.tradingsystem.domain.enums.ProductType;
 import com.tradingsystem.exception.AccountNotFoundException;
+import com.tradingsystem.exception.InvalidOrderArgumentException;
 import com.tradingsystem.exception.InstrumentNotFoundException;
 import com.tradingsystem.domain.repositories.HoldingRepository;
 import com.tradingsystem.domain.repositories.IdempotencyStore;
@@ -24,6 +25,7 @@ import com.tradingsystem.spring_boot_app.mapper.InstrumentMapper;
 import com.tradingsystem.spring_boot_app.mapper.HoldingMapper;
 import com.tradingsystem.spring_boot_app.mapper.OrderMapper;
 import com.tradingsystem.spring_boot_app.mapper.PositionMapper;
+import com.tradingsystem.spring_boot_app.kafka.QuotePayload;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,16 +46,19 @@ public class OrderService {
     private final OrderMapper orders;
     private final PositionMapper positions;
     private final HoldingMapper holdingMapper;
+    private final LatestPriceCache latestPriceCache;
     private final KafkaTemplate<String, KafkaMessageEnvelope<OrderPlacedPayload>> kafkaTemplate;
 
     public OrderService(AccountMapper accounts, InstrumentMapper instruments,
                         OrderMapper orders, PositionMapper positions, HoldingMapper holdingMapper,
+                        LatestPriceCache latestPriceCache,
                         KafkaTemplate<String, KafkaMessageEnvelope<OrderPlacedPayload>> kafkaTemplate) {
         this.accounts = accounts;
         this.instruments = instruments;
         this.orders = orders;
         this.positions = positions;
         this.holdingMapper = holdingMapper;
+        this.latestPriceCache = latestPriceCache;
         this.kafkaTemplate = kafkaTemplate;
     }
 
@@ -66,14 +71,13 @@ public class OrderService {
         Instrument instrument = instruments.findInstrumentBySymbol(request.getSymbol())
                 .orElseThrow(() -> new InstrumentNotFoundException(request.getSymbol()));
 
-        Order order = new Order(orders.nextOrderId(), account, instrument, OrderType.LIMIT,
+        Order order = new Order(orders.nextOrderId(), account, instrument, request.getOrderType(),
                 request.getSide(), ProductType.DELIVERY, request.getQuantity(), request.getPrice(), null,
                 request.getIdempotencyKey());
 
         OrderValidator validator = new OrderValidator(
                 new DatabasePositionRepository(), new DatabaseHoldingRepository(),
-                instrument1 -> instrument1.getSymbol().equals(instrument.getSymbol())
-                        ? request.getPrice() : BigDecimal.ZERO,
+            instrument1 -> resolveValidationPrice(request, instrument1),
                 new DatabaseIdempotencyStore());
         validator.validate(order);
 
@@ -103,6 +107,7 @@ public class OrderService {
                 String.valueOf(order.getOrderId()),
                 account.getAccountId(),
                 instrument.getSymbol(),
+                request.getOrderType().name(),
                 request.getSide().name(),
                 request.getQuantity(),
                 request.getPrice(),
@@ -118,6 +123,32 @@ public class OrderService {
                 1,
                 payload
         );
+    }
+
+    private BigDecimal resolveValidationPrice(PlaceOrderRequest request, Instrument instrument) {
+        if (!instrument.getSymbol().equals(request.getSymbol())) {
+            return BigDecimal.ZERO;
+        }
+
+        if (request.getOrderType() == OrderType.MARKET) {
+            QuotePayload quote = latestPriceCache.get(instrument.getSymbol()).orElseThrow(
+                () -> new InvalidOrderArgumentException("Price", "No live quote available for MARKET order")
+            );
+
+            if (request.getSide() == com.tradingsystem.domain.enums.OrderSide.BUY && quote.ask() != null) {
+                return quote.ask();
+            }
+            if (request.getSide() == com.tradingsystem.domain.enums.OrderSide.SELL && quote.bid() != null) {
+                return quote.bid();
+            }
+
+            if (quote.price() != null) {
+                return quote.price();
+            }
+            throw new InvalidOrderArgumentException("Price", "No executable quote price available for MARKET order");
+        }
+
+        return request.getPrice();
     }
 
     @Transactional
