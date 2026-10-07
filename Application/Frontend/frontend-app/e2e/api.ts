@@ -1,6 +1,7 @@
 import { APIRequestContext, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { env } from './env';
+import { waitForOtp } from './mail';
 
 // Set-up helpers that talk to the real auth service and Trade REST API.
 // Nothing here is a mock: they create the users, KYC submissions and
@@ -40,13 +41,24 @@ export function uniqueUsername(prefix = 'e2e'): string {
   return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1e4)}`;
 }
 
+// Phone numbers are unique per account, so every test user needs its own.
+export function uniquePhone(): string {
+  const random = String(Math.floor(Math.random() * 100)).padStart(2, '0');
+  return `+19${String(Date.now()).slice(-8)}${random}`;
+}
+
+// Document type + number is unique across KYC submissions.
+export function uniqueDocumentNumber(): string {
+  return `P${Date.now()}${Math.floor(Math.random() * 1000)}`;
+}
+
 export function registrationFor(username = uniqueUsername()) {
   return {
     username,
     email: `${username}@example.com`,
     firstName: 'E2e',
     lastName: 'Tester',
-    phone: '+15550001234',
+    phone: uniquePhone(),
     password: 'E2e-Password-123'
   };
 }
@@ -67,19 +79,44 @@ export async function waitUntilCanSignIn(request: APIRequestContext, user: TestU
   throw new Error(`Trading account for ${user.username} was not provisioned in time`);
 }
 
+/**
+ * Verifies `email` the way the register form does (request OTP, read it from
+ * the test inbox, verify) and returns the emailVerificationToken that
+ * POST /auth/register requires.
+ */
+export async function verifyEmailViaApi(request: APIRequestContext, email: string): Promise<string> {
+  const since = Date.now();
+  const sent = await request.post(`${env.authApi}/auth/register/otp`, { data: { email } });
+  expect(sent.status(), 'send registration OTP').toBe(200);
+  const otp = await waitForOtp(request, email, since);
+  const verified = await request.post(`${env.authApi}/auth/register/otp/verify`, { data: { email, otp } });
+  expect(verified.status(), 'verify registration OTP').toBe(200);
+  return (await verified.json()).verificationToken as string;
+}
+
+/** Registers a customer through the real OTP flow; does not wait for the trading account. */
+export async function registerViaApi(request: APIRequestContext, body = registrationFor()) {
+  const emailVerificationToken = await verifyEmailViaApi(request, body.email);
+  const res = await request.post(`${env.authApi}/auth/register`, { data: { ...body, emailVerificationToken } });
+  expect(res.status(), 'register test user').toBe(201);
+  return { userId: (await res.json()).id as string, ...body };
+}
+
 /** Registers a brand-new customer and waits until they can sign in. */
 export async function createUser(request: APIRequestContext): Promise<TestUser & { tokens: Tokens }> {
-  const body = registrationFor();
-  const res = await request.post(`${env.authApi}/auth/register`, { data: body });
-  expect(res.status(), 'register test user').toBe(201);
-  const user = { userId: (await res.json()).id as string, username: body.username, password: body.password };
+  const { userId, username, password } = await registerViaApi(request);
+  const user = { userId, username, password };
   return { ...user, tokens: await waitUntilCanSignIn(request, user) };
 }
 
-export async function submitKyc(request: APIRequestContext, accessToken: string): Promise<void> {
+export async function submitKyc(
+  request: APIRequestContext,
+  accessToken: string,
+  documentNumber = uniqueDocumentNumber()
+): Promise<void> {
   const res = await request.post(`${env.authApi}/kyc`, {
     headers: bearer(accessToken),
-    data: { dateOfBirth: '1990-01-15', documentType: 'PASSPORT', documentNumber: `P${Date.now()}` }
+    data: { dateOfBirth: '1990-01-15', documentType: 'PASSPORT', documentNumber }
   });
   expect(res.status(), 'submit KYC').toBe(201);
 }

@@ -20,6 +20,14 @@ class ApiExceptionHandlerTest {
     }
 
     @Test
+    void forbiddenUsesAuth403Envelope() {
+        ResponseEntity<ErrorResponse> response = handler.forbidden();
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        assertEquals(new ErrorResponse("AUTH-403", "Forbidden"), response.getBody());
+    }
+
+    @Test
     void unexpectedFailureUsesSafeServerErrorEnvelope() {
         ResponseEntity<ErrorResponse> response = handler.unexpected(
                 new IllegalArgumentException("database password and internal detail"));

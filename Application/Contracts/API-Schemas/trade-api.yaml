@@ -940,6 +940,22 @@ components:
           type: string
           format: date-time
           example: '2026-09-28T09:14:22Z'
+        realizedPnl:
+          type: [number, 'null']
+          format: double
+          description: |
+            Realised profit or loss, to two decimal places, using the weighted average cost method:
+            (executedPrice - average cost) x quantity, where average cost is the position's
+            averageCost at the moment the SELL was filled. Set only on FILLED SELL orders; null for
+            BUY orders, unfilled orders and sells whose cost basis is unknown.
+          example: -0.50
+        realizedPnlPercent:
+          type: [number, 'null']
+          format: double
+          description: |
+            realizedPnl / (average cost x quantity) x 100, to two decimal places. Null whenever
+            realizedPnl is null.
+          example: -0.26
 
     AccountResponse:
       type: object
@@ -1051,6 +1067,17 @@ components:
           format: double
           description: quantity multiplied by currentPrice. Null when no quote seen yet.
           example: 2453.00
+        unrealizedPnl:
+          type: [number, 'null']
+          format: double
+          description: |
+            (currentPrice - averageCost) x quantity, to two decimal places. Null when no quote seen yet.
+          example: 200.00
+        unrealizedPnlPercent:
+          type: [number, 'null']
+          format: double
+          description: unrealizedPnl / (averageCost x quantity) x 100, to two decimal places. Null when no quote seen yet.
+          example: 8.00
 
     WatchlistResponse:
       type: object

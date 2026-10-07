@@ -13,6 +13,7 @@ import { KycController } from "./kyc.controller";
 import { AccountProvisioningEventService } from "../services/AccountProvisioningEventService";
 import { NotificationService } from "../services/NotificationService";
 import { EmailOtpService } from "../services/EmailOtpService";
+import { FieldEncryptionService } from "../services/FieldEncryptionService";
 
 @Module({
   imports: [DatabaseModule],
@@ -28,6 +29,7 @@ import { EmailOtpService } from "../services/EmailOtpService";
     AccountProvisioningEventService,
     NotificationService,
     EmailOtpService,
+    FieldEncryptionService,
     BearerGuard,
   ],
   exports: [
@@ -41,6 +43,7 @@ import { EmailOtpService } from "../services/EmailOtpService";
     AccountProvisioningEventService,
     NotificationService,
     EmailOtpService,
+    FieldEncryptionService,
     BearerGuard,
   ],
 })

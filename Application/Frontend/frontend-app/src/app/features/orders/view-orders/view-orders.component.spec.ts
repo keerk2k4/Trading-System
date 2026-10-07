@@ -62,6 +62,32 @@ describe('ViewOrdersComponent', () => {
     expect(rows()[1].textContent).toContain('—');
   });
 
+  it('shows realized P&L in green or red for filled sells and a muted dash otherwise', () => {
+    tradeApi.getOrders.and.returnValue(
+      of([
+        order('ORD-BUY', '2026-01-01T10:00:00Z', { status: 'FILLED', executedPrice: 100 }),
+        order('ORD-WIN', '2026-01-02T10:00:00Z', {
+          side: 'SELL', status: 'FILLED', executedPrice: 108.5, realizedPnl: 200, realizedPnlPercent: 8.5
+        }),
+        order('ORD-LOSS', '2026-01-03T10:00:00Z', {
+          side: 'SELL', status: 'FILLED', executedPrice: 96, realizedPnl: -8, realizedPnlPercent: -4
+        })
+      ])
+    );
+    create();
+
+    const cell = (row: Element, id: string) => row.querySelector(`[data-testid="${id}"] app-pnl-value`)!;
+    const [loss, win, buy] = rows();
+    expect(cell(win, 'order-realized-pnl').textContent?.trim()).toBe('+$200.00');
+    expect(cell(win, 'order-realized-pnl-percent').textContent?.trim()).toBe('+8.50%');
+    expect(cell(win, 'order-realized-pnl').classList).toContain('tp-positive');
+    expect(cell(loss, 'order-realized-pnl').textContent?.trim()).toBe('-$8.00');
+    expect(cell(loss, 'order-realized-pnl-percent').textContent?.trim()).toBe('-4.00%');
+    expect(cell(loss, 'order-realized-pnl-percent').classList).toContain('tp-negative');
+    expect(cell(buy, 'order-realized-pnl').textContent?.trim()).toBe('—');
+    expect(cell(buy, 'order-realized-pnl-percent').classList).toContain('tp-muted');
+  });
+
   it('shows a mapped error message when the API fails', () => {
     tradeApi.getOrders.and.returnValue(throwError(() => ({ errorCode: 'ACC-403', message: '', status: 403 })));
     create();

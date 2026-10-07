@@ -6,6 +6,7 @@ import { RouterLink } from '@angular/router';
 import { TradeApiService } from '../../../shared/services/trade-api.service';
 import { ErrorMappingService } from '../../../shared/services/error-mapping.service';
 import { StatusBadgeComponent } from '../../../shared/ui/status-badge.component';
+import { PnlValueComponent } from '../../../shared/ui/pnl-value.component';
 import { Order, OrderStatus, TradeApiError } from '../../../shared/models/order.models';
 
 const STATUS_FILTERS: { value: OrderStatus | ''; label: string }[] = [
@@ -24,7 +25,7 @@ export const POLL_MAX_DURATION_MS = 5 * 60_000;
 
 @Component({
   selector: 'app-view-orders',
-  imports: [ReactiveFormsModule, RouterLink, CurrencyPipe, DatePipe, DecimalPipe, StatusBadgeComponent],
+  imports: [ReactiveFormsModule, RouterLink, CurrencyPipe, DatePipe, DecimalPipe, StatusBadgeComponent, PnlValueComponent],
   template: `
     <div class="tp-page">
       <header class="tp-page-header">
@@ -101,6 +102,8 @@ export const POLL_MAX_DURATION_MS = 5 * 60_000;
                   <th scope="col" class="num">Limit price</th>
                   <th scope="col" class="num">Fill price</th>
                   <th scope="col">Status</th>
+                  <th scope="col" class="num">Realized P&amp;L</th>
+                  <th scope="col" class="num">P&amp;L %</th>
                 </tr>
               </thead>
               <tbody>
@@ -118,6 +121,9 @@ export const POLL_MAX_DURATION_MS = 5 * 60_000;
                     <td class="num">{{ order.price | currency }}</td>
                     <td class="num">{{ (order.executedPrice | currency) ?? '—' }}</td>
                     <td><app-status-badge data-testid="order-status" [status]="order.status" /></td>
+                    <!-- Only FILLED SELL orders realise P&L; everything else shows a muted dash. -->
+                    <td class="num" data-testid="order-realized-pnl"><app-pnl-value [value]="order.realizedPnl" /></td>
+                    <td class="num" data-testid="order-realized-pnl-percent"><app-pnl-value kind="percent" [value]="order.realizedPnlPercent" /></td>
                   </tr>
                 }
               </tbody>

@@ -14,7 +14,7 @@
  */
 export interface ErrorResponse { 
     /**
-     * | Code | HTTP | Meaning | |---|---|---| | `AUTH-401` | 401 | Unauthorised or invalid token | | `AUTH-403` | 403 | Authenticated, but the wrong role for this endpoint | | `AUTH-409` | 409 | Username already taken | | `ACC-403` | 403 | Linked trading account is suspended (login only) | | `KYC-404` | 404 | No KYC submission exists for the given user | | `KYC-409` | 409 | KYC already submitted, or already approved | | `VAL-422` | 422 | Invalid input |  `AUTH-403`, `AUTH-409`, `KYC-404` and `KYC-409` extend the platform error catalogue and are scoped to this service. `ACC-403` is shared with `trade-api.yaml` and carries the same meaning. 
+     * | Code | HTTP | Meaning | |---|---|---| | `AUTH-401` | 401 | Unauthorised or invalid token | | `AUTH-403` | 403 | Authenticated, but the wrong role for this endpoint | | `AUTH-409` | 409 | Username already taken | | `ACC-403` | 403 | Linked trading account is suspended (login only) | | `KYC-404` | 404 | No KYC submission exists for the given user | | `KYC-409` | 409 | KYC already submitted, or already approved | | `PHONE-409` | 409 | Phone number already registered to another account (register) | | `DOC-409` | 409 | Document type + number already registered to another account (KYC) | | `OTP-400` | 400 | Wrong verification code; the message says how many attempts remain | | `OTP-403` | 403 | Email verification / password reset token missing, wrong, expired or used | | `OTP-404` | 404 | No verification code has been requested (or it was already used) | | `OTP-410` | 410 | Verification code expired | | `OTP-429` | 429 | Resend requested within 60 s, or too many wrong attempts | | `OTP-503` | 503 | The verification email could not be sent | | `VAL-422` | 422 | Invalid input (the message may be more specific, e.g. a future date of birth) |  `AUTH-403`, `AUTH-409`, `KYC-404`, `KYC-409`, `PHONE-409`, `DOC-409` and the `OTP-*` codes extend the platform error catalogue and are scoped to this service. `ACC-403` is shared with `trade-api.yaml` and carries the same meaning. 
      */
     errorCode: ErrorResponse.ErrorCodeEnum;
     /**
@@ -30,6 +30,14 @@ export namespace ErrorResponse {
         ACC_403: 'ACC-403',
         KYC_404: 'KYC-404',
         KYC_409: 'KYC-409',
+        PHONE_409: 'PHONE-409',
+        DOC_409: 'DOC-409',
+        OTP_400: 'OTP-400',
+        OTP_403: 'OTP-403',
+        OTP_404: 'OTP-404',
+        OTP_410: 'OTP-410',
+        OTP_429: 'OTP-429',
+        OTP_503: 'OTP-503',
         VAL_422: 'VAL-422',
     } as const;
     export type ErrorCodeEnum = typeof ErrorCodeEnum[keyof typeof ErrorCodeEnum];

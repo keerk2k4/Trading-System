@@ -13,6 +13,8 @@ import com.tradingsystem.spring_boot_app.mapper.OrderMapper;
 import com.tradingsystem.spring_boot_app.mapper.PositionMapper;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -82,11 +84,18 @@ public class AccountService {
         java.math.BigDecimal currentPrice = prices.get(symbol)
                 .map(com.tradingsystem.spring_boot_app.kafka.QuotePayload::price)
                 .orElse(null);
-        java.math.BigDecimal marketValue = currentPrice == null ? null
-                : currentPrice.multiply(java.math.BigDecimal.valueOf(position.getQuantity()));
+        BigDecimal quantity = BigDecimal.valueOf(position.getQuantity());
+        BigDecimal marketValue = currentPrice == null ? null : currentPrice.multiply(quantity);
+        BigDecimal costBasis = position.getAveragePrice() == null ? null
+                : position.getAveragePrice().multiply(quantity);
+        BigDecimal unrealizedPnl = marketValue == null || costBasis == null ? null
+                : marketValue.subtract(costBasis).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal unrealizedPnlPercent = unrealizedPnl == null || costBasis.signum() == 0 ? null
+                : marketValue.subtract(costBasis).multiply(BigDecimal.valueOf(100))
+                        .divide(costBasis, 2, RoundingMode.HALF_UP);
         return new PositionResponse(position.getAccount().getAccountId(),
                 symbol, position.getQuantity(), position.getAveragePrice(),
-                currentPrice, marketValue);
+                currentPrice, marketValue, unrealizedPnl, unrealizedPnlPercent);
     }
 
     private OrderHistoryEntry order(Order order) {
@@ -106,7 +115,9 @@ public class AccountService {
                 row.executedPrice(),
                 row.status(),
                 row.idempotencyKey(),
-                toOffsetUtc(row.createdOn())
+                toOffsetUtc(row.createdOn()),
+                row.realizedPnl(),
+                row.realizedPnlPercent()
         );
     }
 

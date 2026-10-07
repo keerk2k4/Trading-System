@@ -103,6 +103,12 @@ export const routes: Routes = [
         title: 'KYC review · Trading Platform',
         loadComponent: () =>
           import('./features/admin/kyc-review/kyc-review-list.component').then((m) => m.KycReviewListComponent)
+      },
+      {
+        path: 'health',
+        title: 'Service health · Trading Platform',
+        loadComponent: () =>
+          import('./features/admin/service-health/service-health.component').then((m) => m.ServiceHealthComponent)
       }
     ]
   },

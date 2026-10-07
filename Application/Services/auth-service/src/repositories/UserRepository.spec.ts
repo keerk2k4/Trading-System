@@ -1,6 +1,7 @@
 import { DatabaseService } from "../database/database.service";
 import { User } from "../entities/User";
 import { UserRepository } from "./UserRepository";
+import { FieldEncryptionService } from "../services/FieldEncryptionService";
 
 const USER_ID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 
@@ -29,10 +30,38 @@ const expectedUser: User = {
 describe("UserRepository", () => {
   let query: jest.Mock;
   let repository: UserRepository;
+  const encryption = new FieldEncryptionService("test-key-for-user-repository");
 
   beforeEach(() => {
     query = jest.fn();
-    repository = new UserRepository({ query } as unknown as DatabaseService);
+    repository = new UserRepository({ query } as unknown as DatabaseService, encryption);
+  });
+
+  describe("phone encryption", () => {
+    it("stores the phone encrypted, never in plaintext", async () => {
+      query.mockResolvedValue({ rows: [dbRow], rowCount: 1 });
+
+      await repository.create({ ...expectedUser, phone: "+919876543210" });
+
+      const storedPhone = query.mock.calls[0][1][3] as string;
+      expect(storedPhone).not.toContain("9876543210");
+      expect(encryption.isEncrypted(storedPhone)).toBe(true);
+      expect(encryption.decrypt(storedPhone)).toBe("+919876543210");
+    });
+
+    it("decrypts an encrypted phone when reading a user", async () => {
+      query.mockResolvedValue({ rows: [{ ...dbRow, phone: encryption.encrypt("+919876543210") }], rowCount: 1 });
+
+      const user = await repository.findByUserId(USER_ID);
+
+      expect(user?.phone).toBe("+919876543210");
+    });
+
+    it("still reads a legacy plaintext phone", async () => {
+      query.mockResolvedValue({ rows: [dbRow], rowCount: 1 });
+
+      expect((await repository.findByUserId(USER_ID))?.phone).toBe("+15555550123");
+    });
   });
 
   describe("findByUsername", () => {
@@ -99,14 +128,67 @@ describe("UserRepository", () => {
       expect(query).toHaveBeenCalledTimes(1);
       const [sql, params] = query.mock.calls[0];
       expect(sql).toBe(
-        `INSERT INTO auth.users (user_name, password_hash, email, phone, first_name, last_name, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO auth.users (user_name, password_hash, email, phone, phone_lookup_hash, first_name, last_name, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       );
       expect(params[0]).toBe("alice.trader");
       expect(params[1]).toBe("stored-bcrypt-hash");
-      expect(params[2]).toBe("alice@example.test");
-      expect(params.slice(3)).toEqual([null, "Alice", "Trader", "ACTIVE"]);
+      expect(encryption.decrypt(params[2])).toBe("alice@example.test");
+      // No phone: no ciphertext and no lookup hash.
+      expect(params.slice(3)).toEqual([null, null, "Alice", "Trader", "ACTIVE"]);
+    });
+
+    it("stores the email encrypted, never in plaintext", async () => {
+      query.mockResolvedValue({ rows: [dbRow], rowCount: 1 });
+
+      await repository.create({ ...expectedUser });
+
+      const storedEmail = query.mock.calls[0][1][2] as string;
+      expect(storedEmail).not.toContain("alice@example.test");
+      expect(encryption.isEncrypted(storedEmail)).toBe(true);
+    });
+
+    it("reads an encrypted email back as plaintext", async () => {
+      query.mockResolvedValue({ rows: [{ ...dbRow, email: encryption.encrypt("alice@example.test") }], rowCount: 1 });
+
+      expect((await repository.findByUserId(USER_ID))?.email).toBe("alice@example.test");
+    });
+  });
+
+  describe("phone lookup hash", () => {
+    it("is stored alongside the encrypted phone", async () => {
+      query.mockResolvedValue({ rows: [dbRow], rowCount: 1 });
+
+      await repository.create({ ...expectedUser, phone: "+919876543210" });
+
+      expect(query.mock.calls[0][1][4]).toBe(repository.phoneLookupHash("+919876543210"));
+    });
+
+    it("is the same for the same number in any format, and different for another number", () => {
+      const hash = repository.phoneLookupHash("+919876543210");
+
+      expect(hash).toMatch(/^[0-9a-f]{64}$/);
+      expect(repository.phoneLookupHash("919876543210")).toBe(hash);
+      expect(repository.phoneLookupHash("+91 98765-43210")).toBe(hash);
+      expect(repository.phoneLookupHash("+919876543211")).not.toBe(hash);
+      expect(repository.phoneLookupHash(null)).toBeNull();
+    });
+
+    it("isPhoneTaken compares by lookup hash, never by the phone itself", async () => {
+      query.mockResolvedValue({ rows: [{ "?column?": 1 }], rowCount: 1 });
+
+      await expect(repository.isPhoneTaken("+91 98765 43210")).resolves.toBe(true);
+
+      expect(query).toHaveBeenCalledWith("SELECT 1 FROM auth.users WHERE phone_lookup_hash = $1 LIMIT 1", [
+        repository.phoneLookupHash("+919876543210"),
+      ]);
+    });
+
+    it("isPhoneTaken is false when no row matches", async () => {
+      query.mockResolvedValue({ rows: [], rowCount: 0 });
+
+      await expect(repository.isPhoneTaken("+919876543210")).resolves.toBe(false);
     });
   });
 

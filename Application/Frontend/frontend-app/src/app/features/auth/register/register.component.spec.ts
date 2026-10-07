@@ -142,6 +142,23 @@ describe('RegisterComponent', () => {
     });
   });
 
+  it('shows a phone number already in use on the phone field', () => {
+    auth.register.and.returnValue(
+      throwError(() => ({
+        errorCode: 'PHONE-409',
+        message: 'This phone number is already registered to another account.',
+        status: 409
+      }))
+    );
+    fill(VALID_FIELDS);
+    verifyEmail();
+    submit();
+
+    expect(page.querySelector('#register-phone-error')?.textContent?.trim()).toBe(
+      'This phone number is already registered to another account.'
+    );
+  });
+
   it('drops the verification when the email is changed', () => {
     fill(VALID_FIELDS);
     verifyEmail();

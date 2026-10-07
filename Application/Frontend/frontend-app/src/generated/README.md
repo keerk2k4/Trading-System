@@ -8,6 +8,12 @@ so a contract change shows up as a reviewable diff and the app builds without Ja
 |---|---|---|
 | `sprint09/contracts/auth-api.yaml` | `src/generated/auth-client/` | `AuthService`, `KYCService`, `ProfileService` |
 | `sprint09/contracts/trade-api.yaml` | `src/generated/trade-client/` | `AccountsService`, `OrdersService` |
+| `Contracts/API-Schemas/auth-admin-api.yaml` (the team's own) | `src/generated/auth-admin-client/` | `HealthService` |
+| `Contracts/API-Schemas/trade-admin-api.yaml` (the team's own) | `src/generated/trade-admin-client/` | `AdminService` |
+
+The two `*-admin-api.yaml` contracts were written by the team for the admin dashboard; the
+programme's `auth-api.yaml` and `trade-api.yaml` stay untouched. Their wrapper is
+`src/app/shared/services/service-health.service.ts`.
 
 ## Rules
 

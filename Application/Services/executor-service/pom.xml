@@ -55,6 +55,12 @@
             <artifactId>spring-kafka</artifactId>
         </dependency>
 
+        <!-- Actuator: /actuator/health (UP or DOWN only, see application.yml) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- PostgreSQL Driver -->
         <dependency>
             <groupId>org.postgresql</groupId>

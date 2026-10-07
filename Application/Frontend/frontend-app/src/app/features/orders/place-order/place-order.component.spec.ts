@@ -6,6 +6,7 @@ import { PlaceOrderComponent } from './place-order.component';
 import { MockAuthService } from '../../../shared/services/auth.service';
 import { TradeApiService } from '../../../shared/services/trade-api.service';
 import { PlaceOrderRequest } from '../../../shared/models/order.models';
+import { InstrumentResponse } from '../../../../generated/trade-client';
 
 describe('PlaceOrderComponent', () => {
   let tradeApi: jasmine.SpyObj<TradeApiService>;
@@ -35,7 +36,12 @@ describe('PlaceOrderComponent', () => {
   }
 
   beforeEach(() => {
-    tradeApi = jasmine.createSpyObj<TradeApiService>('TradeApiService', ['placeOrder']);
+    tradeApi = jasmine.createSpyObj<TradeApiService>('TradeApiService', ['placeOrder', 'searchInstruments']);
+    const catalog: InstrumentResponse[] = [
+      { symbol: 'AAPL', name: 'Apple Inc.', price: 189.234, change: 1.2, changePercent: 0.6 },
+      { symbol: 'MSFT', name: 'Microsoft Corporation', price: 410.5, change: -2, changePercent: -0.5 }
+    ];
+    tradeApi.searchInstruments.and.returnValue(of(catalog));
     tradeApi.placeOrder.and.returnValue(
       of({ orderId: 'ORD-1', status: 'NEW', message: 'Order accepted', symbol: 'AAPL', side: 'BUY', quantity: 10, price: 150.25 })
     );
@@ -139,6 +145,105 @@ describe('PlaceOrderComponent', () => {
     expect(badge.classList).toContain('tp-badge-negative');
     expect(page.textContent).toContain('ORD-2');
     expect(page.textContent).toContain('Order rejected');
+  });
+
+  it('lists stocks matching a company name typed into the symbol field', () => {
+    type('symbol', 'micro');
+    fixture.detectChanges();
+
+    const rows = page.querySelectorAll('[data-testid="order-search-row"]');
+    expect(rows.length).toBe(1);
+    expect(rows[0].textContent).toContain('MSFT');
+    expect(rows[0].textContent).toContain('Microsoft Corporation');
+  });
+
+  it('fills the symbol and the live price from a selected result, then hides the results', async () => {
+    type('symbol', 'apple');
+    fixture.detectChanges();
+    el<HTMLButtonElement>('[data-testid="order-search-select"][data-symbol="AAPL"]').click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(el<HTMLInputElement>('#symbol').value).toBe('AAPL');
+    expect(el<HTMLInputElement>('#price').value).toBe('189.23');
+    expect(page.querySelector('[data-testid="order-search-row"]')).toBeNull();
+    expect(document.activeElement).toBe(el('#quantity'));
+  });
+
+  it('keeps a price the trader already typed when a result is selected', () => {
+    type('price', '150.25');
+    type('symbol', 'AAPL');
+    fixture.detectChanges();
+    el<HTMLButtonElement>('[data-testid="order-search-select"]').click();
+    fixture.detectChanges();
+
+    expect(el<HTMLInputElement>('#price').value).toBe('150.25');
+  });
+
+  it('says so when no stock matches the search', () => {
+    type('symbol', 'zzz');
+    fixture.detectChanges();
+
+    expect(el('[data-testid="order-search-empty"]').textContent).toContain('No stocks match “zzz”');
+  });
+
+  it('asks for a stock from the list when search text is submitted instead of a symbol', () => {
+    el<HTMLInputElement>('#side-buy').click();
+    type('symbol', 'apple');
+    type('quantity', '10');
+    type('price', '150.25');
+    fixture.detectChanges();
+    submit();
+
+    expect(tradeApi.placeOrder).not.toHaveBeenCalled();
+    expect(el('#symbol-error').textContent).toContain('Choose a stock from the list below.');
+    expect(document.activeElement).toBe(el('#symbol'));
+  });
+
+  it('does not flag a long company name as too long while the trader is searching', () => {
+    type('symbol', 'Microsoft Corp');
+    el<HTMLInputElement>('#symbol').dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+
+    expect(page.querySelector('#symbol-error')).toBeNull();
+    expect(page.querySelectorAll('[data-testid="order-search-row"]').length).toBe(1);
+  });
+
+  it('leaves a symbol that matches no stock for the server to decide', () => {
+    el<HTMLInputElement>('#side-buy').click();
+    type('symbol', 'ZZZ');
+    type('quantity', '1');
+    type('price', '10');
+    submit();
+
+    expect(tradeApi.placeOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('announces how many stocks match for screen readers', () => {
+    const status = () => el('[data-testid="order-search-status"]').textContent?.trim();
+    expect(status()).toBe('');
+
+    type('symbol', 'a');
+    fixture.detectChanges();
+    expect(status()).toBe('2 stocks match.');
+
+    type('symbol', 'zzz');
+    fixture.detectChanges();
+    expect(status()).toBe('No stocks match.');
+  });
+
+  it('keeps the stock list it already has when refreshing it fails', () => {
+    tradeApi.searchInstruments.and.returnValue(throwError(() => ({ errorCode: '', message: '', status: 0 })));
+    const second = TestBed.createComponent(PlaceOrderComponent);
+    second.detectChanges();
+    const input = second.nativeElement.querySelector('#symbol') as HTMLInputElement;
+    input.value = 'micro';
+    input.dispatchEvent(new Event('input'));
+    second.detectChanges();
+
+    const rows = second.nativeElement.querySelectorAll('[data-testid="order-search-row"]');
+    expect(rows.length).toBe(1);
+    expect(rows[0].textContent).toContain('MSFT');
   });
 
   it('shows a business rejection from the server and keeps the ticket for correction', () => {

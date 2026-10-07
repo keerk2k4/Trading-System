@@ -13,6 +13,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -116,6 +117,57 @@ class JwtTokenProviderTest {
     @NullAndEmptySource
     void rejectsNullOrEmptyToken(String token) {
         assertNull(provider.extractAccountId(token));
+    }
+
+    @Test
+    void extractsRolesClaimAsUppercase() {
+        String token = tokenWithRoles(List.of("admin", "Customer"), SIGNING_KEY);
+
+        assertEquals(List.of("ADMIN", "CUSTOMER"), provider.extractRoles(token));
+    }
+
+    @Test
+    void returnsNoRolesWhenClaimIsMissing() {
+        String token = signedToken(42L, futureExpiration(), SIGNING_KEY);
+
+        assertEquals(List.of(), provider.extractRoles(token));
+    }
+
+    @Test
+    void returnsNoRolesForTokenSignedWithAnotherSecret() {
+        String token = tokenWithRoles(List.of("ADMIN"), OTHER_SIGNING_KEY);
+
+        assertEquals(List.of(), provider.extractRoles(token));
+    }
+
+    @Test
+    void returnsNoRolesForExpiredToken() {
+        String token = Jwts.builder()
+                .subject("admin-under-test")
+                .claim("accountId", 0)
+                .claim("roles", List.of("ADMIN"))
+                .expiration(Date.from(Instant.now().minusSeconds(60)))
+                .signWith(SIGNING_KEY, Jwts.SIG.HS256)
+                .compact();
+
+        assertEquals(List.of(), provider.extractRoles(token));
+    }
+
+    @Test
+    void acceptsAdminTokenWhoseAccountIdIsZero() {
+        String token = tokenWithRoles(List.of("ADMIN"), SIGNING_KEY);
+
+        assertEquals(0L, provider.extractAccountId(token));
+    }
+
+    private static String tokenWithRoles(List<String> roles, SecretKey key) {
+        return Jwts.builder()
+                .subject("admin-under-test")
+                .claim("accountId", 0)
+                .claim("roles", roles)
+                .expiration(futureExpiration())
+                .signWith(key, Jwts.SIG.HS256)
+                .compact();
     }
 
     private static String signedToken(Object accountId, Date expiration, SecretKey key) {

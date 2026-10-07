@@ -1,8 +1,8 @@
-import { EmailEncryptionService } from "./EmailEncryptionService";
+import { FieldEncryptionService } from "./FieldEncryptionService";
 
-describe("EmailEncryptionService", () => {
+describe("FieldEncryptionService", () => {
   it("round-trips an email through encrypt/decrypt", () => {
-    const service = new EmailEncryptionService("test-key-for-email-specs");
+    const service = new FieldEncryptionService("test-key-for-field-specs");
     const ciphertext = service.encrypt("alice@example.test") as string;
 
     expect(ciphertext).not.toBe("alice@example.test");
@@ -11,7 +11,7 @@ describe("EmailEncryptionService", () => {
   });
 
   it("uses a random IV so the same email encrypts differently each time", () => {
-    const service = new EmailEncryptionService("test-key-for-email-specs");
+    const service = new FieldEncryptionService("test-key-for-field-specs");
     const first = service.encrypt("alice@example.test") as string;
     const second = service.encrypt("alice@example.test") as string;
 
@@ -21,14 +21,14 @@ describe("EmailEncryptionService", () => {
   });
 
   it("passes legacy plaintext rows through decrypt unchanged", () => {
-    const service = new EmailEncryptionService("test-key-for-email-specs");
+    const service = new FieldEncryptionService("test-key-for-field-specs");
 
     expect(service.decrypt("alice@example.test")).toBe("alice@example.test");
     expect(service.isEncrypted("alice@example.test")).toBe(false);
   });
 
   it("preserves null and empty values", () => {
-    const service = new EmailEncryptionService("test-key-for-email-specs");
+    const service = new FieldEncryptionService("test-key-for-field-specs");
 
     expect(service.encrypt(null)).toBeNull();
     expect(service.decrypt(null)).toBeNull();
@@ -39,7 +39,7 @@ describe("EmailEncryptionService", () => {
   it("supports a 64-char hex key", () => {
     const hexKey =
       "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    const service = new EmailEncryptionService(hexKey);
+    const service = new FieldEncryptionService(hexKey);
     const ciphertext = service.encrypt("bob@example.test") as string;
 
     expect(service.decrypt(ciphertext)).toBe("bob@example.test");

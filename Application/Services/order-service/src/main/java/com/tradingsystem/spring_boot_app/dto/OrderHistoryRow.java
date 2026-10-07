@@ -19,6 +19,8 @@ public record OrderHistoryRow(
         BigDecimal executedPrice,
         OrderStatus status,
         String idempotencyKey,
-        LocalDateTime createdOn
+        LocalDateTime createdOn,
+        BigDecimal realizedPnl,
+        BigDecimal realizedPnlPercent
 ) {
 }

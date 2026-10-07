@@ -1,9 +1,12 @@
 package com.tradingsystem.spring_boot_app.service;
 
 import com.tradingsystem.exception.AccountNotActiveException;
+import com.tradingsystem.spring_boot_app.exception.ForbiddenException;
 import com.tradingsystem.spring_boot_app.exception.UnauthorisedException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
+
+import java.util.Collection;
 
 /**
  * Authentication and authorization service.
@@ -21,6 +24,8 @@ import org.springframework.stereotype.Service;
 public class AuthService {
     
     private static final String ACCOUNT_ID_ATTRIBUTE = "accountId";
+    private static final String ROLES_ATTRIBUTE = "roles";
+    private static final String ADMIN_ROLE = "ADMIN";
 
     public void requireBearerToken(HttpServletRequest request) {
         String authorization = request.getHeader("Authorization");
@@ -63,5 +68,22 @@ public class AuthService {
             throw new UnauthorisedException();
         }
         return tokenAccountId;
+    }
+
+    /**
+     * Admits only tokens carrying the ADMIN role, for admin-only routes.
+     *
+     * The JWT filter has already verified the token and stored its roles. A
+     * valid token without ADMIN (every customer token) is refused with
+     * AUTH-403; a missing or malformed header is still AUTH-401.
+     *
+     * @throws ForbiddenException if the token does not carry the ADMIN role
+     */
+    public void requireAdmin(HttpServletRequest request) {
+        requireBearerToken(request);
+        if (!(request.getAttribute(ROLES_ATTRIBUTE) instanceof Collection<?> roles)
+                || !roles.contains(ADMIN_ROLE)) {
+            throw new ForbiddenException();
+        }
     }
 }

@@ -15,6 +15,8 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.verify;
@@ -62,6 +64,21 @@ class JwtAuthenticationFilterTest {
         verify(tokenProvider).extractAccountId("valid.jwt.token");
         verify(filterChain).doFilter(request, response);
         assertEquals(17L, request.getAttribute(ACCOUNT_ID_ATTRIBUTE));
+    }
+
+    @Test
+    void validBearerTokenStoresRolesForAdminChecks() throws Exception {
+        MockHttpServletRequest request = request("/api/v1/admin/health");
+        request.addHeader("Authorization", "Bearer admin.jwt.token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        when(tokenProvider.extractAccountId("admin.jwt.token")).thenReturn(0L);
+        when(tokenProvider.extractRoles("admin.jwt.token")).thenReturn(List.of("ADMIN"));
+
+        filter.doFilter(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        assertEquals(0L, request.getAttribute(ACCOUNT_ID_ATTRIBUTE));
+        assertEquals(List.of("ADMIN"), request.getAttribute("roles"));
     }
 
     @ParameterizedTest

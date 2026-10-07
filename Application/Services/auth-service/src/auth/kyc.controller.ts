@@ -18,7 +18,13 @@ import { KycResponse } from "../dtos/KycResponse";
 import { UpdateKycRequest, KycReviewStatus } from "../dtos/UpdateKycRequest";
 import { BearerGuard } from "../guards/BearerGuard";
 import { AuthenticatedUser, CurrentUser } from "../guards/CurrentUser";
-import { KycRepository } from "../repositories/KycRepository";
+import { DOCUMENT_UNIQUE_INDEX, KycRepository } from "../repositories/KycRepository";
+import { isUniqueViolation } from "../database/unique-violation";
+
+const DOCUMENT_TAKEN: ErrorResponse = {
+  errorCode: "DOC-409",
+  message: "This document is already registered to another account. Check the document type and number.",
+};
 import { UserRepository } from "../repositories/UserRepository";
 import { TradeApiClient } from "../services/TradeApiClient";
 import { NotificationService } from "../services/NotificationService";
@@ -108,6 +114,10 @@ export class KycController {
         return;
       }
 
+      if (this.rejectFutureDateOfBirth(request.dateOfBirth, res)) {
+        return;
+      }
+
       const existing = await this.kycRepository.findByUserId(claims.sub);
       if (existing) {
         const response: ErrorResponse = {
@@ -115,6 +125,11 @@ export class KycController {
           message: "KYC already submitted",
         };
         res.status(409).json(response);
+        return;
+      }
+
+      if (await this.kycRepository.isDocumentTaken(request.documentType, request.documentNumber, claims.sub)) {
+        res.status(409).json(DOCUMENT_TAKEN);
         return;
       }
 
@@ -137,6 +152,10 @@ export class KycController {
 
       res.status(201).json(this.toKycResponse(created));
     } catch (error) {
+      if (isUniqueViolation(error, DOCUMENT_UNIQUE_INDEX)) {
+        res.status(409).json(DOCUMENT_TAKEN);
+        return;
+      }
       console.error("Create KYC error:", error);
       const response: ErrorResponse = { errorCode: "VAL-422", message: "Invalid input" };
       res.status(422).json(response);
@@ -174,6 +193,15 @@ export class KycController {
         return;
       }
 
+      if (this.rejectFutureDateOfBirth(request.dateOfBirth, res)) {
+        return;
+      }
+
+      if (await this.kycRepository.isDocumentTaken(request.documentType, request.documentNumber, claims.sub)) {
+        res.status(409).json(DOCUMENT_TAKEN);
+        return;
+      }
+
       const updated = await this.kycRepository.updateSubmissionByUserId({
         userId: claims.sub,
         dateOfBirth: request.dateOfBirth,
@@ -192,6 +220,10 @@ export class KycController {
 
       res.status(200).json(this.toKycResponse(updated));
     } catch (error) {
+      if (isUniqueViolation(error, DOCUMENT_UNIQUE_INDEX)) {
+        res.status(409).json(DOCUMENT_TAKEN);
+        return;
+      }
       console.error("Update KYC error:", error);
       const response: ErrorResponse = { errorCode: "VAL-422", message: "Invalid input" };
       res.status(422).json(response);
@@ -338,6 +370,22 @@ export class KycController {
     } catch (error) {
       console.error(`KYC review notification failed for user ${userId}:`, (error as Error)?.message);
     }
+  }
+
+  // Refuses a date of birth after today. "Today" is taken in the most advanced
+  // time zone (UTC+14), so a user whose local date is already ahead of the
+  // server's is never refused for picking their own today.
+  private rejectFutureDateOfBirth(dateOfBirth: string, res: Response): boolean {
+    const latestToday = new Date(Date.now() + 14 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    if (dateOfBirth.slice(0, 10) <= latestToday) {
+      return false;
+    }
+    const response: ErrorResponse = {
+      errorCode: "VAL-422",
+      message: "Date of birth cannot be a future date. Select today or an earlier date.",
+    };
+    res.status(422).json(response);
+    return true;
   }
 
   private toKycResponse(row: {

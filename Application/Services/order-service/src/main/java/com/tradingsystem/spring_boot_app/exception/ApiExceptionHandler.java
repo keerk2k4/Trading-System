@@ -30,6 +30,11 @@ public class ApiExceptionHandler {
         return response(HttpStatus.UNAUTHORIZED, "AUTH-401", "Unauthorised");
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    ResponseEntity<ErrorResponse> forbidden() {
+        return response(HttpStatus.FORBIDDEN, "AUTH-403", "Forbidden");
+    }
+
     @ExceptionHandler(AccountNotFoundException.class)
     ResponseEntity<ErrorResponse> accountNotFound() {
         return response(HttpStatus.NOT_FOUND, "ACC-404", "Account not found");

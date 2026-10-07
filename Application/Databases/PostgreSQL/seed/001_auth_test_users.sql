@@ -58,8 +58,16 @@ VALUES
     'ACTIVE'
   );
 
--- Copy users from trading schema to auth schema
-INSERT INTO auth.users 
-SELECT * FROM trading.users;
+-- Copy users from trading schema to auth schema. Columns are listed
+-- explicitly: auth.users has extra columns (phone_lookup_hash, migration
+-- 018), so a positional SELECT * would break as soon as the order differs.
+--
+-- These rows are written by SQL, not by auth-service, so email and phone
+-- stay plaintext and phone_lookup_hash stays NULL (the service's
+-- FieldEncryptionService reads plaintext unchanged). Every user created
+-- through the API is stored encrypted with a lookup hash.
+INSERT INTO auth.users (user_id, user_name, password_hash, email, phone, first_name, last_name, status)
+SELECT user_id, user_name, password_hash, email, phone, first_name, last_name, status
+FROM trading.users;
 
 COMMIT;

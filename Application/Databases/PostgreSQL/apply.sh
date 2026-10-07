@@ -11,6 +11,13 @@ fi
 
 export PGPASSWORD="$POSTGRES_PASSWORD"
 
+# Never page query output. Some migrations/seeds print a result (e.g.
+# SELECT setval(...)); in an interactive terminal psql would open a pager and
+# wait for a key press while the migration transaction is still open, holding
+# its locks and silently stalling the whole run.
+export PAGER=cat
+export PSQL_PAGER=cat
+
 # Drop all existing tables and start fresh
 echo "Dropping all existing tables..."
 psql \

@@ -89,6 +89,19 @@ export class WatchlistService {
       });
   }
 
+  /**
+   * Loads only the instrument catalog, for screens that search stocks without
+   * showing a watchlist (the order ticket). Refetched on every call so the
+   * prices next to each result are current. A failed refresh keeps the
+   * catalog already held, since the watchlist page shares it.
+   */
+  loadCatalog(): void {
+    this.tradeApi.searchInstruments('').subscribe({
+      next: (catalog) => this.catalog.set((catalog ?? []).map((s) => this.toStock(s))),
+      error: () => undefined
+    });
+  }
+
   /** Switches to another watchlist and refreshes its live prices. */
   select(id: string | number): void {
     if (String(this.selectedId()) === String(id)) {

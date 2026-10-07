@@ -87,6 +87,7 @@ class SettlementFullSellTest {
         Position current = position(99L, account, instrument, 10);
         when(positionMapper.findPositionByAccountAndInstrument(1L, 7L)).thenReturn(Optional.of(current));
         when(positionMapper.deletePosition(99L)).thenReturn(1);
+        when(orderMapper.recordRealizedPnl(anyLong(), any(), any())).thenReturn(1);
 
         Holding holding = org.mockito.Mockito.mock(Holding.class);
         when(holding.getHoldingId()).thenReturn(55L);
@@ -101,6 +102,8 @@ class SettlementFullSellTest {
         verify(positionMapper).deletePosition(99L);
         verify(positionMapper, never()).updatePosition(anyLong(), anyInt(), any());
         verify(holdingMapper).deleteHolding(55L);
+        // (100.00 - 90.00 average cost) x 10
+        verify(orderMapper).recordRealizedPnl(11L, new BigDecimal("90.00"), new BigDecimal("100.0000"));
     }
 
     @Test
@@ -120,6 +123,7 @@ class SettlementFullSellTest {
         Position current = position(99L, account, instrument, 10);
         when(positionMapper.findPositionByAccountAndInstrument(1L, 7L)).thenReturn(Optional.of(current));
         when(positionMapper.updatePosition(anyLong(), anyInt(), any())).thenReturn(1);
+        when(orderMapper.recordRealizedPnl(anyLong(), any(), any())).thenReturn(1);
 
         Holding holding = org.mockito.Mockito.mock(Holding.class);
         when(holding.getHoldingId()).thenReturn(55L);
@@ -133,5 +137,7 @@ class SettlementFullSellTest {
 
         verify(positionMapper).updatePosition(99L, 6, new BigDecimal("90.00"));
         verify(positionMapper, never()).deletePosition(anyLong());
+        // (100.00 - 90.00 average cost) x 4
+        verify(orderMapper).recordRealizedPnl(12L, new BigDecimal("90.00"), new BigDecimal("40.0000"));
     }
 }

@@ -2,10 +2,16 @@ package com.tradingsystem.spring_boot_app.dto;
 
 import java.math.BigDecimal;
 
+/**
+ * unrealizedPnl = (currentPrice - averageCost) x quantity and
+ * unrealizedPnlPercent = unrealizedPnl / (averageCost x quantity) x 100;
+ * both null, like currentPrice, until a quote has been seen.
+ */
 public record PositionResponse(Long accountId, String symbol, int quantity,
                                BigDecimal averageCost, BigDecimal currentPrice,
-                               BigDecimal marketValue) {
+                               BigDecimal marketValue, BigDecimal unrealizedPnl,
+                               BigDecimal unrealizedPnlPercent) {
     public PositionResponse(Long accountId, String symbol, int quantity, BigDecimal averageCost) {
-        this(accountId, symbol, quantity, averageCost, null, null);
+        this(accountId, symbol, quantity, averageCost, null, null, null, null);
     }
 }

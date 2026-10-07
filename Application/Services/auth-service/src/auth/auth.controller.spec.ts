@@ -131,6 +131,7 @@ describe("AuthController", () => {
       assignRole: jest.fn(),
       deleteById: jest.fn(),
       updatePassword: jest.fn().mockResolvedValue(undefined),
+      isPhoneTaken: jest.fn().mockResolvedValue(false),
       findByUsername: jest.fn(),
       findByUserId: jest.fn(),
       getRoles: jest.fn().mockResolvedValue([Role.CUSTOMER]),
@@ -397,6 +398,34 @@ describe("AuthController", () => {
 
       expect(state.status).toBe(201);
       expect(emailOtpService.consume).toHaveBeenCalledWith("new.trader@example.com");
+    });
+
+    it("returns 409 PHONE-409 and creates nothing when the phone number is already registered", async () => {
+      userRepository.isUsernameTaken.mockResolvedValue(false);
+      userRepository.isPhoneTaken.mockResolvedValue(true);
+      const { res, state } = makeResponse();
+
+      await controller.register(registerRequest(), res);
+
+      expect(state).toEqual({
+        status: 409,
+        body: { errorCode: "PHONE-409", message: "This phone number is already registered to another account." },
+      });
+      expect(userRepository.isPhoneTaken).toHaveBeenCalledWith("+919900112233");
+      expect(userRepository.create).not.toHaveBeenCalled();
+      expect(emailOtpService.consume).not.toHaveBeenCalled();
+    });
+
+    it("maps a phone unique-index violation (two registrations racing) to 409 PHONE-409", async () => {
+      userRepository.isUsernameTaken.mockResolvedValue(false);
+      passwordService.hashPassword.mockResolvedValue("hashed-password");
+      userRepository.create.mockRejectedValue({ code: "23505", constraint: "uq_auth_users_phone_lookup_hash" });
+      const { res, state } = makeResponse();
+
+      await controller.register(registerRequest(), res);
+
+      expect(state.status).toBe(409);
+      expect(state.body.errorCode).toBe("PHONE-409");
     });
 
     it("keeps the verification token when the username is taken", async () => {

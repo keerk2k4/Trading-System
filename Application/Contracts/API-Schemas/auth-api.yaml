@@ -386,7 +386,7 @@ paths:
                     errorCode: OTP-403
                     message: Email not verified. Verify the code sent to your email before registering.
         '409':
-          description: The username is already taken.
+          description: The username (`AUTH-409`) or phone number (`PHONE-409`) is already registered.
           content:
             application/json:
               schema:
@@ -433,7 +433,7 @@ paths:
                     accountId: 0
                     roles: [ADMIN]
         '409':
-          description: The username is already taken.
+          description: The username (`AUTH-409`) or phone number (`PHONE-409`) is already registered.
           content:
             application/json:
               schema:
@@ -663,7 +663,9 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
-          description: This user has already submitted KYC.
+          description: |
+            This user has already submitted KYC (`KYC-409`), or another user already registered the
+            same document type and number (`DOC-409`; compared ignoring case, spaces and punctuation).
           content:
             application/json:
               schema:
@@ -673,6 +675,10 @@ paths:
                   value:
                     errorCode: KYC-409
                     message: KYC already submitted
+                documentTaken:
+                  value:
+                    errorCode: DOC-409
+                    message: This document is already registered to another account. Check the document type and number.
         '422':
           $ref: '#/components/responses/InvalidInput'
       security:
@@ -713,6 +719,17 @@ paths:
                   value:
                     errorCode: KYC-404
                     message: KYC record not found
+        '409':
+          description: Another user already registered the same document type and number.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                documentTaken:
+                  value:
+                    errorCode: DOC-409
+                    message: This document is already registered to another account. Check the document type and number.
         '422':
           $ref: '#/components/responses/InvalidInput'
       security:
@@ -888,7 +905,8 @@ components:
           maxLength: 254
           description: |
             Address for notification emails (registration, KYC submitted, KYC approved or
-            rejected). Never returned in any response and never logged.
+            rejected). Never returned in any response and never logged. Stored AES-256-GCM
+            encrypted at rest.
           writeOnly: true
           example: priya.menon@example.com
         firstName:
@@ -904,6 +922,11 @@ components:
         phone:
           type: string
           pattern: '^\\+?[1-9]\\d{7,14}$'
+          description: |
+            Unique across accounts: a number already registered is refused with `409 PHONE-409`.
+            Numbers are compared by digits only, so `+91 98765-43210` and `919876543210` are the
+            same number. Stored AES-256-GCM encrypted at rest; uniqueness is checked through a
+            keyed lookup hash, never the number itself.
           example: +919876543210
         emailVerificationToken:
           type: string
@@ -1126,17 +1149,27 @@ components:
         dateOfBirth:
           type: string
           format: date
-          description: ISO 8601 calendar date.
+          description: |
+            ISO 8601 calendar date. Must not be in the future, otherwise `422 VAL-422` with the
+            message "Date of birth cannot be a future date. Select today or an earlier date."
+            Stored AES-256-GCM encrypted at rest.
           example: '1995-04-12'
         documentType:
           type: string
           minLength: 2
           maxLength: 50
+          description: Stored AES-256-GCM encrypted at rest.
           example: PASSPORT
         documentNumber:
           type: string
           minLength: 3
           maxLength: 100
+          description: |
+            Document type + number must be unique across users: one already submitted by another
+            user is refused with `409 DOC-409`. Compared ignoring case, spaces and punctuation
+            (`p 123-4567` equals `P1234567`); the same number under a different document type is
+            allowed. Stored AES-256-GCM encrypted at rest; uniqueness is checked through a keyed
+            lookup hash, never the number itself.
           example: N1234567
 
     KycStatus:
@@ -1220,7 +1253,22 @@ components:
       properties:
         errorCode:
           type: string
-          enum: [AUTH-401, AUTH-403, AUTH-409, ACC-403, KYC-404, KYC-409, VAL-422]
+          enum:
+            - AUTH-401
+            - AUTH-403
+            - AUTH-409
+            - ACC-403
+            - KYC-404
+            - KYC-409
+            - PHONE-409
+            - DOC-409
+            - OTP-400
+            - OTP-403
+            - OTP-404
+            - OTP-410
+            - OTP-429
+            - OTP-503
+            - VAL-422
           description: |
             | Code | HTTP | Meaning |
             |---|---|---|
@@ -1230,10 +1278,18 @@ components:
             | `ACC-403` | 403 | Linked trading account is suspended (login only) |
             | `KYC-404` | 404 | No KYC submission exists for the given user |
             | `KYC-409` | 409 | KYC already submitted, or already approved |
-            | `VAL-422` | 422 | Invalid input |
+            | `PHONE-409` | 409 | Phone number already registered to another account (register) |
+            | `DOC-409` | 409 | Document type + number already registered to another account (KYC) |
+            | `OTP-400` | 400 | Wrong verification code; the message says how many attempts remain |
+            | `OTP-403` | 403 | Email verification / password reset token missing, wrong, expired or used |
+            | `OTP-404` | 404 | No verification code has been requested (or it was already used) |
+            | `OTP-410` | 410 | Verification code expired |
+            | `OTP-429` | 429 | Resend requested within 60 s, or too many wrong attempts |
+            | `OTP-503` | 503 | The verification email could not be sent |
+            | `VAL-422` | 422 | Invalid input (the message may be more specific, e.g. a future date of birth) |
 
-            `AUTH-403`, `AUTH-409`, `KYC-404` and `KYC-409` extend the platform error catalogue and
-            are scoped to this service. `ACC-403` is shared with `trade-api.yaml` and carries the
+            `AUTH-403`, `AUTH-409`, `KYC-404`, `KYC-409`, `PHONE-409`, `DOC-409` and the `OTP-*`
+            codes extend the platform error catalogue and are scoped to this service. `ACC-403` is shared with `trade-api.yaml` and carries the
             same meaning.
           example: AUTH-401
         message:
