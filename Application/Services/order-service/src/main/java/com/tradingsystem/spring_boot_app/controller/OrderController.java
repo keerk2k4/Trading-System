@@ -2,6 +2,7 @@ package com.tradingsystem.spring_boot_app.controller;
 
 import com.tradingsystem.domain.dto.PlaceOrderRequest;
 import com.tradingsystem.exception.InvalidOrderArgumentException;
+import com.tradingsystem.spring_boot_app.dto.CreateOrderRequest;
 import com.tradingsystem.spring_boot_app.dto.OrderResponse;
 import com.tradingsystem.spring_boot_app.service.OrderService;
 import com.tradingsystem.spring_boot_app.service.AuthService;
@@ -39,7 +40,7 @@ public class OrderController {
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<OrderResponse> placeOrder(
-            @Valid @RequestBody PlaceOrderRequest body,
+            @Valid @RequestBody CreateOrderRequest body,
             HttpServletRequest request) {
         long accountId = authService.authenticatedAccountId(request);
         PlaceOrderRequest orderRequest = new PlaceOrderRequest(

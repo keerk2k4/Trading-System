@@ -2,6 +2,7 @@ package com.tradeexecutor.execution;
 
 import com.tradingsystem.domain.entities.Order;
 import com.tradingsystem.domain.enums.OrderSide;
+import com.tradingsystem.domain.enums.OrderType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -143,5 +144,45 @@ class DefaultFillRuleTest {
     @DisplayName("Fill rule name is DEFAULT")
     void testFillRuleName() {
         assertEquals("DEFAULT", fillRule.getName());
+    }
+
+    // ========== MARKET ORDER TESTS ==========
+
+    @Test
+    @DisplayName("MARKET BUY order -> FILLED at ask price")
+    void testMarketBuyOrderFilledAtAsk() {
+        when(mockBuyOrder.getOrderType()).thenReturn(OrderType.MARKET);
+        when(mockBuyOrder.getSide()).thenReturn(OrderSide.BUY);
+        BigDecimal bid = new BigDecimal("144.50");
+        BigDecimal ask = new BigDecimal("145.00");
+        
+        ExecutionResult result = fillRule.evaluate(mockBuyOrder, bid, ask);
+        
+        assertEquals(ExecutionResult.Status.FILLED, result.getStatus());
+        assertEquals(ask, result.getExecutionPrice());
+    }
+
+    @Test
+    @DisplayName("MARKET SELL order -> FILLED at bid price")
+    void testMarketSellOrderFilledAtBid() {
+        when(mockSellOrder.getOrderType()).thenReturn(OrderType.MARKET);
+        when(mockSellOrder.getSide()).thenReturn(OrderSide.SELL);
+        BigDecimal bid = new BigDecimal("145.00");
+        BigDecimal ask = new BigDecimal("145.50");
+        
+        ExecutionResult result = fillRule.evaluate(mockSellOrder, bid, ask);
+        
+        assertEquals(ExecutionResult.Status.FILLED, result.getStatus());
+        assertEquals(bid, result.getExecutionPrice());
+    }
+
+    @Test
+    @DisplayName("MARKET order with null quote -> REJECTED")
+    void testMarketOrderWithNullQuote() {
+        ExecutionResult result = fillRule.evaluate(mockBuyOrder, null, null);
+        
+        assertEquals(ExecutionResult.Status.REJECTED, result.getStatus());
+        assertNull(result.getExecutionPrice());
+        assertTrue(result.getReason().contains("bid/ask is missing"));
     }
 }
