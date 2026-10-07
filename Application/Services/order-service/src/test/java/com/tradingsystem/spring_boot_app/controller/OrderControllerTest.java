@@ -104,25 +104,17 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.quantity").value(100))
                 .andExpect(jsonPath("$.price").value(25.50));
 
-        mvc.perform(post("/api/v1/orders")
-                        .header("Authorization", TOKEN)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(validBody().replace("}", ",\"accountId\":999}")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.orderId").value("ORD-" + UUID))
-                .andExpect(jsonPath("$.status").value("FILLED"));
     }
 
     @Test
-    void placeOrderToleratesBodyAccountIdBecauseJwtIsAuthoritative() throws Exception {
-        when(orders.placeOrder(any())).thenReturn(filled());
-
+    void placeOrderRejectsBodyAccountIdBecauseJwtIsAuthoritative() throws Exception {
         mvc.perform(post("/api/v1/orders")
                         .header("Authorization", TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validBody().replace("}", ",\"accountId\":999}")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("FILLED"));
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("VAL-422"));
+        verifyNoInteractions(orders);
     }
 
     @Test

@@ -15,13 +15,9 @@ import java.math.BigDecimal;
 
 /**
  * REST API request body for placing an order.
- * The effective account always comes from the JWT token, never from the body:
- * {@code accountId} is accepted (the contract requires it and the UI sends it)
- * but ignored, exactly like every other caller-supplied account identifier.
+ * The effective account always comes from the JWT token, never from the body.
  */
 public class CreateOrderRequest {
-
-    private final Long accountId;
 
     @NotNull
     private final OrderType orderType;
@@ -47,7 +43,6 @@ public class CreateOrderRequest {
 
     @JsonCreator
     public CreateOrderRequest(
-            @JsonProperty("accountId") Long accountId,
             @JsonProperty("orderType") OrderType orderType,
             @JsonProperty("symbol") String symbol,
             @JsonProperty("side") OrderSide side,
@@ -55,7 +50,6 @@ public class CreateOrderRequest {
             @JsonProperty("price") BigDecimal price,
             @JsonProperty("idempotencyKey") String idempotencyKey
     ) {
-        this.accountId = accountId;
         this.orderType = orderType == null ? OrderType.LIMIT : orderType;
         this.symbol = symbol;
         this.side = side;
@@ -82,14 +76,6 @@ public class CreateOrderRequest {
 
     public OrderType getOrderType() {
         return orderType;
-    }
-
-    /**
-     * The body-supplied account id, if any. Informational only: order placement
-     * always uses the JWT {@code accountId} claim (see {@code OrderController}).
-     */
-    public Long getAccountId() {
-        return accountId;
     }
 
     public String getSymbol() {
