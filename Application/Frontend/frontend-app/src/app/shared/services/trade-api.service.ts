@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import {
   AccountsService,
@@ -81,11 +81,36 @@ export class TradeApiService {
       .pipe(catchError((err) => this.rethrowServerError(err)));
   }
 
+  private isApi404(err: HttpErrorResponse): boolean {
+    const code = err.error?.errorCode;
+    const message = String(err.error?.message ?? '').toLowerCase();
+    return err.status === 404 && (code === 'API-404' || message === 'not found');
+  }
+
+  private defaultPreferences(): Preferences {
+    return {
+      accountId: 0,
+      defaultAccountId: null,
+      alertChannel: 'EMAIL'
+    };
+  }
+
   // GET /api/v1/preferences/me
   getPreferences(): Observable<Preferences> {
     return this.preferences
       .getMyPreferences()
+      .pipe(catchError((err) => this.fallbackPreferences(err)))
       .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  private fallbackPreferences(err: HttpErrorResponse): Observable<Preferences> {
+    // JWT-scoped customer APIs only. If this endpoint is missing in the
+    // running backend, use safe UI defaults instead of calling account-id
+    // routes that are not part of the customer contract.
+    if (!this.isApi404(err)) {
+      throw err;
+    }
+    return of(this.defaultPreferences());
   }
 
   // PUT /api/v1/preferences/me
@@ -99,7 +124,17 @@ export class TradeApiService {
   getNotifications(): Observable<Notification[]> {
     return this.notifications
       .getMyNotifications()
+      .pipe(catchError((err) => this.fallbackNotifications(err)))
       .pipe(catchError((err) => this.rethrowServerError(err)));
+  }
+
+  private fallbackNotifications(err: HttpErrorResponse): Observable<Notification[]> {
+    // JWT-scoped customer APIs only. Missing notifications endpoint should not
+    // trigger calls to non-contracted account-id routes from the UI.
+    if (!this.isApi404(err)) {
+      throw err;
+    }
+    return of([]);
   }
 
   // GET /api/v1/accounts/me/orders, optionally narrowed by status
