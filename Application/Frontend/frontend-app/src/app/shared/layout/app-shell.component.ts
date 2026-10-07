@@ -18,7 +18,7 @@ const CUSTOMER_NAV: NavItem[] = [
   { label: 'Orders', link: '/orders/history', icon: 'var(--tp-icon-list)' },
   { label: 'Positions', link: '/positions', icon: 'var(--tp-icon-list)' },
   { label: 'Holdings', link: '/holdings', icon: 'var(--tp-icon-grid)' },
-  { label: 'Notifications', link: '/notifications', icon: 'var(--tp-icon-eye)' },
+  { label: 'Notifications', link: '/notifications', icon: 'var(--tp-icon-bell)' },
   { label: 'Settings', link: '/settings', icon: 'var(--tp-icon-shield)' },
   { label: 'Verification', link: '/kyc-submission', icon: 'var(--tp-icon-shield)' }
 ];
