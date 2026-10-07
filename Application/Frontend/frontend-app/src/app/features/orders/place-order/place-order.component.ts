@@ -26,6 +26,7 @@ import { ErrorMappingService } from '../../../shared/services/error-mapping.serv
 import { WatchlistService } from '../../../shared/services/watchlist.service';
 import { StatusBadgeComponent } from '../../../shared/ui/status-badge.component';
 import { AccountStatusNoticeComponent } from '../../../shared/ui/account-status-notice.component';
+import { CandlestickChartComponent } from '../../../shared/ui/candlestick-chart.component';
 import { OrderSide, OrderType, PlaceOrderResponse, TradeApiError } from '../../../shared/models/order.models';
 import { WatchlistStock } from '../../../shared/models/watchlist.models';
 
@@ -53,7 +54,15 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
 
 @Component({
   selector: 'app-place-order',
-  imports: [ReactiveFormsModule, RouterLink, CurrencyPipe, DecimalPipe, StatusBadgeComponent, AccountStatusNoticeComponent],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    CurrencyPipe,
+    DecimalPipe,
+    StatusBadgeComponent,
+    AccountStatusNoticeComponent,
+    CandlestickChartComponent
+  ],
   template: `
     <div class="tp-page">
       <header class="tp-page-header">
@@ -184,6 +193,10 @@ function twoDecimals(control: AbstractControl<number | null>): ValidationErrors 
                         </ul>
                       }
                     </div>
+                  }
+
+                  @if (chartSymbol(); as chart) {
+                    <app-candlestick-chart [symbol]="chart" />
                   }
                 </div>
 
@@ -330,6 +343,12 @@ export class PlaceOrderComponent implements OnInit {
   protected readonly showSearch = computed(() => {
     const query = (this.values().symbol ?? '').trim();
     return query !== '' && query.toUpperCase() !== this.pickedSymbol();
+  });
+  // The chart follows the selected instrument and disappears once the trader
+  // types something else into the field.
+  protected readonly chartSymbol = computed(() => {
+    const picked = this.pickedSymbol();
+    return picked && this.summarySymbol() === picked ? picked : '';
   });
   // Same name-or-symbol filter as the watchlist page, over the same catalog.
   protected readonly searchResults = computed(() =>

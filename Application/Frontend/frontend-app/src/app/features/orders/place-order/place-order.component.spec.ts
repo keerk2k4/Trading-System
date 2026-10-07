@@ -1,6 +1,8 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 import { PlaceOrderComponent } from './place-order.component';
 import { MockAuthService } from '../../../shared/services/auth.service';
@@ -52,6 +54,8 @@ describe('PlaceOrderComponent', () => {
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: TradeApiService, useValue: tradeApi },
         {
           provide: MockAuthService,
@@ -171,6 +175,38 @@ describe('PlaceOrderComponent', () => {
     expect(el<HTMLInputElement>('#price').value).toBe('189.23');
     expect(page.querySelector('[data-testid="order-search-row"]')).toBeNull();
     expect(document.activeElement).toBe(el('#quantity'));
+  });
+
+  it('shows the candlestick chart of the selected stock, until another symbol is typed', () => {
+    expect(page.querySelector('[data-testid="candle-chart"]')).toBeNull();
+
+    type('symbol', 'apple');
+    fixture.detectChanges();
+    expect(page.querySelector('[data-testid="candle-chart"]')).toBeNull();
+
+    el<HTMLButtonElement>('[data-testid="order-search-select"][data-symbol="AAPL"]').click();
+    fixture.detectChanges();
+    const candle = { date: '2026-10-06', open: 100, high: 105, low: 95, close: 102, volume: 1, synthetic: false };
+    TestBed.inject(HttpTestingController)
+      .expectOne('candles/AAPL.json')
+      .flush({ data: { symbol: 'AAPL', interval: '1d', currency: 'USD', candles: [candle] } });
+    fixture.detectChanges();
+
+    expect(el('[data-testid="candle-chart"]').textContent).toContain('AAPL');
+    expect(page.querySelectorAll('[data-testid="candle"]').length).toBe(1);
+
+    type('symbol', 'MSF');
+    fixture.detectChanges();
+    expect(page.querySelector('[data-testid="candle-chart"]')).toBeNull();
+  });
+
+  it('says there is no such instrument when the selected stock has no chart data', () => {
+    // As a deep link (/orders/new?symbol=IBM) selects it.
+    fixture.componentInstance['pickedSymbol'].set('IBM');
+    type('symbol', 'IBM');
+    fixture.detectChanges();
+
+    expect(el('[data-testid="candle-error"]').textContent).toContain('There is no such instrument: IBM');
   });
 
   it('keeps a price the trader already typed when a result is selected', () => {
